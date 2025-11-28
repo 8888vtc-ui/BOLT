@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+@layer utilities {
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, #f79b17 0%, #d68410 100%);
+  }
+
+  .bg-gradient-dark {
+    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #fbcd8b 0%, #f79b17 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(247, 155, 23, 0.3);
+  }
+
+  .shadow-glow-lg {
+    box-shadow: 0 0 40px rgba(247, 155, 23, 0.4);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.checker {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.checker:hover {
+  transform: scale(1.1);
+  cursor: grab;
+}
+
+.checker:active {
+  cursor: grabbing;
+}
+
+.dice {
+  animation: rollDice 0.5s ease-out;
+}
+
+@keyframes rollDice {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.1);
+  }
+}
