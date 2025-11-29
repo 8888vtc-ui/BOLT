@@ -195,12 +195,39 @@ const Lobby = () => {
                             <p className="text-sm text-gray-500">Créez une salle privée et invitez un ami.</p>
                         </button>
 
-                        <button className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group">
-                            <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <button
+                            onClick={async () => {
+                                // Créer une salle d'entraînement rapide
+                                const { data, error } = await supabase
+                                    .from('rooms')
+                                    .insert({
+                                        name: `Entraînement ${user?.username}`,
+                                        created_by: user?.id,
+                                        status: 'playing', // Directement en jeu
+                                        is_public: false
+                                    })
+                                    .select()
+                                    .single();
+
+                                if (data) {
+                                    navigate(`/game/${data.id}`);
+                                }
+                            }}
+                            className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group"
+                        >
+                            <div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <Swords className="w-6 h-6" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-1">Entraînement Solo</h3>
+                            <p className="text-sm text-gray-500">Testez le Coach IA sans pression.</p>
+                        </button>
+
+                        <button className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group opacity-50 cursor-not-allowed">
+                            <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center mb-4">
                                 <Trophy className="w-6 h-6" />
                             </div>
                             <h3 className="font-bold text-lg mb-1">Tournois</h3>
-                            <p className="text-sm text-gray-500">Rejoignez les tournois quotidiens.</p>
+                            <p className="text-sm text-gray-500">Bientôt disponible.</p>
                         </button>
                     </div>
                 </div>
