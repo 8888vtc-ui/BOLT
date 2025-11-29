@@ -121,7 +121,7 @@ const GameRoom = () => {
                 onDrop={onDrop}
                 onDragStart={onDragStart}
                 currentPlayer={playerColor}
-                canMove={isMyTurn && dice.length > 0}
+                canMove={isMyTurn && (dice.length > 0 || canUndo)} // Allow drag if undo is possible
                 onClick={() => handleCheckerClick(i)}
             />
         );
@@ -139,7 +139,7 @@ const GameRoom = () => {
                 onDrop={onDrop}
                 onDragStart={onDragStart}
                 currentPlayer={playerColor}
-                canMove={isMyTurn && dice.length > 0}
+                canMove={isMyTurn && (dice.length > 0 || canUndo)} // Allow drag if undo is possible
                 onClick={() => handleCheckerClick(i)}
             />
         );

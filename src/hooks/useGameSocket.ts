@@ -70,8 +70,36 @@ export const useGameSocket = () => {
         if (DEMO_MODE && currentRoom?.players.some(p => p.id === 'bot-gnu') && gameState?.turn === 'bot-gnu') {
             const timer = setTimeout(() => {
                 console.log('🤖 Bot is playing...');
+
+                // 1. Lancer les dés
                 const dice1 = Math.floor(Math.random() * 6) + 1;
                 const dice2 = Math.floor(Math.random() * 6) + 1;
+                let botDice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
+
+                // 2. Jouer les coups (Simulation simple)
+                let currentBoard = JSON.parse(JSON.stringify(gameState.board));
+                const botColor = 2; // Bot est Rouge (Player 2)
+
+                // Essayer de jouer tous les dés
+                for (let i = 0; i < botDice.length; i++) {
+                    let moveFound = false;
+                    const allPoints = [...Array(24).keys()];
+
+                    for (const pointIndex of allPoints) {
+                        const smartMove = getSmartMove(currentBoard, botColor, pointIndex, botDice);
+                        if (smartMove) {
+                            console.log(`🤖 Bot moves from ${pointIndex} to ${smartMove.to}`);
+                            currentBoard = makeMove(currentBoard, botColor, pointIndex, smartMove.to);
+
+                            const dieIndex = botDice.indexOf(smartMove.dieUsed);
+                            if (dieIndex > -1) botDice.splice(dieIndex, 1);
+                            i--;
+                            moveFound = true;
+                            break;
+                        }
+                    }
+                    if (!moveFound) break;
+                }
 
                 addMessage({
                     id: `msg-bot-${Date.now()}`,
@@ -83,11 +111,12 @@ export const useGameSocket = () => {
 
                 updateGame({
                     ...gameState,
+                    board: currentBoard,
                     dice: [],
                     turn: user?.id || 'guest-1'
                 });
 
-            }, 3000);
+            }, 2000);
             return () => clearTimeout(timer);
         }
     }, [gameState, currentRoom, user, updateGame, addMessage]);
@@ -190,11 +219,10 @@ export const useGameSocket = () => {
     const handleCheckerClick = useCallback((index: number) => {
         if (!gameState || !user) return;
 
-        // Vérifier si c'est mon tour
         const isMyTurn = gameState.turn === user.id || (DEMO_MODE && gameState.turn === 'guest-1');
         if (!isMyTurn) return;
 
-        const playerColor = 1; // On assume que l'utilisateur est toujours Player 1 (Blanc) pour la démo
+        const playerColor = 1;
 
         const point = gameState.board.points[index];
         if (point.player !== playerColor || point.count === 0) return;
@@ -228,7 +256,7 @@ export const useGameSocket = () => {
     const sendGameAction = useCallback((action: string, payload: any) => {
         if (DEMO_MODE) {
             if (action === 'rollDice' && gameState) {
-                setHistory([]); // Clear history on new roll
+                setHistory([]);
                 const dice1 = Math.floor(Math.random() * 6) + 1;
                 const dice2 = Math.floor(Math.random() * 6) + 1;
                 updateGame({
@@ -236,11 +264,40 @@ export const useGameSocket = () => {
                     dice: dice1 === dice2 ? [dice1, dice2, dice1, dice2] : [dice1, dice2]
                 });
             }
+
+            if (action === 'move' && gameState) {
+                const { from, to } = payload;
+                const playerColor = 1;
+
+                // Drag Inverse (Undo)
+                const isBackwardMove = to > from; // Pour Blanc (1), avancer c'est from > to. Donc reculer c'est to > from.
+
+                if (isBackwardMove && history.length > 0) {
+                    undoMove();
+                    return;
+                }
+
+                const distance = from - to;
+                const dieIndex = gameState.dice.indexOf(distance);
+
+                if (dieIndex > -1) {
+                    setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
+                    const newBoard = makeMove(gameState.board, playerColor, from, to);
+                    const newDice = [...gameState.dice];
+                    newDice.splice(dieIndex, 1);
+
+                    updateGame({
+                        ...gameState,
+                        board: newBoard,
+                        dice: newDice
+                    });
+                }
+            }
             return;
         }
         if (!socketRef.current) return;
         socketRef.current.emit('gameAction', { action, payload });
-    }, [gameState, updateGame]);
+    }, [gameState, updateGame, history, undoMove]);
 
     const sendMessage = useCallback((message: string) => {
         if (DEMO_MODE) {
