@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Wifi, WifiOff, Search, Trophy } from 'lucide-react';
@@ -66,8 +66,8 @@ const Lobby = () => {
                     >
                         {/* Status Indicator */}
                         <div className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-md transition-colors ${isConnected
-                                ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                                : 'border-red-500/30 bg-red-500/10 text-red-400'
+                            ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                            : 'border-red-500/30 bg-red-500/10 text-red-400'
                             }`}>
                             {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
                             <span className="text-sm font-medium uppercase tracking-wider">

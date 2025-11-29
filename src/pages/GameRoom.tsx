@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -147,8 +147,8 @@ const GameRoom = () => {
 
                     <div className="flex items-center gap-6">
                         <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isMyTurn
-                                ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
-                                : 'bg-gray-800/50 border-gray-700 text-gray-400'
+                            ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
+                            : 'bg-gray-800/50 border-gray-700 text-gray-400'
                             }`}>
                             <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
                             <span className="text-sm font-bold uppercase tracking-wide">
@@ -183,8 +183,8 @@ const GameRoom = () => {
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: idx * 0.1 }}
                                         className={`relative p-4 rounded-xl border transition-all duration-300 ${isCurrentTurn
-                                                ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
-                                                : 'bg-white/5 border-white/5'
+                                            ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
+                                            : 'bg-white/5 border-white/5'
                                             }`}
                                     >
                                         {isCurrentTurn && (
@@ -305,8 +305,8 @@ const GameRoom = () => {
                                 onClick={handleRollDice}
                                 disabled={!isMyTurn || dice.length > 0}
                                 className={`px-12 py-4 rounded-xl font-black text-xl tracking-wide transition-all transform ${isMyTurn && dice.length === 0
-                                        ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
-                                        : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
+                                    ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
+                                    : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
                                     }`}
                             >
                                 {dice.length > 0 ? 'AU JEU !' : 'LANCER LES DÉS'}

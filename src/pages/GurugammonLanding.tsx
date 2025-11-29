@@ -5,35 +5,6 @@ import { useNavigate } from 'react-router-dom';
 export default function GurugammonLanding() {
   const navigate = useNavigate();
 
-  const handleGuestLogin = async () => {
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://gurugammon.onrender.com';
-      const res = await fetch(`${API_URL}/api/auth/guest-login`, { method: 'POST' });
-      const data = await res.json();
-
-      if (data.success && data.data.token) {
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-
-        const gameRes = await fetch(`${API_URL}/api/games`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${data.data.token}`,
-          },
-          body: JSON.stringify({ game_mode: 'AI_VS_PLAYER' }),
-        });
-
-        const gameData = await gameRes.json();
-        if (gameData.success) {
-          navigate(`/gurugammon/game/${gameData.data.game.id}`);
-        }
-      }
-    } catch (error) {
-      console.error('Guest login failed:', error);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/10 via-transparent to-[#8B0000]/10" />
@@ -88,11 +59,11 @@ export default function GurugammonLanding() {
               className="px-12 py-5 bg-gradient-to-r from-[#FFD700] to-[#FFC700] text-black text-xl font-black rounded-xl shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:shadow-[0_0_60px_rgba(255,215,0,0.6)] transition-shadow"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleGuestLogin}
+              onClick={() => navigate('/lobby')}
             >
               <div className="flex items-center gap-3">
                 <Zap className="w-7 h-7" />
-                Play vs AI Now
+                MULTIPLAYER LOBBY
               </div>
             </motion.button>
 
@@ -100,11 +71,11 @@ export default function GurugammonLanding() {
               className="px-12 py-5 bg-black border-2 border-[#FFD700] text-[#FFD700] text-xl font-black rounded-xl hover:bg-[#FFD700]/10 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/play')}
+              onClick={() => navigate('/login')}
             >
               <div className="flex items-center gap-3">
                 <Users className="w-7 h-7" />
-                Local 2-Player
+                Login / Sign Up
               </div>
             </motion.button>
           </motion.div>

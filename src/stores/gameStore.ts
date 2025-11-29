@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-// Types (à adapter selon tes besoins exacts)
+// Types
 export interface User {
     id: string;
     username: string;
@@ -12,6 +12,7 @@ export interface Player {
     username: string;
     score?: number;
     color?: 'white' | 'black'; // ou 1 | 2
+    avatar?: string;
 }
 
 export interface Room {
