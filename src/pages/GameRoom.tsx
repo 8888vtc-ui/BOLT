@@ -9,7 +9,7 @@ import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw, L
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useGameStore } from '../stores/gameStore';
 import { useAuth } from '../hooks/useAuth';
-import { analyzePosition, AIAnalysis } from '../lib/aiService';
+import { analyzeMove, AIAnalysis } from '../lib/aiService';
 
 import Point from '../components/Point';
 import Checker from '../components/Checker';
@@ -96,7 +96,7 @@ const GameRoom = () => {
         setAiAnalysis(null);
         setShowAnalysis(true);
 
-        const analysis = await analyzePosition(gameState);
+        const analysis = await analyzeMove(gameState, gameState.dice);
         setAiAnalysis(analysis);
         setIsAnalyzing(false);
     };
@@ -196,7 +196,8 @@ const GameRoom = () => {
                                         <p className="text-gray-400 animate-pulse">Analyse de la position...</p>
                                     </div>
                                 ) : aiAnalysis ? (
-                                    <div className="space-y-4">
+                                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                        {/* Meilleur Coup */}
                                         <div className="bg-black/30 p-4 rounded-xl border border-white/5">
                                             <div className="text-xs text-gray-500 uppercase font-bold mb-1">Meilleur Coup</div>
                                             <div className="text-lg font-mono text-[#FFD700]">
@@ -204,18 +205,48 @@ const GameRoom = () => {
                                             </div>
                                         </div>
 
+                                        {/* Stratégie Recommandée */}
+                                        {aiAnalysis.strategicAdvice && (
+                                            <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-4 rounded-xl border border-blue-500/20">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <div className="text-xs text-blue-400 uppercase font-bold">Stratégie</div>
+                                                    {aiAnalysis.strategicAdvice.riskLevel && (
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded border ${aiAnalysis.strategicAdvice.riskLevel === 'high' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                                                            aiAnalysis.strategicAdvice.riskLevel === 'low' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                                                                'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                                                            }`}>
+                                                            RISQUE: {aiAnalysis.strategicAdvice.riskLevel.toUpperCase()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-lg font-bold text-white mb-1">
+                                                    {aiAnalysis.strategicAdvice.recommendedStrategy.toUpperCase()}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Analyse Détaillée */}
                                         <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Analyse</div>
-                                            <p className="text-gray-300 text-sm leading-relaxed">
-                                                {aiAnalysis.explanation}
-                                            </p>
+                                            <div className="text-xs text-gray-500 uppercase font-bold mb-2">Analyse du Coach</div>
+                                            <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                                                {aiAnalysis.strategicAdvice ? aiAnalysis.strategicAdvice.analysis : aiAnalysis.explanation}
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                                            <span>Probabilité de victoire :</span>
-                                            <span className={`font-bold ${aiAnalysis.winProbability > 50 ? 'text-green-400' : 'text-red-400'}`}>
-                                                {aiAnalysis.winProbability}%
-                                            </span>
+                                        {/* Stats Techniques */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-black/30 p-3 rounded-xl border border-white/5 flex flex-col items-center">
+                                                <span className="text-[10px] text-gray-500 uppercase">Victoire</span>
+                                                <span className={`text-xl font-bold ${aiAnalysis.winProbability > 50 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {aiAnalysis.winProbability.toFixed(1)}%
+                                                </span>
+                                            </div>
+                                            <div className="bg-black/30 p-3 rounded-xl border border-white/5 flex flex-col items-center">
+                                                <span className="text-[10px] text-gray-500 uppercase">Equity</span>
+                                                <span className="text-xl font-bold text-blue-400">
+                                                    {aiAnalysis.equity?.toFixed(3) || 'N/A'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
