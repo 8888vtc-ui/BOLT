@@ -56,15 +56,15 @@ const GameRoom = () => {
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
         if (!currentRoom || !gameState) {
-            addLog('Chargement de la partie...', 'info', { 
-                hasRoom: !!currentRoom, 
-                hasGameState: !!gameState, 
+            addLog('Chargement de la partie...', 'info', {
+                hasRoom: !!currentRoom,
+                hasGameState: !!gameState,
                 roomId,
-                isConnected 
+                isConnected
             });
         } else {
-            addLog('Partie chargée avec succès !', 'success', { 
-                roomName: currentRoom.name, 
+            addLog('Partie chargée avec succès !', 'success', {
+                roomName: currentRoom.name,
                 turn: gameState.turn,
                 myId: user?.id,
                 isMyTurn: gameState.turn === user?.id || (gameState.turn === 'guest-1' && user?.id === 'guest-1')
@@ -113,7 +113,7 @@ const GameRoom = () => {
     const handleRollDice = () => {
         const addLog = useDebugStore.getState().addLog;
         addLog('Tentative de lancer les dés', 'info', { isMyTurn, diceLength: dice.length });
-        
+
         if (isMyTurn && dice.length === 0) {
             sendGameAction('rollDice', {});
         } else {
@@ -141,14 +141,24 @@ const GameRoom = () => {
     };
 
     const onDragStart = (index: number) => {
-        if (!isMyTurn) return;
+        const addLog = useDebugStore.getState().addLog;
+        if (!isMyTurn) {
+            addLog('Drag refusé: Pas votre tour', 'warning');
+            return;
+        }
+        addLog(`Drag Start: Point ${index}`, 'info');
         setSelectedPoint(index);
     };
 
     const onDrop = (toIndex: number) => {
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`Drop Attempt: ${selectedPoint} -> ${toIndex}`, 'info', { selectedPoint, isMyTurn });
+
         if (selectedPoint !== null && isMyTurn) {
             sendGameAction('move', { from: selectedPoint, to: toIndex });
             setSelectedPoint(null);
+        } else {
+            addLog('Drop ignoré', 'warning', { reason: !isMyTurn ? 'Pas votre tour' : 'Aucun point sélectionné' });
         }
     };
 

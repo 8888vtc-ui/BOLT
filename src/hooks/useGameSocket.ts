@@ -290,8 +290,6 @@ export const useGameSocket = () => {
             addLog('Local game state updated', 'success');
         }
 
-        // TEMPORARY DEBUG: Disable DB update to test local movement
-        /*
         if (!DEMO_MODE && currentRoom && newState.board) {
             const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
             if (error) {
@@ -300,8 +298,6 @@ export const useGameSocket = () => {
                 addLog('Game updated in DB', 'success');
             }
         }
-        */
-        addLog('DB Update skipped for debugging', 'warning');
 
     }, [gameState, updateGame, history, currentRoom, undoMove, players, user]);
 
