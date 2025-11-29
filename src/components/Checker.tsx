@@ -26,8 +26,8 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
     [draggable, player]
   );
 
-  const color = player === 1 ? '#D2B48C' : '#8B0000';
-  const shadow = player === 1 ? 'rgba(210, 180, 140, 0.5)' : 'rgba(139, 0, 0, 0.5)';
+  const color = player === 1 ? '#FFFFFF' : '#FF0000'; // Blanc pur vs Rouge vif
+  const shadow = player === 1 ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 0, 0, 0.8)';
 
   return (
     <motion.div
@@ -59,7 +59,7 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
           boxShadow: draggable
             ? `0 0 20px ${shadow}, 0 4px 8px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.3)`
             : `0 4px 8px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.3)`,
-          border: `2px solid ${player === 1 ? '#C9A961' : '#660000'}`,
+          border: `3px solid ${player === 1 ? '#E0E0E0' : '#CC0000'}`,
         }}
       >
         <div
