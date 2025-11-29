@@ -62,6 +62,35 @@ export const useGameSocket = () => {
         roomsList
     } = useGameStore();
 
+    // Bot Logic
+    useEffect(() => {
+        if (DEMO_MODE && currentRoom?.players.some(p => p.id === 'bot-gnu') && gameState?.turn === 'bot-gnu') {
+            const timer = setTimeout(() => {
+                console.log('🤖 Bot is playing...');
+
+                // 1. Lancer les dés
+                const dice1 = Math.floor(Math.random() * 6) + 1;
+                const dice2 = Math.floor(Math.random() * 6) + 1;
+
+                addMessage({
+                    id: `msg-bot-${Date.now()}`,
+                    userId: 'bot-gnu',
+                    username: 'GNU Backgammon',
+                    text: `J'ai joué ${dice1} et ${dice2}. À toi !`,
+                    timestamp: Date.now()
+                });
+
+                updateGame({
+                    ...gameState,
+                    dice: [], // Reset dice
+                    turn: user?.id || 'guest-1' // Rend la main au joueur
+                });
+
+            }, 3000); // Délai de réflexion simulé
+            return () => clearTimeout(timer);
+        }
+    }, [gameState, currentRoom, user, updateGame, addMessage]);
+
     useEffect(() => {
         if (DEMO_MODE && user) {
             console.log('🎮 DEMO MODE: Using mock data');
@@ -133,6 +162,41 @@ export const useGameSocket = () => {
             }
         };
     }, [user, setIsConnected, setRoomsList, setRoom, updateGame, addMessage]);
+
+    const playVsBot = useCallback(() => {
+        if (DEMO_MODE) {
+            console.log('🤖 DEMO: Starting game vs Bot');
+            const botRoom: Room = {
+                id: `room-bot-${Date.now()}`,
+                name: 'Partie contre GNU',
+                players: [
+                    {
+                        id: user?.id || 'guest-1',
+                        username: user?.username || 'Guest',
+                        avatar: user?.avatar
+                    },
+                    {
+                        id: 'bot-gnu',
+                        username: 'GNU Backgammon',
+                        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=GNU',
+                        score: 3500
+                    }
+                ],
+                status: 'playing'
+            };
+
+            setRoom(botRoom);
+            setPlayers(botRoom.players);
+
+            // Initialiser le jeu
+            const initialState = createMockGameState();
+            // Décider qui commence (50/50)
+            initialState.turn = Math.random() > 0.5 ? (user?.id || 'guest-1') : 'bot-gnu';
+
+            updateGame(initialState);
+            return botRoom.id;
+        }
+    }, [user, setRoom, setPlayers, updateGame]);
 
     const createRoom = useCallback((roomName: string) => {
         if (DEMO_MODE) {
@@ -259,6 +323,7 @@ export const useGameSocket = () => {
         joinRoom,
         leaveRoom,
         sendGameAction,
-        sendMessage
+        sendMessage,
+        playVsBot
     };
 };

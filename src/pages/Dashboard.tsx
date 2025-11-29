@@ -2,10 +2,12 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Play, Trophy, TrendingUp, Target, Clock, Award } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useGameSocket } from '../hooks/useGameSocket';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { playVsBot } = useGameSocket();
 
   const stats = [
     { label: 'Parties jouées', value: '47', icon: Play, color: '#FFD700' },
@@ -68,12 +70,23 @@ export default function Dashboard() {
             className="bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black p-8 rounded-2xl font-black text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,215,0,0.3)]"
           >
             <Play className="w-12 h-12 mb-4 mx-auto" />
-            Jouer Maintenant
+            Jouer en Ligne
+          </button>
+
+          <button
+            onClick={() => {
+              const roomId = playVsBot();
+              if (roomId) navigate(`/game/${roomId}`);
+            }}
+            className="bg-[#111] border-2 border-[#FFD700] text-[#FFD700] p-8 rounded-2xl font-black text-xl hover:bg-[#FFD700]/10 transition-all"
+          >
+            <Target className="w-12 h-12 mb-4 mx-auto" />
+            Jouer contre l'IA
           </button>
 
           <button
             onClick={() => navigate('/tournaments')}
-            className="bg-[#111] border-2 border-[#FFD700] text-[#FFD700] p-8 rounded-2xl font-black text-xl hover:bg-[#FFD700]/10 transition-all"
+            className="bg-[#111] border-2 border-white/20 text-white p-8 rounded-2xl font-black text-xl hover:border-white/40 transition-all"
           >
             <Trophy className="w-12 h-12 mb-4 mx-auto" />
             Tournois
@@ -120,8 +133,8 @@ export default function Dashboard() {
                   <div className="text-lg font-mono font-bold text-gray-300">{game.score}</div>
                   <div
                     className={`px-4 py-2 rounded-lg font-bold ${game.result === 'Victoire'
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-red-500/20 text-red-400'
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
                       }`}
                   >
                     {game.result}
