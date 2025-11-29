@@ -191,6 +191,17 @@ export const useGameSocket = () => {
         }
     }, [currentRoom, user, addMessage]);
 
+    const undoMove = useCallback(() => {
+        if (history.length === 0) return;
+        const previousState = history[history.length - 1];
+        updateGame(previousState);
+        setHistory(prev => prev.slice(0, -1));
+
+        if (!DEMO_MODE && currentRoom) {
+            supabase.from('games').update({ board_state: previousState }).eq('room_id', currentRoom.id);
+        }
+    }, [history, updateGame, currentRoom]);
+
     // --- Game Actions ---
     const sendGameAction = useCallback(async (action: string, payload: any) => {
         let newState = { ...gameState } as GameState;
@@ -257,17 +268,6 @@ export const useGameSocket = () => {
             }
         }
     }, [gameState, user, updateGame, currentRoom]);
-
-    const undoMove = useCallback(() => {
-        if (history.length === 0) return;
-        const previousState = history[history.length - 1];
-        updateGame(previousState);
-        setHistory(prev => prev.slice(0, -1));
-
-        if (!DEMO_MODE && currentRoom) {
-            supabase.from('games').update({ board_state: previousState }).eq('room_id', currentRoom.id);
-        }
-    }, [history, updateGame, currentRoom]);
 
     const playVsBot = useCallback(() => {
         return 'bot-room-id';

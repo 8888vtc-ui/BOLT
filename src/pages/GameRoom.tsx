@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { TouchBackend } from 'react-dnd-touch-backend';
-import { motion } from 'framer-motion';
-import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw, Lightbulb, X } from 'lucide-react';
 
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useGameStore } from '../stores/gameStore';
 import { useAuth } from '../hooks/useAuth';
+import { analyzePosition, AIAnalysis } from '../lib/aiService';
 
 import Point from '../components/Point';
 import Checker from '../components/Checker';
@@ -36,6 +37,11 @@ const GameRoom = () => {
 
     const { currentRoom, gameState, players } = useGameStore();
     const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+
+    // AI Coach State
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
+    const [showAnalysis, setShowAnalysis] = useState(false);
 
     // Rejoindre la room au montage
     useEffect(() => {
@@ -82,6 +88,17 @@ const GameRoom = () => {
         if (isMyTurn && dice.length === 0) {
             sendGameAction('rollDice', {});
         }
+    };
+
+    const handleAskCoach = async () => {
+        if (isAnalyzing) return;
+        setIsAnalyzing(true);
+        setAiAnalysis(null);
+        setShowAnalysis(true);
+
+        const analysis = await analyzePosition(gameState);
+        setAiAnalysis(analysis);
+        setIsAnalyzing(false);
     };
 
     const onDragStart = (index: number) => {
@@ -147,7 +164,68 @@ const GameRoom = () => {
 
     return (
         <DndProvider backend={backend}>
-            <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans">
+            <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans relative">
+
+                {/* AI Coach Modal */}
+                <AnimatePresence>
+                    {showAnalysis && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                        >
+                            <div className="bg-[#1a1a1a] border border-[#FFD700]/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+                                <button
+                                    onClick={() => setShowAnalysis(false)}
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-[#FFD700]/10 flex items-center justify-center">
+                                        <Lightbulb className="w-6 h-6 text-[#FFD700]" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">L'avis du Coach</h3>
+                                </div>
+
+                                {isAnalyzing ? (
+                                    <div className="py-8 flex flex-col items-center gap-4">
+                                        <div className="w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-gray-400 animate-pulse">Analyse de la position...</p>
+                                    </div>
+                                ) : aiAnalysis ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Meilleur Coup</div>
+                                            <div className="text-lg font-mono text-[#FFD700]">
+                                                {aiAnalysis.bestMove.map(m => `${m.from + 1} → ${m.to + 1}`).join(', ')}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Analyse</div>
+                                            <p className="text-gray-300 text-sm leading-relaxed">
+                                                {aiAnalysis.explanation}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <span>Probabilité de victoire :</span>
+                                            <span className={`font-bold ${aiAnalysis.winProbability > 50 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {aiAnalysis.winProbability}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-red-400">Erreur lors de l'analyse.</p>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* Header */}
                 <header className="h-16 bg-[#111] border-b border-white/10 px-6 flex justify-between items-center shrink-0 z-20 relative shadow-lg">
                     <div className="flex items-center gap-4">
@@ -169,8 +247,8 @@ const GameRoom = () => {
 
                     <div className="flex items-center gap-6">
                         <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isMyTurn
-                                ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
-                                : 'bg-gray-800/50 border-gray-700 text-gray-400'
+                            ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
+                            : 'bg-gray-800/50 border-gray-700 text-gray-400'
                             }`}>
                             <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
                             <span className="text-sm font-bold uppercase tracking-wide">
@@ -205,8 +283,8 @@ const GameRoom = () => {
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: idx * 0.1 }}
                                         className={`relative p-4 rounded-xl border transition-all duration-300 ${isCurrentTurn
-                                                ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
-                                                : 'bg-white/5 border-white/5'
+                                            ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
+                                            : 'bg-white/5 border-white/5'
                                             }`}
                                     >
                                         {isCurrentTurn && (
@@ -323,6 +401,17 @@ const GameRoom = () => {
 
                         {/* Action Bar (Bottom) */}
                         <div className="h-24 bg-[#111] border-t border-white/10 flex items-center justify-center px-8 shrink-0 gap-4">
+
+                            {/* AI Coach Button */}
+                            <button
+                                onClick={handleAskCoach}
+                                className="px-4 py-4 rounded-xl bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/20 font-bold hover:bg-[#FFD700]/20 transition-colors flex items-center gap-2"
+                                title="Demander conseil au Coach"
+                            >
+                                <Lightbulb className="w-5 h-5" />
+                                COACH
+                            </button>
+
                             {/* Undo Button */}
                             {canUndo && (
                                 <button
@@ -338,8 +427,8 @@ const GameRoom = () => {
                                 onClick={handleRollDice}
                                 disabled={!isMyTurn || dice.length > 0}
                                 className={`px-12 py-4 rounded-xl font-black text-xl tracking-wide transition-all transform ${isMyTurn && dice.length === 0
-                                        ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
-                                        : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
+                                    ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
+                                    : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
                                     }`}
                             >
                                 {dice.length > 0 ? 'AU JEU !' : 'LANCER LES DÉS'}
