@@ -36,7 +36,8 @@ export const useGameSocket = () => {
         currentRoom,
         gameState,
         isConnected,
-        roomsList
+        roomsList,
+        players
     } = useGameStore();
 
     const channelRef = useRef<any>(null);
@@ -234,7 +235,22 @@ export const useGameSocket = () => {
             addLog(`Dice rolled: ${newState.dice.join(', ')}`, 'success');
         } else if (action === 'move') {
             const { from, to } = payload;
-            const playerColor = 1;
+
+            // Déterminer la couleur du joueur
+            let playerColor = 1;
+            if (user && players && players.length > 0) {
+                // Si je suis le créateur/premier joueur -> Blanc (1)
+                // Sinon -> Noir (2)
+                if (players[0]?.id === user.id) playerColor = 1;
+                else if (players[1]?.id === user.id) playerColor = 2;
+            }
+
+            // Hack pour le mode demo/guest si on joue seul
+            if (DEMO_MODE || (players && players.length === 0)) {
+                playerColor = 1;
+            }
+
+            addLog(`Player Color: ${playerColor}`, 'info');
 
             const isBackwardMove = to > from;
             if (isBackwardMove && history.length > 0) {
@@ -242,13 +258,12 @@ export const useGameSocket = () => {
                 return;
             }
 
-            const distance = Math.abs(from - to);
             const currentDice = newState.dice || [];
 
             let dieUsed = -1;
             if (playerColor === 1) { // Blanc (23 -> 0)
                 if (from > to) dieUsed = from - to;
-            } else {
+            } else { // Noir (0 -> 23)
                 if (to > from) dieUsed = to - from;
             }
 
@@ -264,7 +279,7 @@ export const useGameSocket = () => {
                 newState.dice = newDice;
                 addLog('Move executed locally', 'success');
             } else {
-                addLog('Invalid move or no matching die', 'error', { from, to, dieUsed, dice: currentDice });
+                addLog('Invalid move or no matching die', 'error', { from, to, dieUsed, dice: currentDice, playerColor });
                 return;
             }
         }
@@ -276,17 +291,24 @@ export const useGameSocket = () => {
         if (!DEMO_MODE && currentRoom && newState.board) {
             const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
             if (error) {
-                addLog('Error updating game in DB', 'error', error);
+                addLog('Error updating game in DB', 'error', { message: error.message, details: error.details, hint: error.hint, code: error.code });
             } else {
                 addLog('Game updated in DB', 'success');
             }
         }
 
-    }, [gameState, updateGame, history, currentRoom, undoMove]);
+    }, [gameState, updateGame, history, currentRoom, undoMove, players, user]);
 
     const handleCheckerClick = useCallback((index: number) => {
         if (!gameState || !user) return;
-        const playerColor = 1;
+
+        // Déterminer la couleur du joueur (même logique)
+        let playerColor = 1;
+        if (players && players.length > 0) {
+            if (players[0]?.id === user.id) playerColor = 1;
+            else if (players[1]?.id === user.id) playerColor = 2;
+        }
+
         const point = gameState.board.points[index];
         if (point.player !== playerColor || point.count === 0) return;
 
@@ -305,7 +327,7 @@ export const useGameSocket = () => {
                 supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
             }
         }
-    }, [gameState, user, updateGame, currentRoom]);
+    }, [gameState, user, updateGame, currentRoom, players]);
 
     const playVsBot = useCallback(() => {
         return 'bot-room-id';
