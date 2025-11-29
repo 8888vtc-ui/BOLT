@@ -29,7 +29,6 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
   // Couleurs classiques et élégantes
   // Player 1: Ivoire (Blanc cassé)
   // Player 2: Rouge Profond
-  const baseColor = player === 1 ? '#E8E8E8' : '#D00000';
   const borderColor = player === 1 ? '#C0C0C0' : '#800000';
 
   // Dégradé subtil pour effet 3D
@@ -42,12 +41,11 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
       ref={draggable ? drag : null}
       className="absolute cursor-pointer select-none"
       style={{
-        width: '90%', // Un peu plus petit pour laisser de l'espace
-        height: '90%',
-        left: '5%',
+        width: '100%',
+        height: '100%',
         zIndex: index,
         opacity: isDragging ? 0.3 : 1,
-        bottom: `${index * 100}%`, // Empilement vertical ajusté
+        // Positionnement géré par le parent (Point.tsx) via Flexbox + Marges négatives
       }}
       animate={{
         scale: draggable ? [1, 1.05, 1] : 1,

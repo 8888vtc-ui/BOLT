@@ -46,7 +46,7 @@ export default function Point({
     const stackHeight = isLastVisible ? point.count : 1;
 
     checkers.push(
-      <div key={i} className="relative w-full aspect-square" style={{ marginBottom: '-60%' }}>
+      <div key={i} className="relative w-[90%] aspect-square flex-shrink-0" style={{ marginBottom: '-15%' }}>
         <Checker
           player={point.player!}
           draggable={
@@ -89,8 +89,8 @@ export default function Point({
           justifyContent: isTop ? 'flex-start' : 'flex-end',
         }}
       >
-        {/* Inverser l'ordre d'affichage pour le bas pour que la pile monte */}
-        {isTop ? checkers : [...checkers].reverse()}
+        {/* Pas de reverse() ici car flex-col-reverse gère déjà l'ordre visuel pour le bas */}
+        {checkers}
       </div>
 
       {/* Numéro du point - Z-INDEX ÉLEVÉ pour être toujours visible */}
