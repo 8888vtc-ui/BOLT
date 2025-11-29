@@ -394,35 +394,41 @@ const GameRoom = () => {
                     <div className="flex-1 bg-[#0f0f0f] relative flex flex-col">
                         <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
                             {/* Board Container */}
-                            <div className="relative aspect-[16/10] w-full max-w-5xl bg-[#2d2d2d] rounded-xl shadow-2xl border-8 border-[#1a1a1a] overflow-hidden">
+                            <div className="relative aspect-[16/11] w-full max-w-6xl bg-[#2d5a27] rounded-lg shadow-2xl border-[16px] border-[#3e2723] overflow-hidden"
+                                style={{
+                                    boxShadow: 'inset 0 0 100px rgba(0,0,0,0.5)', // Vignette interne
+                                    backgroundImage: 'radial-gradient(#35682d 1px, transparent 1px)', // Texture subtile
+                                    backgroundSize: '4px 4px'
+                                }}
+                            >
                                 {/* Grille des points */}
-                                <div className="absolute inset-0 grid grid-cols-2 gap-8 p-6">
-                                    <div className="flex flex-col gap-4">
-                                        <div className="flex-1 grid grid-cols-6 gap-1">{topPoints.slice(0, 6)}</div>
-                                        <div className="flex-1 grid grid-cols-6 gap-1">{bottomPoints.slice(0, 6)}</div>
+                                <div className="absolute inset-0 grid grid-cols-2 gap-12 p-8">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex-1 grid grid-cols-6 gap-0">{topPoints.slice(0, 6)}</div>
+                                        <div className="flex-1 grid grid-cols-6 gap-0">{bottomPoints.slice(0, 6)}</div>
                                     </div>
-                                    <div className="flex flex-col gap-4">
-                                        <div className="flex-1 grid grid-cols-6 gap-1">{topPoints.slice(6, 12)}</div>
-                                        <div className="flex-1 grid grid-cols-6 gap-1">{bottomPoints.slice(6, 12)}</div>
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex-1 grid grid-cols-6 gap-0">{topPoints.slice(6, 12)}</div>
+                                        <div className="flex-1 grid grid-cols-6 gap-0">{bottomPoints.slice(6, 12)}</div>
                                     </div>
                                 </div>
 
                                 {/* Barre centrale (Bar) */}
-                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 bg-[#1a1a1a] h-full border-x-4 border-[#0f0f0f] flex flex-col items-center justify-center gap-4 z-10">
-                                    <div className="flex flex-col gap-1">
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 bg-[#2d1b15] h-full shadow-2xl flex flex-col items-center justify-center gap-2 z-10 border-x border-[#1a0f0b]">
+                                    <div className="flex flex-col gap-1 py-4">
                                         {Array.from({ length: board.bar?.player2 || 0 }).map((_, i) => (
-                                            <div key={`bar-p2-${i}`} className="w-8 h-8"><Checker player={2} /></div>
+                                            <div key={`bar-p2-${i}`} className="w-10 h-10"><Checker player={2} /></div>
                                         ))}
                                     </div>
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex flex-col gap-1 py-4">
                                         {Array.from({ length: board.bar?.player1 || 0 }).map((_, i) => (
-                                            <div key={`bar-p1-${i}`} className="w-8 h-8"><Checker player={1} /></div>
+                                            <div key={`bar-p1-${i}`} className="w-10 h-10"><Checker player={1} /></div>
                                         ))}
                                     </div>
                                 </div>
 
                                 {/* Dés */}
-                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-4 z-20 pointer-events-none">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-8 z-20 pointer-events-none">
                                     {dice.map((val, i) => (
                                         <Dice key={i} value={val} rolling={false} />
                                     ))}

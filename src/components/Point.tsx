@@ -80,13 +80,14 @@ export default function Point({
     >
       {/* Triangle du point */}
       <div
-        className={`absolute inset-0 w-full h-full opacity-20 transition-all duration-300 ${isValidDestination || isOver ? 'opacity-50 bg-[#FFD700]/20' : ''
+        className={`absolute inset-0 w-full h-full transition-all duration-300 ${isValidDestination || isOver ? 'opacity-80 bg-[#FFD700]/40' : 'opacity-100'
           }`}
         style={{
           clipPath: isTop
-            ? 'polygon(50% 100%, 0 0, 100% 0)'
-            : 'polygon(50% 0, 0 100%, 100% 100%)',
-          background: index % 2 === 0 ? '#404040' : '#202020', // Alternance de couleurs des flèches
+            ? 'polygon(50% 85%, 0 0, 100% 0)' // Pointes un peu moins longues pour laisser de la place aux pions
+            : 'polygon(50% 15%, 0 100%, 100% 100%)',
+          background: index % 2 === 0 ? '#5d4037' : '#d7ccc8', // Marron foncé et Beige
+          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.2)' // Légère ombre interne
         }}
       />
 

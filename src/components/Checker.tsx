@@ -60,25 +60,36 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
       whileHover={draggable ? { scale: 1.1 } : {}}
     >
       <div
-        className="relative w-full h-full rounded-full shadow-lg"
+        className="relative w-full h-full rounded-full shadow-md"
         style={{
-          background: gradient,
-          boxShadow: '0 4px 6px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.3)',
-          border: `2px solid ${borderColor}`,
+          background: player === 1
+            ? 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)' // Blanc cassé
+            : 'linear-gradient(135deg, #212121 0%, #000000 100%)', // Noir profond
+          boxShadow: '0 3px 4px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.3)',
+          border: player === 1 ? '1px solid #9e9e9e' : '1px solid #424242',
         }}
       >
-        {/* Reflet subtil */}
+        {/* Effet de texture (cercle interne) */}
+        <div
+          className="absolute inset-[15%] rounded-full border opacity-30"
+          style={{
+            borderColor: player === 1 ? '#000' : '#fff',
+            borderWidth: '1px'
+          }}
+        />
+
+        {/* Reflet supérieur */}
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            background: `radial-gradient(circle at 40% 40%, rgba(255,255,255,0.4), transparent 60%)`,
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.2) 0%, transparent 40%)'
           }}
         />
 
         {/* Compteur si pile > 5 */}
         {stackHeight > 5 && index === stackHeight - 1 && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-sm font-bold ${player === 1 ? 'text-black' : 'text-white'}`}>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full backdrop-blur-[1px]">
+            <span className="text-sm font-bold text-white drop-shadow-md">
               {stackHeight}
             </span>
           </div>
