@@ -22,6 +22,9 @@ export interface GameState {
   matchLength: number;
 }
 
+// Standard Backgammon Starting Position
+// GNUbg Position ID: 4HPwATDgc/ABMA
+// Matches official setup: 24:2, 13:5, 8:3, 6:5 for Player 1
 export const INITIAL_BOARD: BoardState = {
   points: [
     { player: 2, count: 2 },  // Index 0 (Point 1): 2 Rouges
