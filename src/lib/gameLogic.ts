@@ -24,30 +24,30 @@ export interface GameState {
 
 export const INITIAL_BOARD: BoardState = {
   points: [
-    { player: 1, count: 2 },  // Point 0: 2 blancs
+    { player: 2, count: 2 },  // Index 0 (Point 1): 2 Rouges
     { player: null, count: 0 },
     { player: null, count: 0 },
     { player: null, count: 0 },
     { player: null, count: 0 },
-    { player: 2, count: 5 },  // Point 5: 5 rouges
+    { player: 1, count: 5 },  // Index 5 (Point 6): 5 Blancs
     { player: null, count: 0 },
-    { player: 2, count: 3 },  // Point 7: 3 rouges
-    { player: null, count: 0 },
-    { player: null, count: 0 },
-    { player: null, count: 0 },
-    { player: 1, count: 5 },  // Point 11: 5 blancs
-    { player: 2, count: 5 },  // Point 12: 5 rouges
+    { player: 1, count: 3 },  // Index 7 (Point 8): 3 Blancs
     { player: null, count: 0 },
     { player: null, count: 0 },
     { player: null, count: 0 },
-    { player: 1, count: 3 },  // Point 16: 3 blancs
-    { player: null, count: 0 },
-    { player: 1, count: 5 },  // Point 18: 5 blancs
-    { player: null, count: 0 },
+    { player: 2, count: 5 },  // Index 11 (Point 12): 5 Rouges
+    { player: 1, count: 5 },  // Index 12 (Point 13): 5 Blancs
     { player: null, count: 0 },
     { player: null, count: 0 },
     { player: null, count: 0 },
-    { player: 2, count: 2 },  // Point 23: 2 rouges
+    { player: 2, count: 3 },  // Index 16 (Point 17): 3 Rouges
+    { player: null, count: 0 },
+    { player: 2, count: 5 },  // Index 18 (Point 19): 5 Rouges
+    { player: null, count: 0 },
+    { player: null, count: 0 },
+    { player: null, count: 0 },
+    { player: null, count: 0 },
+    { player: 1, count: 2 },  // Index 23 (Point 24): 2 Blancs
   ],
   bar: { player1: 0, player2: 0 },
   off: { player1: 0, player2: 0 },
