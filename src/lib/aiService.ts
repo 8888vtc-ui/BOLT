@@ -19,6 +19,8 @@ export const analyzeMove = async (
     dice: number[]
 ): Promise<AIAnalysis> => {
     try {
+        console.log('🤖 AI Service: Preparing analysis...', { dice, turn: gameState.turn });
+
         // Préparer le payload pour l'API BotGammon
         const payload = {
             dice: dice,
@@ -36,7 +38,7 @@ export const analyzeMove = async (
                     black: gameState.board.off.black
                 }
             },
-            player: gameState.turn === 'white' ? 1 : 2,
+            player: gameState.turn === 'white' ? 1 : 2, // TODO: Vérifier si c'est correct selon l'ID du joueur
             // Ajouter le contexte pour GPT-4o
             context: {
                 gamePhase: 'middle', // À calculer dynamiquement idéalement
@@ -45,7 +47,8 @@ export const analyzeMove = async (
             }
         };
 
-        console.log('Calling BotGammon API...', payload);
+        console.log('🤖 AI Service: Calling BotGammon API...', BOT_API_URL);
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
         const response = await fetch(BOT_API_URL, {
             method: 'POST',
@@ -55,12 +58,16 @@ export const analyzeMove = async (
             body: JSON.stringify(payload),
         });
 
+        console.log('🤖 AI Service: Response status:', response.status);
+
         if (!response.ok) {
-            throw new Error(`BotGammon API Error: ${response.statusText}`);
+            const errorText = await response.text();
+            console.error('🤖 AI Service: Error response:', errorText);
+            throw new Error(`BotGammon API Error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
-        console.log('BotGammon Analysis:', data);
+        console.log('🤖 AI Service: Analysis received:', data);
 
         // Convertir la réponse de l'API au format attendu par le frontend
         const bestMoves = data.bestMoves && data.bestMoves.length > 0
@@ -85,8 +92,19 @@ export const analyzeMove = async (
         };
 
     } catch (error) {
-        console.error('AI Analysis Failed:', error);
-        // Fallback silencieux ou erreur
-        throw error;
+        console.error('❌ AI Analysis Failed:', error);
+        
+        // Fallback pour ne pas casser l'UI
+        return {
+            bestMove: [],
+            explanation: "Impossible de contacter le coach. Vérifiez votre connexion.",
+            winProbability: 50,
+            equity: 0,
+            strategicAdvice: {
+                analysis: "Le serveur d'analyse est indisponible. Veuillez réessayer plus tard.",
+                recommendedStrategy: "Jeu prudent",
+                riskLevel: "N/A"
+            }
+        };
     }
 };

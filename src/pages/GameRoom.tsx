@@ -51,6 +51,22 @@ const GameRoom = () => {
     }, [roomId, isConnected, currentRoom, joinRoom]);
 
     // Loading State
+    useEffect(() => {
+        if (!currentRoom || !gameState) {
+            console.log('⏳ GameRoom Loading State:', {
+                hasRoom: !!currentRoom,
+                hasGameState: !!gameState,
+                roomId,
+                isConnected
+            });
+        } else {
+            console.log('✅ GameRoom Loaded:', {
+                roomName: currentRoom.name,
+                turn: gameState.turn
+            });
+        }
+    }, [currentRoom, gameState, roomId, isConnected]);
+
     if (!currentRoom || !gameState) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white">
@@ -59,6 +75,9 @@ const GameRoom = () => {
                     Chargement de la partie...
                 </h2>
                 <p className="text-gray-500 mt-2">Synchronisation avec le serveur</p>
+                <p className="text-xs text-gray-700 mt-4 font-mono">
+                    {isConnected ? 'Connecté' : 'Connexion en cours...'}
+                </p>
             </div>
         );
     }
