@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 export interface User {
   id: string;
@@ -8,96 +9,80 @@ export interface User {
   role?: string;
 }
 
-// Helper pour décoder le JWT sans librairie externe
-const parseJwt = (token: string): any => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
-  }
-};
-
-const API_URL = 'http://localhost:8888'; // En prod, changer par l'URL du backend
-
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initAuth = () => {
-      // 1. Vérifier si un token est présent dans l'URL (retour de Google Auth)
-      const params = new URLSearchParams(window.location.search);
-      const urlToken = params.get('token');
-
-      if (urlToken) {
-        localStorage.setItem('token', urlToken);
-        // Nettoyer l'URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        formatAndSetUser(session.user);
+      } else {
+        setLoading(false);
       }
+    });
 
-      // 2. Récupérer le token du localStorage
-      const token = localStorage.getItem('token');
-
-      if (token) {
-        const decoded = parseJwt(token);
-        if (decoded) {
-          // Vérifier l'expiration si le token contient 'exp'
-          if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-            logout();
-          } else {
-            setUser({
-              id: decoded.id || decoded.sub,
-              username: decoded.username || decoded.name || 'Joueur',
-              email: decoded.email,
-              avatar: decoded.avatar || decoded.picture,
-              role: decoded.role
-            });
-          }
-        } else {
-          localStorage.removeItem('token');
-        }
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        formatAndSetUser(session.user);
+      } else {
+        setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
-    };
+    });
 
-    initAuth();
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loginWithGoogle = () => {
-    // Redirection vers l'endpoint backend qui lance le flow OAuth Google
-    window.location.href = `${API_URL}/auth/google`;
+  const formatAndSetUser = async (authUser: any) => {
+    // Fetch additional profile data from 'profiles' table if needed
+    // For now, we use metadata from auth
+    const metadata = authUser.user_metadata || {};
+
+    setUser({
+      id: authUser.id,
+      username: metadata.username || metadata.full_name || authUser.email?.split('@')[0] || 'Joueur',
+      email: authUser.email,
+      avatar: metadata.avatar_url || metadata.picture,
+      role: authUser.is_anonymous ? 'guest' : 'user'
+    });
+    setLoading(false);
   };
 
-  const loginAsGuest = () => {
-    // Création d'un user invité fictif
-    const guestId = 'guest-' + Math.floor(Math.random() * 10000);
-    const guestUser: User = {
-      id: guestId,
-      username: `Guest ${Math.floor(Math.random() * 1000)}`,
-      email: `${guestId}@example.com`,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
-      role: 'guest'
-    };
-
-    // Création d'un faux token JWT (Header.Payload.Signature)
-    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-    const payload = btoa(JSON.stringify(guestUser));
-    const signature = "dummy_signature";
-    const token = `${header}.${payload}.${signature}`;
-
-    localStorage.setItem('token', token);
-    setUser(guestUser);
-    // Pas de redirection nécessaire ici, le state user mettra à jour l'app
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) console.error('Google login error:', error);
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
+  const loginAsGuest = async () => {
+    // Sign in anonymously
+    const { data, error } = await supabase.auth.signInAnonymously();
+
+    if (error) {
+      console.error('Guest login error:', error);
+      return;
+    }
+
+    if (data?.user) {
+      // Update profile with random guest name
+      const guestName = `Guest ${Math.floor(Math.random() * 1000)}`;
+      const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.id}`;
+
+      await supabase.auth.updateUser({
+        data: { username: guestName, avatar_url: avatar }
+      });
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     window.location.href = '/';
   };
