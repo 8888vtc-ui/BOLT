@@ -216,3 +216,30 @@ export function getDirection(player: PlayerColor): 1 | -1 {
   return player === 1 ? 1 : -1;
 }
 
+export function getSmartMove(
+  board: BoardState,
+  player: PlayerColor,
+  from: number,
+  dice: number[]
+): { to: number; dieUsed: number } | null {
+  // 1. Essayer avec le plus grand dé d'abord (Convention UX standard)
+  const sortedDice = [...dice].sort((a, b) => b - a);
+
+  for (const die of sortedDice) {
+    const dest = player === 1 ? from + die : from - die;
+
+    // Vérifier la sortie (Bearing Off)
+    if (player === 1 && dest >= 24) {
+      if (canBearOff(board, player, from, die)) return { to: dest, dieUsed: die };
+    } else if (player === 2 && dest < 0) {
+      if (canBearOff(board, player, from, die)) return { to: dest, dieUsed: die };
+    }
+    // Vérifier le mouvement normal
+    else if (canMoveTo(board, player, dest)) {
+      return { to: dest, dieUsed: die };
+    }
+  }
+
+  return null;
+}
+

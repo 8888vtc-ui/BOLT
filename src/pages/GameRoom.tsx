@@ -4,7 +4,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { motion } from 'framer-motion';
-import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag } from 'lucide-react';
+import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw } from 'lucide-react';
 
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useGameStore } from '../stores/gameStore';
@@ -28,7 +28,10 @@ const GameRoom = () => {
         isConnected,
         joinRoom,
         leaveRoom,
-        sendGameAction
+        sendGameAction,
+        handleCheckerClick,
+        undoMove,
+        canUndo
     } = useGameSocket();
 
     const { currentRoom, gameState, players } = useGameStore();
@@ -71,7 +74,7 @@ const GameRoom = () => {
 
     // --- Game Logic ---
     const { board, dice, turn, score, cubeValue } = gameState;
-    const isMyTurn = turn === user?.id;
+    const isMyTurn = turn === user?.id || (turn === 'guest-1' && user?.id === 'guest-1'); // Hack for demo
     const playerColor = players[0]?.id === user?.id ? 1 : 2; // 1 = Blanc, 2 = Rouge
 
     // Handlers
@@ -119,6 +122,7 @@ const GameRoom = () => {
                 onDragStart={onDragStart}
                 currentPlayer={playerColor}
                 canMove={isMyTurn && dice.length > 0}
+                onClick={() => handleCheckerClick(i)}
             />
         );
     }
@@ -136,6 +140,7 @@ const GameRoom = () => {
                 onDragStart={onDragStart}
                 currentPlayer={playerColor}
                 canMove={isMyTurn && dice.length > 0}
+                onClick={() => handleCheckerClick(i)}
             />
         );
     }
@@ -164,8 +169,8 @@ const GameRoom = () => {
 
                     <div className="flex items-center gap-6">
                         <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isMyTurn
-                            ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
-                            : 'bg-gray-800/50 border-gray-700 text-gray-400'
+                                ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
+                                : 'bg-gray-800/50 border-gray-700 text-gray-400'
                             }`}>
                             <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
                             <span className="text-sm font-bold uppercase tracking-wide">
@@ -200,8 +205,8 @@ const GameRoom = () => {
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: idx * 0.1 }}
                                         className={`relative p-4 rounded-xl border transition-all duration-300 ${isCurrentTurn
-                                            ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
-                                            : 'bg-white/5 border-white/5'
+                                                ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
+                                                : 'bg-white/5 border-white/5'
                                             }`}
                                     >
                                         {isCurrentTurn && (
@@ -317,13 +322,24 @@ const GameRoom = () => {
                         </div>
 
                         {/* Action Bar (Bottom) */}
-                        <div className="h-24 bg-[#111] border-t border-white/10 flex items-center justify-center px-8 shrink-0">
+                        <div className="h-24 bg-[#111] border-t border-white/10 flex items-center justify-center px-8 shrink-0 gap-4">
+                            {/* Undo Button */}
+                            {canUndo && (
+                                <button
+                                    onClick={undoMove}
+                                    className="px-6 py-4 rounded-xl bg-gray-800 text-white font-bold hover:bg-gray-700 transition-colors flex items-center gap-2"
+                                >
+                                    <RotateCcw className="w-5 h-5" />
+                                    ANNULER
+                                </button>
+                            )}
+
                             <button
                                 onClick={handleRollDice}
                                 disabled={!isMyTurn || dice.length > 0}
                                 className={`px-12 py-4 rounded-xl font-black text-xl tracking-wide transition-all transform ${isMyTurn && dice.length === 0
-                                    ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
-                                    : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
+                                        ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
+                                        : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
                                     }`}
                             >
                                 {dice.length > 0 ? 'AU JEU !' : 'LANCER LES DÉS'}

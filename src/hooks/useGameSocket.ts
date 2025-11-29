@@ -1,8 +1,8 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState } from '../stores/gameStore';
-import { INITIAL_BOARD } from '../lib/gameLogic';
+import { INITIAL_BOARD, getSmartMove, makeMove } from '../lib/gameLogic';
 
 const SOCKET_URL = 'http://localhost:8888';
 const DEMO_MODE = true;
@@ -48,6 +48,9 @@ export const useGameSocket = () => {
     const socketRef = useRef<Socket | null>(null);
     const { user } = useAuth();
 
+    // Local history for Undo functionality
+    const [history, setHistory] = useState<GameState[]>([]);
+
     const {
         setIsConnected,
         setRoomsList,
@@ -67,8 +70,6 @@ export const useGameSocket = () => {
         if (DEMO_MODE && currentRoom?.players.some(p => p.id === 'bot-gnu') && gameState?.turn === 'bot-gnu') {
             const timer = setTimeout(() => {
                 console.log('🤖 Bot is playing...');
-
-                // 1. Lancer les dés
                 const dice1 = Math.floor(Math.random() * 6) + 1;
                 const dice2 = Math.floor(Math.random() * 6) + 1;
 
@@ -82,11 +83,11 @@ export const useGameSocket = () => {
 
                 updateGame({
                     ...gameState,
-                    dice: [], // Reset dice
-                    turn: user?.id || 'guest-1' // Rend la main au joueur
+                    dice: [],
+                    turn: user?.id || 'guest-1'
                 });
 
-            }, 3000); // Délai de réflexion simulé
+            }, 3000);
             return () => clearTimeout(timer);
         }
     }, [gameState, currentRoom, user, updateGame, addMessage]);
@@ -102,97 +103,42 @@ export const useGameSocket = () => {
         if (!user) return;
         if (socketRef.current?.connected) return;
 
-        console.log('🔌 Connecting to WebSocket:', SOCKET_URL);
-
         socketRef.current = io(SOCKET_URL, {
-            auth: {
-                token: 'mock-token',
-                userId: user.id,
-                username: user.username
-            },
+            auth: { token: 'mock-token', userId: user.id, username: user.username },
             transports: ['websocket'],
             reconnection: true,
         });
 
         const socket = socketRef.current;
 
-        socket.on('connect', () => {
-            console.log('✅ Connected to WebSocket');
-            setIsConnected(true);
-            socket.emit('getRooms');
-        });
-
-        socket.on('disconnect', () => {
-            console.log('❌ Disconnected from WebSocket');
-            setIsConnected(false);
-        });
-
-        socket.on('connect_error', (err) => {
-            console.error('Connection error:', err);
-        });
-
-        socket.on('roomsList', (updatedRooms: Room[]) => {
-            console.log('🏠 Rooms updated:', updatedRooms);
-            setRoomsList(updatedRooms);
-        });
-
-        socket.on('roomUpdate', (room: Room) => {
-            console.log('📝 Room updated:', room);
-            setRoom(room);
-        });
-
-        socket.on('gameStarted', (initialState: GameState) => {
-            console.log('🎲 Game started:', initialState);
-            updateGame(initialState);
-        });
-
-        socket.on('gameStateUpdate', (newState: GameState) => {
-            updateGame(newState);
-        });
-
-        socket.on('chatMessage', (msg: any) => {
-            addMessage(msg);
-        });
+        socket.on('connect', () => { setIsConnected(true); socket.emit('getRooms'); });
+        socket.on('disconnect', () => { setIsConnected(false); });
+        socket.on('roomsList', (updatedRooms: Room[]) => setRoomsList(updatedRooms));
+        socket.on('roomUpdate', (room: Room) => setRoom(room));
+        socket.on('gameStarted', (initialState: GameState) => updateGame(initialState));
+        socket.on('gameStateUpdate', (newState: GameState) => updateGame(newState));
+        socket.on('chatMessage', (msg: any) => addMessage(msg));
 
         return () => {
-            if (socket) {
-                socket.disconnect();
-                socketRef.current = null;
-                setIsConnected(false);
-            }
+            if (socket) { socket.disconnect(); socketRef.current = null; setIsConnected(false); }
         };
     }, [user, setIsConnected, setRoomsList, setRoom, updateGame, addMessage]);
 
     const playVsBot = useCallback(() => {
         if (DEMO_MODE) {
-            console.log('🤖 DEMO: Starting game vs Bot');
             const botRoom: Room = {
                 id: `room-bot-${Date.now()}`,
                 name: 'Partie contre GNU',
                 players: [
-                    {
-                        id: user?.id || 'guest-1',
-                        username: user?.username || 'Guest',
-                        avatar: user?.avatar
-                    },
-                    {
-                        id: 'bot-gnu',
-                        username: 'GNU Backgammon',
-                        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=GNU',
-                        score: 3500
-                    }
+                    { id: user?.id || 'guest-1', username: user?.username || 'Guest', avatar: user?.avatar },
+                    { id: 'bot-gnu', username: 'GNU Backgammon', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=GNU', score: 3500 }
                 ],
                 status: 'playing'
             };
-
             setRoom(botRoom);
             setPlayers(botRoom.players);
-
-            // Initialiser le jeu
             const initialState = createMockGameState();
-            // Décider qui commence (50/50)
             initialState.turn = Math.random() > 0.5 ? (user?.id || 'guest-1') : 'bot-gnu';
-
             updateGame(initialState);
             return botRoom.id;
         }
@@ -200,80 +146,89 @@ export const useGameSocket = () => {
 
     const createRoom = useCallback((roomName: string) => {
         if (DEMO_MODE) {
-            console.log('🎮 DEMO: Creating room:', roomName);
             const newRoom: Room = {
                 id: `room-${Date.now()}`,
                 name: roomName,
-                players: [
-                    {
-                        id: user?.id || 'guest-1',
-                        username: user?.username || 'Guest',
-                        avatar: user?.avatar
-                    }
-                ],
+                players: [{ id: user?.id || 'guest-1', username: user?.username || 'Guest', avatar: user?.avatar }],
                 status: 'waiting'
             };
             setRoomsList([...roomsList, newRoom]);
             return;
         }
-
         if (!socketRef.current) return;
-        console.log('🔨 Creating room:', roomName);
         socketRef.current.emit('createRoom', { name: roomName });
     }, [user, roomsList, setRoomsList]);
 
     const joinRoom = useCallback((roomId: string) => {
         if (DEMO_MODE) {
-            console.log('🎮 DEMO: Joining room:', roomId);
             const room = roomsList.find(r => r.id === roomId);
             if (room) {
                 const updatedRoom = {
                     ...room,
-                    players: room.players.length < 2 ? [
-                        ...room.players,
-                        {
-                            id: user?.id || 'guest-2',
-                            username: user?.username || 'Guest',
-                            avatar: user?.avatar
-                        }
-                    ] : room.players,
+                    players: room.players.length < 2 ? [...room.players, { id: user?.id || 'guest-2', username: user?.username || 'Guest', avatar: user?.avatar }] : room.players,
                     status: room.players.length >= 1 ? 'playing' as const : 'waiting' as const
                 };
                 setRoom(updatedRoom);
-                setPlayers(updatedRoom.players); // FIX: Mettre à jour les players
-
+                setPlayers(updatedRoom.players);
                 if (updatedRoom.status === 'playing') {
-                    const mockState = createMockGameState();
-                    console.log('🎲 Initializing game state with board:', mockState.board);
-                    updateGame(mockState);
+                    updateGame(createMockGameState());
                 }
             }
             return;
         }
-
         if (!socketRef.current) return;
-        console.log('👋 Joining room:', roomId);
         socketRef.current.emit('joinRoom', { roomId });
     }, [user, roomsList, setRoom, setPlayers, updateGame]);
 
     const leaveRoom = useCallback(() => {
-        if (DEMO_MODE) {
-            console.log('🎮 DEMO: Leaving room');
-            resetGame();
-            return;
-        }
-
+        if (DEMO_MODE) { resetGame(); return; }
         if (!socketRef.current || !currentRoom) return;
-        console.log('🚪 Leaving room');
         socketRef.current.emit('leaveRoom', { roomId: currentRoom.id });
         resetGame();
     }, [currentRoom, resetGame]);
 
+    const handleCheckerClick = useCallback((index: number) => {
+        if (!gameState || !user) return;
+
+        // Vérifier si c'est mon tour
+        const isMyTurn = gameState.turn === user.id || (DEMO_MODE && gameState.turn === 'guest-1');
+        if (!isMyTurn) return;
+
+        const playerColor = 1; // On assume que l'utilisateur est toujours Player 1 (Blanc) pour la démo
+
+        const point = gameState.board.points[index];
+        if (point.player !== playerColor || point.count === 0) return;
+
+        const smartMove = getSmartMove(gameState.board, playerColor, index, gameState.dice);
+
+        if (smartMove) {
+            console.log('🚀 Smart Move:', smartMove);
+            setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
+
+            const newBoard = makeMove(gameState.board, playerColor, index, smartMove.to);
+            const newDice = [...gameState.dice];
+            const dieIndex = newDice.indexOf(smartMove.dieUsed);
+            if (dieIndex > -1) newDice.splice(dieIndex, 1);
+
+            updateGame({
+                ...gameState,
+                board: newBoard,
+                dice: newDice
+            });
+        }
+    }, [gameState, user, updateGame]);
+
+    const undoMove = useCallback(() => {
+        if (history.length === 0) return;
+        const previousState = history[history.length - 1];
+        updateGame(previousState);
+        setHistory(prev => prev.slice(0, -1));
+    }, [history, updateGame]);
+
     const sendGameAction = useCallback((action: string, payload: any) => {
         if (DEMO_MODE) {
-            console.log('🎮 DEMO: Game action:', action, payload);
-
             if (action === 'rollDice' && gameState) {
+                setHistory([]); // Clear history on new roll
                 const dice1 = Math.floor(Math.random() * 6) + 1;
                 const dice2 = Math.floor(Math.random() * 6) + 1;
                 updateGame({
@@ -281,34 +236,17 @@ export const useGameSocket = () => {
                     dice: dice1 === dice2 ? [dice1, dice2, dice1, dice2] : [dice1, dice2]
                 });
             }
-
-            if (action === 'move' && gameState) {
-                updateGame({
-                    ...gameState,
-                    dice: []
-                });
-            }
-
             return;
         }
-
         if (!socketRef.current) return;
         socketRef.current.emit('gameAction', { action, payload });
     }, [gameState, updateGame]);
 
     const sendMessage = useCallback((message: string) => {
         if (DEMO_MODE) {
-            console.log('🎮 DEMO: Sending message:', message);
-            addMessage({
-                id: `msg-${Date.now()}`,
-                userId: user?.id || 'guest-1',
-                username: user?.username || 'Guest',
-                text: message,
-                timestamp: Date.now()
-            });
+            addMessage({ id: `msg-${Date.now()}`, userId: user?.id || 'guest-1', username: user?.username || 'Guest', text: message, timestamp: Date.now() });
             return;
         }
-
         if (!socketRef.current || !currentRoom) return;
         socketRef.current.emit('chatMessage', { roomId: currentRoom.id, message });
     }, [user, currentRoom, addMessage]);
@@ -324,6 +262,9 @@ export const useGameSocket = () => {
         leaveRoom,
         sendGameAction,
         sendMessage,
-        playVsBot
+        playVsBot,
+        handleCheckerClick,
+        undoMove,
+        canUndo: history.length > 0
     };
 };

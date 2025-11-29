@@ -12,6 +12,7 @@ interface PointProps {
   onDragStart: (index: number) => void;
   currentPlayer: number;
   canMove: boolean;
+  onClick?: () => void;
 }
 
 export default function Point({
@@ -23,6 +24,7 @@ export default function Point({
   onDragStart,
   currentPlayer,
   canMove,
+  onClick
 }: PointProps) {
   const [{ isOver }, drop] = useDrop(
     () => ({
@@ -36,24 +38,30 @@ export default function Point({
   );
 
   const checkers = [];
-  // Limiter l'affichage visuel à 5 pions pour éviter que ça sorte du board
-  // Le dernier pion affichera le nombre total si > 5
   const displayCount = Math.min(point.count, 5);
 
   for (let i = 0; i < displayCount; i++) {
-    // Le dernier pion visible porte l'info du total si stack > 5
     const isLastVisible = i === displayCount - 1;
     const stackHeight = isLastVisible ? point.count : 1;
 
+    // Seul le pion du haut est interactif (click ou drag)
+    const isInteractive = canMove && point.player === currentPlayer && isLastVisible;
+
     checkers.push(
-      <div key={i} className="relative w-[90%] aspect-square flex-shrink-0" style={{ marginBottom: '-15%' }}>
+      <div
+        key={i}
+        className="relative w-[90%] aspect-square flex-shrink-0"
+        style={{ marginBottom: '-15%' }}
+        onClick={(e) => {
+          if (isInteractive && onClick) {
+            e.stopPropagation(); // Empêcher la propagation si nécessaire
+            onClick();
+          }
+        }}
+      >
         <Checker
           player={point.player!}
-          draggable={
-            canMove &&
-            point.player === currentPlayer &&
-            i === displayCount - 1 // Seul le pion du haut est draggable
-          }
+          draggable={isInteractive}
           onDragStart={() => onDragStart(index)}
           index={i}
           stackHeight={stackHeight}
