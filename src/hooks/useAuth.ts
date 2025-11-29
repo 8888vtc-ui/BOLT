@@ -74,6 +74,28 @@ export function useAuth() {
     window.location.href = `${API_URL}/auth/google`;
   };
 
+  const loginAsGuest = () => {
+    // Création d'un user invité fictif
+    const guestId = 'guest-' + Math.floor(Math.random() * 10000);
+    const guestUser: User = {
+      id: guestId,
+      username: `Guest ${Math.floor(Math.random() * 1000)}`,
+      email: `${guestId}@example.com`,
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
+      role: 'guest'
+    };
+
+    // Création d'un faux token JWT (Header.Payload.Signature)
+    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const payload = btoa(JSON.stringify(guestUser));
+    const signature = "dummy_signature";
+    const token = `${header}.${payload}.${signature}`;
+
+    localStorage.setItem('token', token);
+    setUser(guestUser);
+    // Pas de redirection nécessaire ici, le state user mettra à jour l'app
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
@@ -85,6 +107,7 @@ export function useAuth() {
     loading,
     isAuthenticated: !!user,
     loginWithGoogle,
+    loginAsGuest,
     logout
   };
 }

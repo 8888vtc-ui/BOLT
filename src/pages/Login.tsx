@@ -1,27 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Dices, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { Dices, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { loginWithGoogle } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
+  const { loginWithGoogle, loginAsGuest } = useAuth();
   const [error, setError] = useState('');
 
   const handleGoogleLogin = () => {
-    // Cette fonction redirige directement vers le backend
     loginWithGoogle();
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('Email login not implemented yet. Please use Google Login.');
-    // TODO: Implement email login with new backend if needed
   };
 
   return (
@@ -86,6 +79,17 @@ export default function Login() {
             <span>Continue with Google</span>
           </button>
 
+          <button
+            onClick={() => {
+              loginAsGuest();
+              navigate('/lobby');
+            }}
+            className="w-full group relative overflow-hidden bg-[#1a1a1a] border-2 border-gray-700 hover:border-white text-gray-300 hover:text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 text-lg shadow-lg"
+          >
+            <UserIcon className="w-6 h-6" />
+            <span>Play as Guest</span>
+          </button>
+
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-800"></div>
@@ -96,7 +100,6 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleEmailAuth} className="space-y-4 opacity-50 pointer-events-none">
-            {/* Formulaire email désactivé pour focus sur Google Auth */}
             <div className="text-center text-gray-500 text-sm">
               Email login coming soon
             </div>
