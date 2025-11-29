@@ -56,19 +56,21 @@ const GameRoom = () => {
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
         if (!currentRoom || !gameState) {
-            addLog('Chargement de la partie...', 'info', {
-                hasRoom: !!currentRoom,
-                hasGameState: !!gameState,
+            addLog('Chargement de la partie...', 'info', { 
+                hasRoom: !!currentRoom, 
+                hasGameState: !!gameState, 
                 roomId,
-                isConnected
+                isConnected 
             });
         } else {
-            addLog('Partie chargée avec succès !', 'success', {
-                roomName: currentRoom.name,
-                turn: gameState.turn
+            addLog('Partie chargée avec succès !', 'success', { 
+                roomName: currentRoom.name, 
+                turn: gameState.turn,
+                myId: user?.id,
+                isMyTurn: gameState.turn === user?.id || (gameState.turn === 'guest-1' && user?.id === 'guest-1')
             });
         }
-    }, [currentRoom, gameState, roomId, isConnected]);
+    }, [currentRoom, gameState, roomId, isConnected, user]);
 
     if (!currentRoom || !gameState) {
         return (
@@ -109,8 +111,13 @@ const GameRoom = () => {
 
     // Handlers
     const handleRollDice = () => {
+        const addLog = useDebugStore.getState().addLog;
+        addLog('Tentative de lancer les dés', 'info', { isMyTurn, diceLength: dice.length });
+        
         if (isMyTurn && dice.length === 0) {
             sendGameAction('rollDice', {});
+        } else {
+            addLog('Action refusée', 'error', { reason: !isMyTurn ? 'Pas votre tour' : 'Dés déjà lancés' });
         }
     };
 

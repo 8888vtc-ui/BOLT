@@ -8,13 +8,12 @@ import { useDebugStore } from '../stores/debugStore';
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
 // --- Mock Data for Demo Mode ---
-const createMockGameState = (): GameState => ({
+const createMockGameState = (userId?: string): GameState => ({
     board: INITIAL_BOARD,
     dice: [],
-    turn: '', // Pas de tour par défaut
-    score: {}, // Score vide
+    turn: userId || 'guest-1', // Le tour est au joueur par défaut
+    score: {},
     cubeValue: 1,
-    availableMoves: [],
     doubleValue: 1,
     canDouble: true,
     matchLength: 5,
@@ -100,7 +99,7 @@ export const useGameSocket = () => {
                 players: []
             };
             setRoom(room as Room);
-            updateGame(createMockGameState());
+            updateGame(createMockGameState(user?.id));
             return;
         }
 
@@ -154,7 +153,7 @@ export const useGameSocket = () => {
                 updateGame(gameData.board_state);
             } else {
                 addLog('No game found, creating new game...', 'info');
-                const initialState = createMockGameState();
+                const initialState = createMockGameState(user?.id);
                 const { error: insertError } = await supabase.from('games').insert({
                     room_id: roomId,
                     board_state: initialState,
@@ -173,7 +172,7 @@ export const useGameSocket = () => {
         } catch (err) {
             addLog('Critical error joining room', 'error', err);
             setRoom({ id: roomId, name: 'Erreur Connexion', status: 'playing', players: [] });
-            updateGame(createMockGameState());
+            updateGame(createMockGameState(user?.id));
         }
 
     }, [user, roomsList, setRoom, updateGame, addMessage]);
@@ -222,6 +221,9 @@ export const useGameSocket = () => {
 
     // --- Game Actions ---
     const sendGameAction = useCallback(async (action: string, payload: any) => {
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`Action: ${action}`, 'info', payload);
+
         let newState = { ...gameState } as GameState;
 
         if (action === 'rollDice') {
@@ -229,6 +231,7 @@ export const useGameSocket = () => {
             const dice1 = Math.floor(Math.random() * 6) + 1;
             const dice2 = Math.floor(Math.random() * 6) + 1;
             newState.dice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
+            addLog(`Dice rolled: ${newState.dice.join(', ')}`, 'success');
         } else if (action === 'move') {
             const { from, to } = payload;
             const playerColor = 1;
@@ -239,9 +242,17 @@ export const useGameSocket = () => {
                 return;
             }
 
-            const distance = from - to;
+            const distance = Math.abs(from - to);
             const currentDice = newState.dice || [];
-            const dieIndex = currentDice.indexOf(distance);
+
+            let dieUsed = -1;
+            if (playerColor === 1) { // Blanc (23 -> 0)
+                if (from > to) dieUsed = from - to;
+            } else {
+                if (to > from) dieUsed = to - from;
+            }
+
+            const dieIndex = currentDice.indexOf(dieUsed);
 
             if (dieIndex > -1) {
                 setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
@@ -251,6 +262,10 @@ export const useGameSocket = () => {
 
                 newState.board = newBoard;
                 newState.dice = newDice;
+                addLog('Move executed locally', 'success');
+            } else {
+                addLog('Invalid move or no matching die', 'error', { from, to, dieUsed, dice: currentDice });
+                return;
             }
         }
 
@@ -259,7 +274,12 @@ export const useGameSocket = () => {
         }
 
         if (!DEMO_MODE && currentRoom && newState.board) {
-            await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+            const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+            if (error) {
+                addLog('Error updating game in DB', 'error', error);
+            } else {
+                addLog('Game updated in DB', 'success');
+            }
         }
 
     }, [gameState, updateGame, history, currentRoom, undoMove]);
