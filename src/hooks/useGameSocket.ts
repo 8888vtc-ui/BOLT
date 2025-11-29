@@ -331,9 +331,37 @@ export const useGameSocket = () => {
         }
     }, [gameState, user, updateGame, currentRoom, players]);
 
-    const playVsBot = useCallback(() => {
-        return 'bot-room-id';
-    }, []);
+    const playVsBot = useCallback(async () => {
+        const addLog = useDebugStore.getState().addLog;
+        addLog('Creating training room...', 'info');
+
+        try {
+            const { data, error } = await supabase
+                .from('rooms')
+                .insert({
+                    name: `Entraînement ${user?.username || 'Solo'}`,
+                    created_by: user?.id,
+                    status: 'playing'
+                })
+                .select()
+                .single();
+
+            if (error) {
+                addLog('Error creating training room', 'error', error);
+                return null;
+            }
+
+            if (data) {
+                addLog('Training room created', 'success', { roomId: data.id });
+                return data.id;
+            }
+        } catch (err) {
+            addLog('Exception creating training room', 'error', err);
+            return null;
+        }
+
+        return null;
+    }, [user]);
 
     return {
         socket: null,

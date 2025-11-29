@@ -192,6 +192,36 @@ const Lobby = () => {
                                 <Users className="w-6 h-6" />
                             </div>
                             <h3 className="font-bold text-lg mb-1">Jouer avec un ami</h3>
+                            <p className="text-sm text-gray-500">Créez une salle privée et invitez un ami.</p>
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                if (!user) {
+                                    alert("Vous devez être connecté pour jouer.");
+                                    return;
+                                }
+                                // Créer une salle d'entraînement rapide
+                                const { data, error } = await supabase
+                                    .from('rooms')
+                                    .insert({
+                                        name: `Entraînement ${user?.username || 'Solo'}`,
+                                        created_by: user?.id,
+                                        status: 'playing'
+                                    })
+                                    .select()
+                                    .single();
+
+                                if (error) {
+                                    console.error("Erreur création salle:", error);
+                                    alert(`Erreur création salle: ${error.message}`);
+                                }
+
+                                if (data) {
+                                    navigate(`/game/${data.id}`);
+                                }
+                            }}
+                            className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group"
                         >
                             <div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                                 <Swords className="w-6 h-6" />

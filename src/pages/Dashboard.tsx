@@ -74,9 +74,10 @@ export default function Dashboard() {
           </button>
 
           <button
-            onClick={() => {
-              const roomId = playVsBot();
+            onClick={async () => {
+              const roomId = await playVsBot();
               if (roomId) navigate(`/game/${roomId}`);
+              else alert("Erreur lors de la création de la salle d'entraînement.");
             }}
             className="bg-[#111] border-2 border-[#FFD700] text-[#FFD700] p-8 rounded-2xl font-black text-xl hover:bg-[#FFD700]/10 transition-all"
           >
