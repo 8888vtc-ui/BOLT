@@ -91,12 +91,11 @@ export const useGameSocket = () => {
         const addLog = useDebugStore.getState().addLog;
         addLog(`Joining room: ${roomId}`, 'info');
 
-        // Mode Local (Demo ou Bot)
-        if (DEMO_MODE || roomId === 'bot-room-id') {
-            addLog('Local mode join (No DB)', 'info');
+        if (DEMO_MODE) {
+            addLog('Demo mode join', 'info');
             const room = roomsList.find(r => r.id === roomId) || {
                 id: roomId,
-                name: roomId === 'bot-room-id' ? 'Entraînement contre le Coach' : 'Salle Demo',
+                name: 'Salle Demo',
                 status: 'playing',
                 players: []
             };
@@ -291,10 +290,7 @@ export const useGameSocket = () => {
             addLog('Local game state updated', 'success');
         }
 
-        // Ne pas synchroniser avec la DB si on est en mode Demo ou Bot (local)
-        const isLocalMode = DEMO_MODE || (currentRoom && currentRoom.id === 'bot-room-id');
-
-        if (!isLocalMode && currentRoom && newState.board) {
+        if (!DEMO_MODE && currentRoom && newState.board) {
             const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
             if (error) {
                 addLog('Error updating game in DB', 'error', { message: error.message, details: error.details, hint: error.hint, code: error.code });
