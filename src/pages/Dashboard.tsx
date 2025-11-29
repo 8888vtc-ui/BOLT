@@ -1,156 +1,136 @@
-import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Gamepad2, Trophy, User, Dices } from 'lucide-react';
+import { Play, Trophy, TrendingUp, Target, Clock, Award } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { api } from '../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, logout, loading } = useAuth();
-  const [creatingGame, setCreatingGame] = useState(false);
+  const { user } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  const stats = [
+    { label: 'Parties jouées', value: '47', icon: Play, color: '#FFD700' },
+    { label: 'Victoires', value: '32', icon: Trophy, color: '#00FF00' },
+    { label: 'Taux de victoire', value: '68%', icon: TrendingUp, color: '#FF00FF' },
+    { label: 'Classement', value: '#142', icon: Award, color: '#00FFFF' },
+  ];
 
-  const handleNewGame = async () => {
-    try {
-      setCreatingGame(true);
-      const game = await api.createGame(undefined, 'pvp');
-      navigate(`/game/${game.id}`);
-    } catch (error) {
-      console.error('Failed to create game:', error);
-    } finally {
-      setCreatingGame(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Dices className="w-16 h-16 text-[#FFD700] animate-spin" />
-          <p className="text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    navigate('/');
-    return null;
-  }
+  const recentGames = [
+    { opponent: 'Magnus', result: 'Victoire', score: '7-3', date: 'Il y a 2h' },
+    { opponent: 'Kasparov', result: 'Défaite', score: '4-7', date: 'Il y a 5h' },
+    { opponent: 'Alice', result: 'Victoire', score: '7-1', date: 'Hier' },
+  ];
 
   return (
-    <div className="min-h-screen bg-black backgammon-pattern">
-      <nav className="border-b border-gray-900 bg-black/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <Dices className="w-8 h-8 text-[#FFD700]" />
-              <span className="text-2xl font-bold text-[#FFD700]">GuruGammon</span>
-            </div>
+    <div className="min-h-screen bg-[#050505] p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-12"
+        >
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#FDB931] mb-2">
+            Bienvenue, {user?.username} !
+          </h1>
+          <p className="text-gray-400 text-lg">Prêt à dominer le plateau ?</p>
+        </motion.div>
 
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-800 hover:border-[#FFD700] text-gray-400 hover:text-[#FFD700] rounded-lg transition-all duration-300"
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-[#111] rounded-2xl p-6 border border-white/10 hover:border-[#FFD700]/50 transition-all"
             >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-12">
-          <div className="flex items-center gap-6 mb-8">
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.username}
-                className="w-24 h-24 rounded-full border-4 border-[#FFD700] shadow-[0_0_40px_rgba(255,215,0,0.3)]"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFC700] flex items-center justify-center shadow-[0_0_40px_rgba(255,215,0,0.3)]">
-                <User className="w-12 h-12 text-black" />
+              <div className="flex items-center justify-between mb-4">
+                <stat.icon className="w-8 h-8" style={{ color: stat.color }} />
+                <div className="text-3xl font-black" style={{ color: stat.color }}>
+                  {stat.value}
+                </div>
               </div>
-            )}
-
-            <div>
-              <h1 className="text-4xl md:text-5xl font-bold mb-2">
-                <span className="text-gray-400">Welcome,</span>{' '}
-                <span className="text-[#FFD700]">{user.username}</span>
-              </h1>
-              <p className="text-gray-500 text-lg capitalize">{user.role} Player</p>
-            </div>
-          </div>
+              <div className="text-gray-400 text-sm font-medium">{stat.label}</div>
+            </motion.div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+        >
           <button
-            onClick={handleNewGame}
-            disabled={creatingGame}
-            className="group relative overflow-hidden bg-gradient-to-br from-gray-900 to-black border border-gray-800 hover:border-[#FFD700] rounded-2xl p-8 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-[0_0_40px_rgba(255,215,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => navigate('/lobby')}
+            className="bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black p-8 rounded-2xl font-black text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,215,0,0.3)]"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700] opacity-5 rounded-full blur-3xl group-hover:opacity-10 transition-opacity"></div>
-
-            <div className="relative">
-              <div className="mb-4 inline-block p-4 bg-[#FFD700]/10 rounded-xl group-hover:bg-[#FFD700]/20 transition-colors">
-                <Gamepad2 className="w-10 h-10 text-[#FFD700]" />
-              </div>
-
-              <h3 className="text-2xl font-bold text-white mb-2">New Game</h3>
-              <p className="text-gray-400">Start a new backgammon match</p>
-            </div>
+            <Play className="w-12 h-12 mb-4 mx-auto" />
+            Jouer Maintenant
           </button>
 
           <button
             onClick={() => navigate('/tournaments')}
-            className="group relative overflow-hidden bg-gradient-to-br from-gray-900 to-black border border-gray-800 hover:border-[#FFD700] rounded-2xl p-8 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-[0_0_40px_rgba(255,215,0,0.2)]"
+            className="bg-[#111] border-2 border-[#FFD700] text-[#FFD700] p-8 rounded-2xl font-black text-xl hover:bg-[#FFD700]/10 transition-all"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700] opacity-5 rounded-full blur-3xl group-hover:opacity-10 transition-opacity"></div>
-
-            <div className="relative">
-              <div className="mb-4 inline-block p-4 bg-[#FFD700]/10 rounded-xl group-hover:bg-[#FFD700]/20 transition-colors">
-                <Trophy className="w-10 h-10 text-[#FFD700]" />
-              </div>
-
-              <h3 className="text-2xl font-bold text-white mb-2">Tournaments</h3>
-              <p className="text-gray-400">Compete in live tournaments</p>
-            </div>
+            <Trophy className="w-12 h-12 mb-4 mx-auto" />
+            Tournois
           </button>
 
           <button
             onClick={() => navigate('/leaderboard')}
-            className="group relative overflow-hidden bg-gradient-to-br from-gray-900 to-black border border-gray-800 hover:border-[#FFD700] rounded-2xl p-8 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-[0_0_40px_rgba(255,215,0,0.2)]"
+            className="bg-[#111] border-2 border-white/20 text-white p-8 rounded-2xl font-black text-xl hover:border-white/40 transition-all"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFD700] opacity-5 rounded-full blur-3xl group-hover:opacity-10 transition-opacity"></div>
-
-            <div className="relative">
-              <div className="mb-4 inline-block p-4 bg-[#FFD700]/10 rounded-xl group-hover:bg-[#FFD700]/20 transition-colors">
-                <User className="w-10 h-10 text-[#FFD700]" />
-              </div>
-
-              <h3 className="text-2xl font-bold text-white mb-2">Leaderboard</h3>
-              <p className="text-gray-400">View global rankings</p>
-            </div>
+            <TrendingUp className="w-12 h-12 mb-4 mx-auto" />
+            Classement
           </button>
-        </div>
+        </motion.div>
 
-        <div className="mt-12 p-8 bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-2xl">
-          <h2 className="text-3xl font-bold text-[#FFD700] mb-4">Getting Started</h2>
-          <div className="space-y-4 text-gray-400">
-            <p className="text-lg">Welcome to GuruGammon! Here's what you can do:</p>
-            <ul className="space-y-2 list-disc list-inside">
-              <li>Play instant matches against AI or other players</li>
-              <li>Join tournaments and climb the leaderboard</li>
-              <li>Track your progress and improve your skills</li>
-              <li>Connect with the backgammon community</li>
-            </ul>
+        {/* Recent Games */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-[#111] rounded-2xl p-8 border border-white/10"
+        >
+          <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-3">
+            <Clock className="w-6 h-6 text-[#FFD700]" />
+            Parties Récentes
+          </h2>
+
+          <div className="space-y-4">
+            {recentGames.map((game, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-700 to-black flex items-center justify-center text-white font-bold">
+                    {game.opponent[0]}
+                  </div>
+                  <div>
+                    <div className="font-bold text-white">vs {game.opponent}</div>
+                    <div className="text-sm text-gray-400">{game.date}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="text-lg font-mono font-bold text-gray-300">{game.score}</div>
+                  <div
+                    className={`px-4 py-2 rounded-lg font-bold ${game.result === 'Victoire'
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-red-500/20 text-red-400'
+                      }`}
+                  >
+                    {game.result}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

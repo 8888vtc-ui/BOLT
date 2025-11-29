@@ -1,8 +1,8 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { GameToaster } from './components/common/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
+import Navbar from './components/common/Navbar';
 
 // Pages
 import GurugammonLanding from './pages/GurugammonLanding';
@@ -12,6 +12,18 @@ import Lobby from './pages/Lobby';
 import GameRoom from './pages/GameRoom';
 import Tournaments from './pages/Tournaments';
 import Leaderboard from './pages/Leaderboard';
+
+function LayoutWithNavbar() {
+  const location = useLocation();
+  const showNavbar = !['/login', '/'].includes(location.pathname) && !location.pathname.startsWith('/game/');
+
+  return (
+    <>
+      {showNavbar && <Navbar />}
+      <Outlet />
+    </>
+  );
+}
 
 function App() {
   const { loading } = useAuth();
@@ -32,10 +44,10 @@ function App() {
           <Route path="/" element={<GurugammonLanding />} />
           <Route path="/login" element={<Login />} />
 
-          {/* Protected Routes Wrapper */}
+          {/* Protected Routes with Navbar */}
           <Route element={
             <ProtectedRoute>
-              <Outlet />
+              <LayoutWithNavbar />
             </ProtectedRoute>
           }>
             <Route path="/dashboard" element={<Dashboard />} />

@@ -4,13 +4,9 @@ import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState } from '../stores/gameStore';
 import { INITIAL_BOARD } from '../lib/gameLogic';
 
-// URL de ton backend local
 const SOCKET_URL = 'http://localhost:8888';
+const DEMO_MODE = true;
 
-// Mode démo : données mockées pour tester l'UI
-const DEMO_MODE = true; // Mettre à false quand le backend est prêt
-
-// Données de démo
 const createMockGameState = (): GameState => ({
     board: INITIAL_BOARD,
     dice: [],
@@ -56,6 +52,7 @@ export const useGameSocket = () => {
         setIsConnected,
         setRoomsList,
         setRoom,
+        setPlayers,
         updateGame,
         addMessage,
         resetGame,
@@ -65,7 +62,6 @@ export const useGameSocket = () => {
         roomsList
     } = useGameStore();
 
-    // Mode démo : initialisation des données mockées
     useEffect(() => {
         if (DEMO_MODE && user) {
             console.log('🎮 DEMO MODE: Using mock data');
@@ -74,7 +70,6 @@ export const useGameSocket = () => {
             return;
         }
 
-        // Mode production : connexion WebSocket réelle
         if (!user) return;
         if (socketRef.current?.connected) return;
 
@@ -139,7 +134,6 @@ export const useGameSocket = () => {
         };
     }, [user, setIsConnected, setRoomsList, setRoom, updateGame, addMessage]);
 
-    // Actions
     const createRoom = useCallback((roomName: string) => {
         if (DEMO_MODE) {
             console.log('🎮 DEMO: Creating room:', roomName);
@@ -169,7 +163,6 @@ export const useGameSocket = () => {
             console.log('🎮 DEMO: Joining room:', roomId);
             const room = roomsList.find(r => r.id === roomId);
             if (room) {
-                // Ajouter le joueur actuel à la room
                 const updatedRoom = {
                     ...room,
                     players: room.players.length < 2 ? [
@@ -183,10 +176,12 @@ export const useGameSocket = () => {
                     status: room.players.length >= 1 ? 'playing' as const : 'waiting' as const
                 };
                 setRoom(updatedRoom);
+                setPlayers(updatedRoom.players); // FIX: Mettre à jour les players
 
-                // Initialiser le gameState si la partie commence
                 if (updatedRoom.status === 'playing') {
-                    updateGame(createMockGameState());
+                    const mockState = createMockGameState();
+                    console.log('🎲 Initializing game state with board:', mockState.board);
+                    updateGame(mockState);
                 }
             }
             return;
@@ -195,7 +190,7 @@ export const useGameSocket = () => {
         if (!socketRef.current) return;
         console.log('👋 Joining room:', roomId);
         socketRef.current.emit('joinRoom', { roomId });
-    }, [user, roomsList, setRoom, updateGame]);
+    }, [user, roomsList, setRoom, setPlayers, updateGame]);
 
     const leaveRoom = useCallback(() => {
         if (DEMO_MODE) {
@@ -214,7 +209,6 @@ export const useGameSocket = () => {
         if (DEMO_MODE) {
             console.log('🎮 DEMO: Game action:', action, payload);
 
-            // Simuler le lancer de dés
             if (action === 'rollDice' && gameState) {
                 const dice1 = Math.floor(Math.random() * 6) + 1;
                 const dice2 = Math.floor(Math.random() * 6) + 1;
@@ -224,10 +218,7 @@ export const useGameSocket = () => {
                 });
             }
 
-            // Simuler un mouvement
             if (action === 'move' && gameState) {
-                // Ici tu pourrais implémenter une vraie logique de mouvement
-                // Pour l'instant on vide juste les dés après un mouvement
                 updateGame({
                     ...gameState,
                     dice: []
