@@ -100,27 +100,44 @@ const GameRoom = () => {
         }
     };
 
-    // Construction du plateau
+    // Construction du plateau selon la disposition standard du backgammon
+    // Top row: points 12-17 (gauche) et 18-23 (droite)
+    // Bottom row: points 11-6 (gauche) et 5-0 (droite)
     const topPoints = [];
     const bottomPoints = [];
 
-    for (let i = 0; i < 24; i++) {
-        const pointComponent = (
+    // Top row (points 12 à 23, de gauche à droite)
+    for (let i = 12; i <= 23; i++) {
+        topPoints.push(
             <Point
                 key={i}
                 index={i}
                 point={board.points[i]}
-                isTop={i >= 12}
-                isValidDestination={false} // À connecter avec logique de validation
+                isTop={true}
+                isValidDestination={false}
                 onDrop={onDrop}
                 onDragStart={onDragStart}
                 currentPlayer={playerColor}
                 canMove={isMyTurn && dice.length > 0}
             />
         );
+    }
 
-        if (i >= 12) topPoints.push(pointComponent);
-        else bottomPoints.unshift(pointComponent);
+    // Bottom row (points 11 à 0, de gauche à droite)
+    for (let i = 11; i >= 0; i--) {
+        bottomPoints.push(
+            <Point
+                key={i}
+                index={i}
+                point={board.points[i]}
+                isTop={false}
+                isValidDestination={false}
+                onDrop={onDrop}
+                onDragStart={onDragStart}
+                currentPlayer={playerColor}
+                canMove={isMyTurn && dice.length > 0}
+            />
+        );
     }
 
     return (
