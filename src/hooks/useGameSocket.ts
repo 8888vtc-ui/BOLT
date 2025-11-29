@@ -7,11 +7,12 @@ import { supabase } from '../lib/supabase';
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
 // --- Mock Data for Demo Mode ---
+// --- Mock Data for Demo Mode ---
 const createMockGameState = (): GameState => ({
     board: INITIAL_BOARD,
     dice: [],
-    turn: 'guest-1',
-    score: { 'guest-1': 0, 'guest-2': 0 },
+    turn: '', // Pas de tour par défaut
+    score: {}, // Score vide
     cubeValue: 1,
     availableMoves: [],
     doubleValue: 1,
@@ -20,25 +21,7 @@ const createMockGameState = (): GameState => ({
     currentPlayer: 1
 });
 
-const createMockRooms = (): Room[] => [
-    {
-        id: 'room-1',
-        name: 'Table des Champions',
-        players: [
-            { id: 'player-1', username: 'Magnus', score: 15, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Magnus' },
-            { id: 'player-2', username: 'Kasparov', score: 12, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kasparov' }
-        ],
-        status: 'playing'
-    },
-    {
-        id: 'room-2',
-        name: 'Débutants Bienvenus',
-        players: [
-            { id: 'player-3', username: 'Alice', score: 3, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alice' }
-        ],
-        status: 'waiting'
-    }
-];
+const createMockRooms = (): Room[] => []; // Plus de fausses salles
 
 export const useGameSocket = () => {
     const { user } = useAuth();
