@@ -9,7 +9,7 @@ export default function Tournaments() {
       status: 'En cours',
       players: 128,
       maxPlayers: 128,
-      prize: '1000€',
+      prize: '🏆 500 Points',
       startDate: 'Aujourd\'hui 20:00',
       format: 'Élimination directe',
       entryFee: 'Gratuit',
@@ -20,10 +20,10 @@ export default function Tournaments() {
       status: 'Inscription ouverte',
       players: 45,
       maxPlayers: 256,
-      prize: '5000€',
+      prize: '🏆 2000 Points',
       startDate: 'Dans 3 jours',
       format: 'Swiss System',
-      entryFee: '50€',
+      entryFee: 'Gratuit',
     },
     {
       id: 3,
@@ -31,7 +31,7 @@ export default function Tournaments() {
       status: 'Inscription ouverte',
       players: 67,
       maxPlayers: 64,
-      prize: '500€',
+      prize: '🏆 200 Points',
       startDate: 'Demain 18:00',
       format: 'Round Robin',
       entryFee: 'Gratuit',
@@ -115,8 +115,8 @@ export default function Tournaments() {
                     <div className="flex items-center gap-4 text-sm">
                       <span
                         className={`px-3 py-1 rounded-full font-bold ${tournament.status === 'En cours'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-blue-500/20 text-blue-400'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-blue-500/20 text-blue-400'
                           }`}
                       >
                         {tournament.status}
@@ -127,7 +127,7 @@ export default function Tournaments() {
 
                   <div className="text-right">
                     <div className="text-3xl font-black text-[#FFD700] mb-1">{tournament.prize}</div>
-                    <div className="text-sm text-gray-400">Prize Pool</div>
+                    <div className="text-sm text-gray-400">Récompense</div>
                   </div>
                 </div>
 
@@ -169,8 +169,8 @@ export default function Tournaments() {
 
                 <button
                   className={`w-full py-4 rounded-xl font-black text-lg transition-all flex items-center justify-center gap-2 ${tournament.status === 'En cours'
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(255,215,0,0.3)]'
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(255,215,0,0.3)]'
                     }`}
                   disabled={tournament.status === 'En cours'}
                 >
