@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState } from '../stores/gameStore';
+import { INITIAL_BOARD } from '../lib/gameLogic';
 
 // URL de ton backend local
 const SOCKET_URL = 'http://localhost:8888';
@@ -11,22 +12,7 @@ const DEMO_MODE = true; // Mettre à false quand le backend est prêt
 
 // Données de démo
 const createMockGameState = (): GameState => ({
-    board: {
-        points: Array.from({ length: 24 }, (_, i) => {
-            // Configuration initiale standard du backgammon
-            if (i === 0) return { player: 2, count: 2 };
-            if (i === 5) return { player: 1, count: 5 };
-            if (i === 7) return { player: 1, count: 3 };
-            if (i === 11) return { player: 2, count: 5 };
-            if (i === 12) return { player: 1, count: 5 };
-            if (i === 16) return { player: 2, count: 3 };
-            if (i === 18) return { player: 2, count: 5 };
-            if (i === 23) return { player: 1, count: 2 };
-            return { player: null, count: 0 };
-        }),
-        bar: { player1: 0, player2: 0 },
-        off: { player1: 0, player2: 0 }
-    },
+    board: INITIAL_BOARD,
     dice: [],
     turn: 'guest-1',
     score: { 'guest-1': 0, 'guest-2': 0 },
