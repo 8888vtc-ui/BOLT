@@ -124,10 +124,14 @@ function canMoveTo(board: BoardState, player: PlayerColor, pointIndex: number): 
   return false;
 }
 
+// ... (précédent code)
+
+// Amélioration de la règle de sortie (Bearing Off)
 function canBearOff(board: BoardState, player: PlayerColor, from: number, die: number): boolean {
   const homeStart = player === 1 ? 18 : 0;
   const homeEnd = player === 1 ? 24 : 6;
 
+  // 1. Vérifier si tous les pions sont dans la maison intérieure
   for (let i = 0; i < 24; i++) {
     const point = board.points[i];
     if (point.player === player && point.count > 0) {
@@ -136,65 +140,71 @@ function canBearOff(board: BoardState, player: PlayerColor, from: number, die: n
     }
   }
 
+  // Vérifier aussi la barre
+  if ((player === 1 && board.bar.player1 > 0) || (player === 2 && board.bar.player2 > 0)) {
+    return false;
+  }
+
   const dest = player === 1 ? from + die : from - die;
-  if (player === 1 && dest >= 24) return true;
-  if (player === 2 && dest < 0) return true;
+
+  // 2. Sortie directe (le dé correspond exactement à la distance de sortie)
+  if (player === 1 && dest === 24) return true;
+  if (player === 2 && dest === -1) return true;
+
+  // 3. Sortie avec un dé supérieur (si aucun pion sur les points plus éloignés)
+  if (player === 1 && dest > 24) {
+    // Vérifier s'il y a des pions sur les points précédents (19 à from-1)
+    for (let i = 18; i < from; i++) {
+      if (board.points[i].player === player && board.points[i].count > 0) return false; // On doit jouer les pions plus loin d'abord
+    }
+    return true;
+  }
+
+  if (player === 2 && dest < -1) {
+    // Vérifier s'il y a des pions sur les points précédents (from+1 à 5)
+    for (let i = from + 1; i <= 5; i++) {
+      if (board.points[i].player === player && board.points[i].count > 0) return false;
+    }
+    return true;
+  }
 
   return false;
 }
 
-export function makeMove(
-  board: BoardState,
-  player: PlayerColor,
-  from: number,
-  to: number
-): BoardState {
-  const newBoard: BoardState = {
-    points: board.points.map(p => ({ ...p })),
-    bar: { ...board.bar },
-    off: { ...board.off },
-  };
+// ... (makeMove inchangé)
 
-  if (from === -1) {
-    if (player === 1) {
-      newBoard.bar.player1--;
-    } else {
-      newBoard.bar.player2--;
-    }
-  } else {
-    newBoard.points[from].count--;
-    if (newBoard.points[from].count === 0) {
-      newBoard.points[from].player = null;
-    }
+export type WinType = 'simple' | 'gammon' | 'backgammon';
+
+export function checkWinType(board: BoardState, winner: PlayerColor): WinType {
+  const loser = winner === 1 ? 2 : 1;
+  const loserOff = loser === 1 ? board.off.player1 : board.off.player2;
+
+  // Si le perdant a sorti au moins un pion -> Victoire Simple
+  if (loserOff > 0) return 'simple';
+
+  // Si le perdant n'a rien sorti -> Gammon ou Backgammon
+  // Vérifier Backgammon : Pions dans la maison du vainqueur ou sur la barre
+  const winnerHomeStart = winner === 1 ? 18 : 0;
+  const winnerHomeEnd = winner === 1 ? 24 : 6;
+
+  let hasCheckerInWinnerHomeOrBar = false;
+
+  // Vérifier la barre
+  if ((loser === 1 && board.bar.player1 > 0) || (loser === 2 && board.bar.player2 > 0)) {
+    hasCheckerInWinnerHomeOrBar = true;
   }
 
-  if (to < 0 || to >= 24) {
-    if (player === 1) {
-      newBoard.off.player1++;
-    } else {
-      newBoard.off.player2++;
-    }
-  } else {
-    const destPoint = newBoard.points[to];
-    if (destPoint.player !== null && destPoint.player !== player && destPoint.count === 1) {
-      if (destPoint.player === 1) {
-        newBoard.bar.player1++;
-      } else {
-        newBoard.bar.player2++;
+  // Vérifier la maison du vainqueur
+  if (!hasCheckerInWinnerHomeOrBar) {
+    for (let i = winnerHomeStart; i < winnerHomeEnd; i++) {
+      if (board.points[i].player === loser && board.points[i].count > 0) {
+        hasCheckerInWinnerHomeOrBar = true;
+        break;
       }
-      destPoint.count = 0;
-      destPoint.player = null;
-    }
-
-    if (destPoint.player === null) {
-      destPoint.player = player;
-      destPoint.count = 1;
-    } else {
-      destPoint.count++;
     }
   }
 
-  return newBoard;
+  return hasCheckerInWinnerHomeOrBar ? 'backgammon' : 'gammon';
 }
 
 export function hasWon(board: BoardState, player: PlayerColor): boolean {
@@ -205,3 +215,4 @@ export function hasWon(board: BoardState, player: PlayerColor): boolean {
 export function getDirection(player: PlayerColor): 1 | -1 {
   return player === 1 ? 1 : -1;
 }
+
