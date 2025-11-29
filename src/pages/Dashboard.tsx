@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Trophy, TrendingUp, Target, Clock, Award } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useGameSocket } from '../hooks/useGameSocket';
+import TrophyCase from '../components/profile/TrophyCase';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -100,6 +101,26 @@ export default function Dashboard() {
             <TrendingUp className="w-12 h-12 mb-4 mx-auto" />
             Classement
           </button>
+        </motion.div>
+
+        {/* Trophy Case */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mb-12"
+        >
+          <h2 className="text-3xl font-black text-white mb-6 flex items-center gap-3">
+            <Trophy className="w-8 h-8 text-[#FFD700]" />
+            Mes Trophées
+          </h2>
+          <TrophyCase
+            tournamentsWon={12}
+            tournamentsPlayed={47}
+            tournamentPoints={3450}
+            bestFinish={1}
+            badges={[]}
+          />
         </motion.div>
 
         {/* Recent Games */}
