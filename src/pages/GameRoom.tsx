@@ -67,7 +67,8 @@ const GameRoom = () => {
                 roomName: currentRoom.name,
                 turn: gameState.turn,
                 myId: user?.id,
-                isMyTurn: gameState.turn === user?.id || (gameState.turn === 'guest-1' && user?.id === 'guest-1')
+                isMyTurn: gameState.turn === user?.id || (gameState.turn === 'guest-1' && user?.id === 'guest-1'),
+                dice: gameState.dice
             });
         }
     }, [currentRoom, gameState, roomId, isConnected, user]);
@@ -272,23 +273,23 @@ const GameRoom = () => {
                                                 <div className="text-sm font-bold text-white mb-1">
                                                     {aiAnalysis.strategicAdvice.recommendedStrategy}
                                                 </div>
-                                                <div className="text-xs text-gray-400 leading-relaxed">
-                                                    {aiAnalysis.strategicAdvice.analysis}
-                                                </div>
+                                                <p className="text-xs text-gray-300 leading-relaxed">
+                                                    {aiAnalysis.strategicAdvice.explanation}
+                                                </p>
                                             </div>
                                         )}
 
-                                        {/* Explication Technique */}
+                                        {/* Explication */}
                                         <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Détails Techniques</div>
-                                            <div className="text-sm text-gray-300 whitespace-pre-line">
-                                                {aiAnalysis.explanation.split('\n\n🧠')[0]}
-                                            </div>
+                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Analyse détaillée</div>
+                                            <p className="text-sm text-gray-300 leading-relaxed">
+                                                {aiAnalysis.explanation}
+                                            </p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="text-center text-gray-500 py-8">
-                                        Impossible de récupérer l'analyse.
+                                    <div className="text-center py-8 text-gray-500">
+                                        Impossible de charger l'analyse.
                                     </div>
                                 )}
                             </div>
@@ -296,188 +297,126 @@ const GameRoom = () => {
                     )}
                 </AnimatePresence>
 
-                {/* Header */}
-                <header className="h-16 bg-[#111] border-b border-white/10 flex items-center justify-between px-6 shrink-0 z-20">
+                {/* Navbar du jeu */}
+                <div className="h-16 bg-[#111] border-b border-white/10 flex items-center justify-between px-6 z-20 shadow-lg">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/lobby')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                            <ArrowLeft className="w-5 h-5 text-gray-400" />
+                        <button onClick={handleLeave} className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
+                            <ArrowLeft className="w-6 h-6" />
                         </button>
                         <div>
-                            <h1 className="text-lg font-bold text-[#FFD700] flex items-center gap-2">
-                                {currentRoom.name}
-                                <span className="px-2 py-0.5 rounded text-[10px] bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/20 uppercase tracking-wider">
-                                    Ranked
-                                </span>
-                            </h1>
+                            <h1 className="text-lg font-bold text-white tracking-wide">{currentRoom.name}</h1>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                En ligne
+                            </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all ${isMyTurn
-                            ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
-                            : 'bg-gray-800/50 border-gray-700 text-gray-400'
-                            }`}>
-                            <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-                            <span className="text-sm font-bold uppercase tracking-wide">
-                                {isMyTurn ? "C'est à vous !" : "Tour adverse"}
-                            </span>
+                        <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/5">
+                            <div className="flex flex-col items-end">
+                                <span className="text-xs text-gray-400">Score</span>
+                                <span className="text-sm font-bold text-[#FFD700]">{score.player1 || 0} - {score.player2 || 0}</span>
+                            </div>
                         </div>
-
-                        <button
-                            onClick={handleLeave}
-                            className="flex items-center gap-2 text-xs font-bold text-red-500/80 hover:text-red-500 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors"
+                        
+                        <button 
+                            onClick={handleAskCoach}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 group"
                         >
-                            <LogOut className="w-4 h-4" />
-                            QUITTER
+                            <Lightbulb className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+                            <span className="text-sm font-bold">Coach AI</span>
                         </button>
                     </div>
-                </header>
+                </div>
 
-                {/* Main Layout */}
-                <div className="flex-1 flex overflow-hidden">
+                {/* Zone de jeu principale */}
+                <div className="flex-1 flex relative bg-[#1a1a1a]">
+                    {/* Plateau de jeu */}
+                    <div className="flex-1 relative flex items-center justify-center p-4 md:p-8">
+                        {/* Cadre du plateau */}
+                        <div className="relative w-full max-w-[1000px] aspect-[4/3] bg-[#0a3d1d] rounded-xl shadow-2xl border-[16px] border-[#3d2b1f] flex overflow-hidden">
+                            
+                            {/* Texture bois du cadre */}
+                            <div className="absolute inset-0 border-[16px] border-[#3d2b1f] pointer-events-none z-10 rounded-xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]"></div>
 
-                    {/* Left Column: Players Info */}
-                    <div className="w-72 bg-[#0a0a0a] border-r border-white/10 flex flex-col shrink-0 z-10">
-                        <div className="p-6 space-y-6">
-                            <h3 className="text-gray-500 text-xs uppercase tracking-wider font-bold mb-4">Joueurs</h3>
-
-                            {players.map((player, idx) => {
-                                const isCurrentTurn = turn === player.id;
-                                return (
-                                    <motion.div
-                                        key={player.id || idx}
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: idx * 0.1 }}
-                                        className={`relative p-4 rounded-xl border transition-all duration-300 ${isCurrentTurn
-                                            ? 'bg-[#FFD700]/5 border-[#FFD700] shadow-[0_0_20px_rgba(255,215,0,0.1)]'
-                                            : 'bg-white/5 border-white/5'
-                                            }`}
-                                    >
-                                        {isCurrentTurn && (
-                                            <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-12 bg-[#FFD700] rounded-r-full shadow-[0_0_10px_#FFD700]" />
-                                        )}
-
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <div className="relative">
-                                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-700 to-black flex items-center justify-center border-2 border-white/10 overflow-hidden">
-                                                    {player.avatar ? (
-                                                        <img src={player.avatar} alt={player.username} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <UserIcon className="w-6 h-6 text-gray-400" />
-                                                    )}
-                                                </div>
-                                                <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#0a0a0a] flex items-center justify-center text-[10px] font-bold ${idx === 0 ? 'bg-[#e2e8f0] text-black' : 'bg-[#ef4444] text-white'
-                                                    }`}>
-                                                    {idx === 0 ? '1' : '2'}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-sm truncate">{player.username || 'Joueur'}</div>
-                                                <div className="text-xs text-gray-500 flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" /> 05:00
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-between bg-black/30 rounded-lg p-2">
-                                            <div className="text-xs text-gray-500">Score</div>
-                                            <div className="text-lg font-mono font-bold text-[#FFD700]">{score[player.id] || 0}</div>
-                                        </div>
-                                    </motion.div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Chat */}
-                        <div className="flex-1 flex flex-col min-h-0 border-t border-white/10">
-                            <ChatBox />
-                        </div>
-                    </div>
-
-                    {/* Center: Game Board */}
-                    <div className="flex-1 bg-[#0f0f0f] relative flex flex-col">
-                        <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-                            {/* Board Container */}
-                            <div className="relative aspect-[16/11] w-full max-w-6xl bg-[#2d5a27] rounded-lg shadow-2xl border-[16px] border-[#3e2723] overflow-hidden"
-                                style={{
-                                    boxShadow: 'inset 0 0 100px rgba(0,0,0,0.5)', // Vignette interne
-                                    backgroundImage: 'radial-gradient(#35682d 1px, transparent 1px)', // Texture subtile
-                                    backgroundSize: '4px 4px'
-                                }}
-                            >
-                                {/* Grille des points */}
-                                <div className="absolute inset-0 grid grid-cols-2 gap-12 p-8">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex-1 grid grid-cols-6 gap-0">{topPoints.slice(0, 6)}</div>
-                                        <div className="flex-1 grid grid-cols-6 gap-0">{bottomPoints.slice(0, 6)}</div>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex-1 grid grid-cols-6 gap-0">{topPoints.slice(6, 12)}</div>
-                                        <div className="flex-1 grid grid-cols-6 gap-0">{bottomPoints.slice(6, 12)}</div>
-                                    </div>
+                            {/* Colonne Gauche (Points 12-7 et 13-18) */}
+                            <div className="flex-1 flex flex-col border-r-4 border-[#2a1d15]/50 relative">
+                                {/* Top Left (13-18) */}
+                                <div className="flex-1 flex flex-row-reverse">
+                                    {topPoints.slice(0, 6)}
                                 </div>
-
-                                {/* Barre centrale (Bar) */}
-                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 bg-[#2d1b15] h-full shadow-2xl flex flex-col items-center justify-center gap-2 z-10 border-x border-[#1a0f0b]">
-                                    <div className="flex flex-col gap-1 py-4">
-                                        {Array.from({ length: board.bar?.player2 || 0 }).map((_, i) => (
-                                            <div key={`bar-p2-${i}`} className="w-10 h-10"><Checker player={2} /></div>
-                                        ))}
-                                    </div>
-                                    <div className="flex flex-col gap-1 py-4">
-                                        {Array.from({ length: board.bar?.player1 || 0 }).map((_, i) => (
-                                            <div key={`bar-p1-${i}`} className="w-10 h-10"><Checker player={1} /></div>
-                                        ))}
-                                    </div>
+                                {/* Bottom Left (12-7) */}
+                                <div className="flex-1 flex flex-row-reverse">
+                                    {bottomPoints.slice(6, 12)}
                                 </div>
+                            </div>
 
-                                {/* Dés */}
-                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-8 z-20 pointer-events-none">
-                                    {dice.map((val, i) => (
-                                        <Dice key={i} value={val} rolling={false} />
+                            {/* Barre Centrale (Bar) */}
+                            <div className="w-16 bg-[#2a1d15] flex flex-col items-center justify-center border-x-2 border-[#1a120d] shadow-inner relative z-0">
+                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-30 mix-blend-overlay"></div>
+                                
+                                {/* Pions capturés (Bar) */}
+                                <div className="flex-1 flex flex-col justify-center gap-1 py-4">
+                                    {/* Player 1 Bar */}
+                                    {Array.from({ length: board.bar.player1 }).map((_, i) => (
+                                        <div key={`bar-p1-${i}`} className="w-10 h-10 rounded-full bg-gray-200 border-2 border-gray-400 shadow-lg" />
+                                    ))}
+                                    {/* Player 2 Bar */}
+                                    {Array.from({ length: board.bar.player2 }).map((_, i) => (
+                                        <div key={`bar-p2-${i}`} className="w-10 h-10 rounded-full bg-red-700 border-2 border-red-900 shadow-lg" />
                                     ))}
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Bottom Bar: Actions */}
-                        <div className="h-20 bg-[#111] border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-20">
-                            <div className="flex items-center gap-4">
-                                <DoublingCube value={cubeValue} />
-                                <div className="text-xs text-gray-500 max-w-[150px]">
-                                    Le cube double les enjeux de la partie.
+                            {/* Colonne Droite (Points 19-24 et 6-1) */}
+                            <div className="flex-1 flex flex-col border-l-4 border-[#2a1d15]/50 relative">
+                                {/* Top Right (19-24) */}
+                                <div className="flex-1 flex flex-row-reverse">
+                                    {topPoints.slice(6, 12)}
+                                </div>
+                                {/* Bottom Right (6-1) */}
+                                <div className="flex-1 flex flex-row-reverse">
+                                    {bottomPoints.slice(0, 6)}
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={undoMove}
-                                    disabled={!canUndo || !isMyTurn}
-                                    className="p-3 rounded-full bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors"
-                                    title="Annuler le dernier mouvement"
-                                >
-                                    <RotateCcw className="w-6 h-6 text-gray-400" />
-                                </button>
-
-                                <button
-                                    onClick={handleAskCoach}
-                                    disabled={isAnalyzing}
-                                    className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-purple-900/20 transition-all hover:scale-105 active:scale-95"
-                                >
-                                    <Lightbulb className="w-5 h-5" />
-                                    {isAnalyzing ? 'Analyse...' : 'COACH'}
-                                </button>
-
-                                <button
-                                    onClick={handleRollDice}
-                                    disabled={!isMyTurn || dice.length > 0}
-                                    className="px-8 py-3 bg-[#FFD700] hover:bg-[#FDB931] disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-lg rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.3)] hover:shadow-[0_0_30px_rgba(255,215,0,0.5)] transition-all hover:scale-105 active:scale-95"
-                                >
-                                    LANCER LES DÉS
-                                </button>
+                            {/* Zone centrale (Dés et Cube) */}
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20">
+                                <div className="flex gap-8 pointer-events-auto">
+                                    <Dice dice={dice} onRoll={handleRollDice} canRoll={isMyTurn && dice.length === 0} />
+                                    <DoublingCube value={cubeValue} canDouble={isMyTurn && gameState.canDouble} onDouble={() => sendGameAction('double', {})} />
+                                </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Sidebar Droite (Chat & Infos) */}
+                    <div className="w-80 bg-[#111] border-l border-white/10 flex flex-col">
+                        <div className="p-4 border-b border-white/10">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Joueurs</h3>
+                            <div className="space-y-3">
+                                <div className={`flex items-center gap-3 p-3 rounded-lg ${turn === players[0]?.id ? 'bg-white/10 border border-[#FFD700]/30' : 'bg-black/20'}`}>
+                                    <div className="w-2 h-2 rounded-full bg-gray-200"></div>
+                                    <div className="flex-1">
+                                        <div className="text-sm font-bold text-white">{players[0]?.username || 'Joueur 1'}</div>
+                                        <div className="text-xs text-gray-500">Blanc</div>
+                                    </div>
+                                    {turn === players[0]?.id && <Clock className="w-4 h-4 text-[#FFD700] animate-pulse" />}
+                                </div>
+                                <div className={`flex items-center gap-3 p-3 rounded-lg ${turn === players[1]?.id ? 'bg-white/10 border border-[#FFD700]/30' : 'bg-black/20'}`}>
+                                    <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                                    <div className="flex-1">
+                                        <div className="text-sm font-bold text-white">{players[1]?.username || 'Joueur 2'}</div>
+                                        <div className="text-xs text-gray-500">Rouge</div>
+                                    </div>
+                                    {turn === players[1]?.id && <Clock className="w-4 h-4 text-[#FFD700] animate-pulse" />}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-hidden">
+                            <ChatBox />
                         </div>
                     </div>
                 </div>
