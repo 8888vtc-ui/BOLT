@@ -26,21 +26,28 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
     [draggable, player]
   );
 
-  // COULEURS ULTRA FLASHY IMPOSSIBLES À MANQUER
-  const color = player === 1 ? '#00FF00' : '#FF00FF'; // Vert fluo vs Magenta fluo
-  const borderColor = player === 1 ? '#00DD00' : '#DD00DD';
-  const glowColor = player === 1 ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 0, 255, 0.8)';
+  // Couleurs classiques et élégantes
+  // Player 1: Ivoire (Blanc cassé)
+  // Player 2: Rouge Profond
+  const baseColor = player === 1 ? '#E8E8E8' : '#D00000';
+  const borderColor = player === 1 ? '#C0C0C0' : '#800000';
+
+  // Dégradé subtil pour effet 3D
+  const gradient = player === 1
+    ? 'radial-gradient(circle at 30% 30%, #FFFFFF, #D0D0D0)'
+    : 'radial-gradient(circle at 30% 30%, #FF4444, #8B0000)';
 
   return (
     <motion.div
       ref={draggable ? drag : null}
       className="absolute cursor-pointer select-none"
       style={{
-        width: '100%',
-        height: '100%',
+        width: '90%', // Un peu plus petit pour laisser de l'espace
+        height: '90%',
+        left: '5%',
         zIndex: index,
         opacity: isDragging ? 0.3 : 1,
-        bottom: `${index * 85}%`,
+        bottom: `${index * 100}%`, // Empilement vertical ajusté
       }}
       animate={{
         scale: draggable ? [1, 1.05, 1] : 1,
@@ -55,28 +62,25 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
       whileHover={draggable ? { scale: 1.1 } : {}}
     >
       <div
-        className="relative w-full h-full rounded-full"
+        className="relative w-full h-full rounded-full shadow-lg"
         style={{
-          background: `radial-gradient(circle at 30% 30%, ${color}, ${color}dd)`,
-          boxShadow: `
-            0 0 30px ${glowColor},
-            0 0 60px ${glowColor},
-            0 8px 16px rgba(0,0,0,0.9),
-            inset 0 4px 8px rgba(255,255,255,0.5)
-          `,
-          border: `5px solid ${borderColor}`,
+          background: gradient,
+          boxShadow: '0 4px 6px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.3)',
+          border: `2px solid ${borderColor}`,
         }}
       >
+        {/* Reflet subtil */}
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            background: `radial-gradient(circle at 40% 40%, rgba(255,255,255,0.6), transparent 60%)`,
+            background: `radial-gradient(circle at 40% 40%, rgba(255,255,255,0.4), transparent 60%)`,
           }}
         />
 
+        {/* Compteur si pile > 5 */}
         {stackHeight > 5 && index === stackHeight - 1 && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-black text-lg md:text-xl font-black drop-shadow-[0_2px_4px_rgba(255,255,255,1)]">
+            <span className={`text-sm font-bold ${player === 1 ? 'text-black' : 'text-white'}`}>
               {stackHeight}
             </span>
           </div>

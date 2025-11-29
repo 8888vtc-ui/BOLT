@@ -1,16 +1,16 @@
-import { motion } from 'framer-motion';
 import { useDrop } from 'react-dnd';
+import { motion } from 'framer-motion';
 import Checker from './Checker';
-import { Point as PointType, PlayerColor } from '../lib/gameLogic';
+import { Point as PointType } from '../lib/gameLogic';
 
 interface PointProps {
   index: number;
   point: PointType;
   isTop: boolean;
-  isValidDestination?: boolean;
-  onDrop?: (from: number) => void;
-  onDragStart?: (from: number) => void;
-  currentPlayer: PlayerColor;
+  isValidDestination: boolean;
+  onDrop: (index: number) => void;
+  onDragStart: (index: number) => void;
+  currentPlayer: number;
   canMove: boolean;
 }
 
@@ -24,103 +24,88 @@ export default function Point({
   currentPlayer,
   canMove,
 }: PointProps) {
-  const [{ isOver, canDrop }, drop] = useDrop(
+  const [{ isOver }, drop] = useDrop(
     () => ({
       accept: 'CHECKER',
-      canDrop: () => isValidDestination || false,
-      drop: () => {
-        onDrop?.(index);
-      },
+      drop: () => onDrop(index),
       collect: (monitor) => ({
         isOver: monitor.isOver(),
-        canDrop: monitor.canDrop(),
       }),
     }),
-    [isValidDestination, index]
+    [index, onDrop]
   );
 
-  const isDark = Math.floor(index / 6) % 2 === (index % 2);
-  const bgColor = isDark ? '#2d2d2d' : '#1a1a1a';
-
   const checkers = [];
-  const maxVisible = 5;
-  for (let i = 0; i < Math.min(point.count, maxVisible); i++) {
+  // Limiter l'affichage visuel à 5 pions pour éviter que ça sorte du board
+  // Le dernier pion affichera le nombre total si > 5
+  const displayCount = Math.min(point.count, 5);
+
+  for (let i = 0; i < displayCount; i++) {
+    // Le dernier pion visible porte l'info du total si stack > 5
+    const isLastVisible = i === displayCount - 1;
+    const stackHeight = isLastVisible ? point.count : 1;
+
     checkers.push(
-      <Checker
-        key={i}
-        player={point.player!}
-        draggable={canMove && point.player === currentPlayer && i === point.count - 1}
-        onDragStart={() => onDragStart?.(index)}
-        index={i}
-        stackHeight={point.count}
-      />
+      <div key={i} className="relative w-full aspect-square" style={{ marginBottom: '-60%' }}>
+        <Checker
+          player={point.player!}
+          draggable={
+            canMove &&
+            point.player === currentPlayer &&
+            i === displayCount - 1 // Seul le pion du haut est draggable
+          }
+          onDragStart={() => onDragStart(index)}
+          index={i}
+          stackHeight={stackHeight}
+        />
+      </div>
     );
   }
 
   return (
     <motion.div
       ref={drop}
-      className="relative flex flex-col items-center"
-      style={{
-        width: '100%',
-        height: '100%',
-      }}
-      animate={{
-        boxShadow: isValidDestination
-          ? '0 0 30px rgba(34, 197, 94, 0.8), inset 0 0 20px rgba(34, 197, 94, 0.3)'
-          : isOver && canDrop
-          ? '0 0 30px rgba(34, 197, 94, 0.6)'
-          : 'none',
-      }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`relative h-full flex flex-col items-center justify-end group ${isTop ? 'flex-col' : 'flex-col-reverse'
+        }`}
     >
-      <svg
-        className="absolute"
-        style={{
-          width: '100%',
-          height: '100%',
-          transform: isTop ? 'none' : 'rotate(180deg)',
-        }}
-        viewBox="0 0 100 300"
-        preserveAspectRatio="none"
-      >
-        <polygon points="0,0 50,280 100,0" fill={bgColor} stroke="#0f0f0f" strokeWidth="1" />
-        {isDark && (
-          <polygon
-            points="0,0 50,280 100,0"
-            fill="url(#woodGrain)"
-            opacity="0.1"
-            stroke="#0f0f0f"
-            strokeWidth="1"
-          />
-        )}
-      </svg>
-
-      {isValidDestination && (
-        <motion.div
-          className="absolute inset-0 pointer-events-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          style={{
-            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.3), transparent 70%)',
-          }}
-        />
-      )}
-
+      {/* Triangle du point */}
       <div
-        className="relative z-10 flex flex-col gap-0 items-center justify-start"
+        className={`absolute inset-0 w-full h-full opacity-20 transition-all duration-300 ${isValidDestination || isOver ? 'opacity-50 bg-[#FFD700]/20' : ''
+          }`}
         style={{
-          width: '70%',
-          height: '100%',
-          paddingTop: isTop ? '8px' : '0',
-          paddingBottom: isTop ? '0' : '8px',
-          flexDirection: isTop ? 'column' : 'column-reverse',
+          clipPath: isTop
+            ? 'polygon(50% 100%, 0 0, 100% 0)'
+            : 'polygon(50% 0, 0 100%, 100% 100%)',
+          background: index % 2 === 0 ? '#404040' : '#202020', // Alternance de couleurs des flèches
+        }}
+      />
+
+      {/* Conteneur des pions */}
+      <div
+        className="relative z-10 flex flex-col items-center w-full h-full py-2"
+        style={{
+          justifyContent: isTop ? 'flex-start' : 'flex-end',
         }}
       >
-        {checkers}
+        {/* Inverser l'ordre d'affichage pour le bas pour que la pile monte */}
+        {isTop ? checkers : [...checkers].reverse()}
       </div>
 
-      <div className="absolute bottom-1 text-[10px] text-gray-600 font-mono">{index + 1}</div>
+      {/* Numéro du point - Z-INDEX ÉLEVÉ pour être toujours visible */}
+      <div
+        className={`absolute ${isTop ? '-top-6' : '-bottom-6'} left-1/2 -translate-x-1/2 text-xs font-bold text-gray-500 z-20`}
+      >
+        {index + 1}
+      </div>
+
+      {/* Indicateur de destination valide */}
+      {(isValidDestination || isOver) && (
+        <div
+          className={`absolute ${isTop ? 'bottom-4' : 'top-4'} w-3 h-3 rounded-full bg-[#FFD700] animate-pulse z-20`}
+        />
+      )}
     </motion.div>
   );
 }
