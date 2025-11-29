@@ -3,10 +3,10 @@ import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState } from '../stores/gameStore';
 import { INITIAL_BOARD, getSmartMove, makeMove } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
+import { useDebugStore } from '../stores/debugStore';
 
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
-// --- Mock Data for Demo Mode ---
 // --- Mock Data for Demo Mode ---
 const createMockGameState = (): GameState => ({
     board: INITIAL_BOARD,
@@ -21,7 +21,7 @@ const createMockGameState = (): GameState => ({
     currentPlayer: 1
 });
 
-const createMockRooms = (): Room[] => []; // Plus de fausses salles
+const createMockRooms = (): Room[] => [];
 
 export const useGameSocket = () => {
     const { user } = useAuth();
@@ -88,10 +88,11 @@ export const useGameSocket = () => {
 
     // --- Join Room & Subscribe to Game State ---
     const joinRoom = useCallback(async (roomId: string) => {
-        console.log('Joining room:', roomId);
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`Joining room: ${roomId}`, 'info');
 
         if (DEMO_MODE) {
-            console.log('Demo mode join');
+            addLog('Demo mode join', 'info');
             const room = roomsList.find(r => r.id === roomId) || {
                 id: roomId,
                 name: 'Salle Demo',
@@ -111,10 +112,11 @@ export const useGameSocket = () => {
             const { data: roomData, error: roomError } = await supabase.from('rooms').select('*').eq('id', roomId).single();
 
             if (roomError) {
-                console.error('Error fetching room:', roomError);
-                // Fallback si on ne peut pas récupérer la salle (ex: latence)
+                addLog('Error fetching room', 'error', roomError);
+                // Fallback
                 setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
             } else if (roomData) {
+                addLog(`Room fetched: ${roomData.name}`, 'success');
                 setRoom(roomData);
             }
 
@@ -124,6 +126,7 @@ export const useGameSocket = () => {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `room_id=eq.${roomId}` }, (payload) => {
                     const newGame = payload.new as any;
                     if (newGame && newGame.board_state) {
+                        addLog('Game update received', 'info');
                         updateGame(newGame.board_state);
                     }
                 })
@@ -132,13 +135,13 @@ export const useGameSocket = () => {
                     addMessage({
                         id: msg.id,
                         userId: msg.user_id,
-                        username: 'Joueur', // On améliorera ça plus tard
+                        username: 'Joueur',
                         text: msg.content,
                         timestamp: new Date(msg.created_at).getTime()
                     });
                 })
                 .subscribe((status) => {
-                    console.log('Subscription status:', status);
+                    addLog(`Subscription status: ${status}`, status === 'SUBSCRIBED' ? 'success' : 'info');
                 });
 
             channelRef.current = channel;
@@ -147,12 +150,11 @@ export const useGameSocket = () => {
             const { data: gameData, error: gameError } = await supabase.from('games').select('*').eq('room_id', roomId).single();
 
             if (gameData) {
-                console.log('Game found, updating state');
+                addLog('Game state found', 'success');
                 updateGame(gameData.board_state);
             } else {
-                console.log('No game found, creating new game');
+                addLog('No game found, creating new game...', 'info');
                 const initialState = createMockGameState();
-                // On essaie de créer, si ça échoue (race condition), on ignore
                 const { error: insertError } = await supabase.from('games').insert({
                     room_id: roomId,
                     board_state: initialState,
@@ -160,18 +162,16 @@ export const useGameSocket = () => {
                 });
 
                 if (insertError) {
-                    console.warn('Error creating game (might already exist):', insertError);
-                    // Retry fetch
+                    addLog('Error creating game (retry)', 'error', insertError);
                     const { data: retryGame } = await supabase.from('games').select('*').eq('room_id', roomId).single();
                     if (retryGame) updateGame(retryGame.board_state);
-                    else updateGame(initialState); // Fallback ultime
+                    else updateGame(initialState);
                 } else {
                     updateGame(initialState);
                 }
             }
         } catch (err) {
-            console.error('Critical error joining room:', err);
-            // Pour ne pas bloquer l'UI
+            addLog('Critical error joining room', 'error', err);
             setRoom({ id: roomId, name: 'Erreur Connexion', status: 'playing', players: [] });
             updateGame(createMockGameState());
         }

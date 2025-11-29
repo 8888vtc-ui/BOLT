@@ -1,4 +1,5 @@
 import { GameState } from '../stores/gameStore';
+import { useDebugStore } from '../stores/debugStore';
 
 const BOT_API_URL = 'https://botgammon.netlify.app/.netlify/functions/analyze';
 
@@ -18,8 +19,10 @@ export const analyzeMove = async (
     gameState: GameState,
     dice: number[]
 ): Promise<AIAnalysis> => {
+    const addLog = useDebugStore.getState().addLog;
+
     try {
-        console.log('🤖 AI Service: Preparing analysis...', { dice, turn: gameState.turn });
+        addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn });
 
         // Préparer le payload pour l'API BotGammon
         const payload = {
@@ -38,17 +41,15 @@ export const analyzeMove = async (
                     black: gameState.board.off.black
                 }
             },
-            player: gameState.turn === 'white' ? 1 : 2, // TODO: Vérifier si c'est correct selon l'ID du joueur
-            // Ajouter le contexte pour GPT-4o
+            player: gameState.turn === 'white' ? 1 : 2,
             context: {
-                gamePhase: 'middle', // À calculer dynamiquement idéalement
+                gamePhase: 'middle',
                 matchScore: '0-0',
                 opponentTendencies: 'unknown'
             }
         };
 
-        console.log('🤖 AI Service: Calling BotGammon API...', BOT_API_URL);
-        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+        addLog('🤖 AI Service: Calling BotGammon API...', 'info', BOT_API_URL);
 
         const response = await fetch(BOT_API_URL, {
             method: 'POST',
@@ -58,16 +59,16 @@ export const analyzeMove = async (
             body: JSON.stringify(payload),
         });
 
-        console.log('🤖 AI Service: Response status:', response.status);
+        addLog(`🤖 AI Service: Response status: ${response.status}`, response.ok ? 'success' : 'error');
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('🤖 AI Service: Error response:', errorText);
+            addLog('🤖 AI Service: Error response', 'error', errorText);
             throw new Error(`BotGammon API Error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
-        console.log('🤖 AI Service: Analysis received:', data);
+        addLog('🤖 AI Service: Analysis received', 'success');
 
         // Convertir la réponse de l'API au format attendu par le frontend
         const bestMoves = data.bestMoves && data.bestMoves.length > 0
@@ -92,8 +93,8 @@ export const analyzeMove = async (
         };
 
     } catch (error) {
-        console.error('❌ AI Analysis Failed:', error);
-        
+        addLog('❌ AI Analysis Failed', 'error', error);
+
         // Fallback pour ne pas casser l'UI
         return {
             bestMove: [],

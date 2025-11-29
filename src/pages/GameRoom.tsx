@@ -10,12 +10,14 @@ import { useGameSocket } from '../hooks/useGameSocket';
 import { useGameStore } from '../stores/gameStore';
 import { useAuth } from '../hooks/useAuth';
 import { analyzeMove, AIAnalysis } from '../lib/aiService';
+import { useDebugStore } from '../stores/debugStore';
 
 import Point from '../components/Point';
 import Checker from '../components/Checker';
 import Dice from '../components/Dice';
 import DoublingCube from '../components/DoublingCube';
 import ChatBox from '../components/game/ChatBox';
+import DebugOverlay from '../components/DebugOverlay';
 
 // Détection mobile pour Drag & Drop
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -50,17 +52,18 @@ const GameRoom = () => {
         }
     }, [roomId, isConnected, currentRoom, joinRoom]);
 
-    // Loading State
+    // Loading State Logs
     useEffect(() => {
+        const addLog = useDebugStore.getState().addLog;
         if (!currentRoom || !gameState) {
-            console.log('⏳ GameRoom Loading State:', {
+            addLog('Chargement de la partie...', 'info', {
                 hasRoom: !!currentRoom,
                 hasGameState: !!gameState,
                 roomId,
                 isConnected
             });
         } else {
-            console.log('✅ GameRoom Loaded:', {
+            addLog('Partie chargée avec succès !', 'success', {
                 roomName: currentRoom.name,
                 turn: gameState.turn
             });
@@ -70,13 +73,14 @@ const GameRoom = () => {
     if (!currentRoom || !gameState) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white">
+                <DebugOverlay />
                 <div className="w-16 h-16 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin mb-6" />
                 <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#B8860B]">
                     Chargement de la partie...
                 </h2>
                 <p className="text-gray-500 mt-2">Synchronisation avec le serveur</p>
                 <p className="text-xs text-gray-700 mt-4 font-mono">
-                    {isConnected ? 'Connecté' : 'Connexion en cours...'}
+                    {isConnected ? 'Connecté au socket' : 'Connexion socket en cours...'}
                 </p>
             </div>
         );
@@ -86,6 +90,7 @@ const GameRoom = () => {
     if (!isConnected) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center text-white">
+                <DebugOverlay />
                 <div className="text-center p-8 bg-[#111] rounded-2xl border border-red-500/20">
                     <WifiOff className="w-12 h-12 text-red-500 mx-auto mb-4" />
                     <h2 className="text-xl font-bold mb-2">Connexion perdue</h2>
@@ -115,8 +120,16 @@ const GameRoom = () => {
         setAiAnalysis(null);
         setShowAnalysis(true);
 
-        const analysis = await analyzeMove(gameState, gameState.dice);
-        setAiAnalysis(analysis);
+        const addLog = useDebugStore.getState().addLog;
+        addLog('Demande d\'analyse au Coach...', 'info');
+
+        try {
+            const analysis = await analyzeMove(gameState, gameState.dice);
+            setAiAnalysis(analysis);
+            addLog('Analyse reçue !', 'success');
+        } catch (e) {
+            addLog('Erreur analyse', 'error', e);
+        }
         setIsAnalyzing(false);
     };
 
@@ -184,6 +197,7 @@ const GameRoom = () => {
     return (
         <DndProvider backend={backend}>
             <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans relative">
+                <DebugOverlay />
 
                 {/* AI Coach Modal */}
                 <AnimatePresence>
@@ -238,38 +252,27 @@ const GameRoom = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-lg font-bold text-white mb-1">
-                                                    {aiAnalysis.strategicAdvice.recommendedStrategy.toUpperCase()}
+                                                <div className="text-sm font-bold text-white mb-1">
+                                                    {aiAnalysis.strategicAdvice.recommendedStrategy}
+                                                </div>
+                                                <div className="text-xs text-gray-400 leading-relaxed">
+                                                    {aiAnalysis.strategicAdvice.analysis}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Analyse Détaillée */}
-                                        <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                                            <div className="text-xs text-gray-500 uppercase font-bold mb-2">Analyse du Coach</div>
-                                            <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
-                                                {aiAnalysis.strategicAdvice ? aiAnalysis.strategicAdvice.analysis : aiAnalysis.explanation}
-                                            </div>
-                                        </div>
-
-                                        {/* Stats Techniques */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-black/30 p-3 rounded-xl border border-white/5 flex flex-col items-center">
-                                                <span className="text-[10px] text-gray-500 uppercase">Victoire</span>
-                                                <span className={`text-xl font-bold ${aiAnalysis.winProbability > 50 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {aiAnalysis.winProbability.toFixed(1)}%
-                                                </span>
-                                            </div>
-                                            <div className="bg-black/30 p-3 rounded-xl border border-white/5 flex flex-col items-center">
-                                                <span className="text-[10px] text-gray-500 uppercase">Equity</span>
-                                                <span className="text-xl font-bold text-blue-400">
-                                                    {aiAnalysis.equity?.toFixed(3) || 'N/A'}
-                                                </span>
+                                        {/* Explication Technique */}
+                                        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Détails Techniques</div>
+                                            <div className="text-sm text-gray-300 whitespace-pre-line">
+                                                {aiAnalysis.explanation.split('\n\n🧠')[0]}
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-red-400">Erreur lors de l'analyse.</p>
+                                    <div className="text-center text-gray-500 py-8">
+                                        Impossible de récupérer l'analyse.
+                                    </div>
                                 )}
                             </div>
                         </motion.div>
@@ -277,13 +280,10 @@ const GameRoom = () => {
                 </AnimatePresence>
 
                 {/* Header */}
-                <header className="h-16 bg-[#111] border-b border-white/10 px-6 flex justify-between items-center shrink-0 z-20 relative shadow-lg">
+                <header className="h-16 bg-[#111] border-b border-white/10 flex items-center justify-between px-6 shrink-0 z-20">
                     <div className="flex items-center gap-4">
-                        <button
-                            onClick={handleLeave}
-                            className="p-2 -ml-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
+                        <button onClick={() => navigate('/lobby')} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                            <ArrowLeft className="w-5 h-5 text-gray-400" />
                         </button>
                         <div>
                             <h1 className="text-lg font-bold text-[#FFD700] flex items-center gap-2">
@@ -357,59 +357,29 @@ const GameRoom = () => {
                                             </div>
 
                                             <div className="flex-1 min-w-0">
-                                                <div className="font-bold truncate text-white">{player.username}</div>
-                                                <div className="text-xs text-gray-400 flex items-center gap-1">
-                                                    <span className="w-2 h-2 rounded-full bg-green-500" /> En ligne
+                                                <div className="font-bold text-sm truncate">{player.username || 'Joueur'}</div>
+                                                <div className="text-xs text-gray-500 flex items-center gap-1">
+                                                    <Clock className="w-3 h-3" /> 05:00
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex justify-between items-center bg-black/30 rounded-lg p-2">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] text-gray-500 uppercase font-bold">Score</span>
-                                                <span className="text-lg font-mono font-bold text-[#FFD700] leading-none">
-                                                    {score[player.id] || 0}
-                                                </span>
-                                            </div>
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" /> Timer
-                                                </span>
-                                                <span className={`text-lg font-mono font-bold leading-none ${isCurrentTurn ? 'text-white' : 'text-gray-600'}`}>
-                                                    05:00
-                                                </span>
-                                            </div>
+                                        <div className="flex items-center justify-between bg-black/30 rounded-lg p-2">
+                                            <div className="text-xs text-gray-500">Score</div>
+                                            <div className="text-lg font-mono font-bold text-[#FFD700]">{score[player.id] || 0}</div>
                                         </div>
                                     </motion.div>
                                 );
                             })}
                         </div>
 
-                        {/* Game Controls */}
-                        <div className="mt-auto p-6 border-t border-white/10 bg-[#0f0f0f]">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <div className="text-center mb-2 text-gray-500 text-[10px] uppercase tracking-wider font-bold">Videau (Doubling Cube)</div>
-                                    <div className="flex justify-center">
-                                        <DoublingCube
-                                            value={cubeValue || 1}
-                                            canDouble={isMyTurn && dice.length > 0}
-                                            onDouble={() => sendGameAction('double', {})}
-                                        />
-                                    </div>
-                                </div>
-
-                                <button
-                                    className="col-span-2 flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 transition-all text-sm font-bold"
-                                    onClick={() => { if (window.confirm('Abandonner la partie ?')) sendGameAction('resign', {}); }}
-                                >
-                                    <Flag className="w-4 h-4" /> Abandonner
-                                </button>
-                            </div>
+                        {/* Chat */}
+                        <div className="flex-1 flex flex-col min-h-0 border-t border-white/10">
+                            <ChatBox />
                         </div>
                     </div>
 
-                    {/* Center Column: Game Board */}
+                    {/* Center: Game Board */}
                     <div className="flex-1 bg-[#0f0f0f] relative flex flex-col">
                         <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
                             {/* Board Container */}
@@ -455,46 +425,43 @@ const GameRoom = () => {
                             </div>
                         </div>
 
-                        {/* Action Bar (Bottom) */}
-                        <div className="h-24 bg-[#111] border-t border-white/10 flex items-center justify-center px-8 shrink-0 gap-4">
+                        {/* Bottom Bar: Actions */}
+                        <div className="h-20 bg-[#111] border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-20">
+                            <div className="flex items-center gap-4">
+                                <DoublingCube value={cubeValue} />
+                                <div className="text-xs text-gray-500 max-w-[150px]">
+                                    Le cube double les enjeux de la partie.
+                                </div>
+                            </div>
 
-                            {/* AI Coach Button */}
-                            <button
-                                onClick={handleAskCoach}
-                                className="px-4 py-4 rounded-xl bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/20 font-bold hover:bg-[#FFD700]/20 transition-colors flex items-center gap-2"
-                                title="Demander conseil au Coach"
-                            >
-                                <Lightbulb className="w-5 h-5" />
-                                COACH
-                            </button>
-
-                            {/* Undo Button */}
-                            {canUndo && (
+                            <div className="flex items-center gap-4">
                                 <button
                                     onClick={undoMove}
-                                    className="px-6 py-4 rounded-xl bg-gray-800 text-white font-bold hover:bg-gray-700 transition-colors flex items-center gap-2"
+                                    disabled={!canUndo || !isMyTurn}
+                                    className="p-3 rounded-full bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors"
+                                    title="Annuler le dernier mouvement"
                                 >
-                                    <RotateCcw className="w-5 h-5" />
-                                    ANNULER
+                                    <RotateCcw className="w-6 h-6 text-gray-400" />
                                 </button>
-                            )}
 
-                            <button
-                                onClick={handleRollDice}
-                                disabled={!isMyTurn || dice.length > 0}
-                                className={`px-12 py-4 rounded-xl font-black text-xl tracking-wide transition-all transform ${isMyTurn && dice.length === 0
-                                    ? 'bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black hover:scale-105 shadow-[0_0_30px_rgba(255,215,0,0.3)]'
-                                    : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
-                                    }`}
-                            >
-                                {dice.length > 0 ? 'AU JEU !' : 'LANCER LES DÉS'}
-                            </button>
+                                <button
+                                    onClick={handleAskCoach}
+                                    disabled={isAnalyzing}
+                                    className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-purple-900/20 transition-all hover:scale-105 active:scale-95"
+                                >
+                                    <Lightbulb className="w-5 h-5" />
+                                    {isAnalyzing ? 'Analyse...' : 'COACH'}
+                                </button>
+
+                                <button
+                                    onClick={handleRollDice}
+                                    disabled={!isMyTurn || dice.length > 0}
+                                    className="px-8 py-3 bg-[#FFD700] hover:bg-[#FDB931] disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-lg rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.3)] hover:shadow-[0_0_30px_rgba(255,215,0,0.5)] transition-all hover:scale-105 active:scale-95"
+                                >
+                                    LANCER LES DÉS
+                                </button>
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Right Column: Chat */}
-                    <div className="w-80 bg-[#0a0a0a] border-l border-white/10 flex flex-col shrink-0 z-10">
-                        <ChatBox />
                     </div>
                 </div>
             </div>
