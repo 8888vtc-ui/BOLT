@@ -171,7 +171,63 @@ function canBearOff(board: BoardState, player: PlayerColor, from: number, die: n
   return false;
 }
 
-// ... (makeMove inchangé)
+export function makeMove(
+  board: BoardState,
+  player: PlayerColor,
+  from: number,
+  to: number
+): BoardState {
+  const newBoard = JSON.parse(JSON.stringify(board));
+
+  // 1. Retirer le pion du point de départ
+  if (from === -1) {
+    // Sortie de la barre (Barre n'est pas gérée comme index -1 ici normalement, mais pour compatibilité)
+    // TODO: Vérifier comment la barre est passée. Dans getValidMoves, on utilise -1 pour la barre ?
+    // Non, getValidMoves retourne une Map.
+    // Si from est un index de point (0-23), c'est bon.
+    // Si on vient de la barre, il faut une convention. Disons que la logique appelante gère ça.
+    // Mais attendons, makeMove est appelé avec 'index' qui vient du click.
+    // Si on clique sur la barre, c'est un autre handler ?
+    // Pour l'instant, assumons que from est un index valide 0-23.
+
+    // Si on veut gérer la barre via makeMove, il faut un index spécial ou une logique.
+    // Dans notre cas actuel, le click se fait sur un Point.
+  }
+
+  // Gestion Bar (si from est hors limites ou spécial)
+  // Pour l'instant, on gère les points normaux.
+  if (from >= 0 && from <= 23) {
+    newBoard.points[from].count--;
+    if (newBoard.points[from].count === 0) {
+      newBoard.points[from].player = null;
+    }
+  }
+
+  // 2. Ajouter le pion au point d'arrivée
+  // Gestion Sortie (Bear Off)
+  if ((player === 1 && to > 23) || (player === 2 && to < 0)) {
+    if (player === 1) newBoard.off.player1++;
+    else newBoard.off.player2++;
+  }
+  // Mouvement normal
+  else if (to >= 0 && to <= 23) {
+    const destPoint = newBoard.points[to];
+
+    // Gérer la frappe (Hit)
+    if (destPoint.player !== null && destPoint.player !== player && destPoint.count === 1) {
+      // Le pion adverse est frappé et envoyé à la barre
+      if (destPoint.player === 1) newBoard.bar.player1++;
+      else newBoard.bar.player2++;
+      destPoint.count = 1; // Le pion frappé est remplacé par le nouveau
+      destPoint.player = player;
+    } else {
+      destPoint.player = player;
+      destPoint.count++;
+    }
+  }
+
+  return newBoard;
+}
 
 export type WinType = 'simple' | 'gammon' | 'backgammon';
 

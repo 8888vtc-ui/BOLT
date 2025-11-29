@@ -4,7 +4,7 @@ import { useGameStore, Room, GameState } from '../stores/gameStore';
 import { INITIAL_BOARD, getSmartMove, makeMove } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
 
-const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL; // Fallback to demo if no Supabase
+const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
 // --- Mock Data for Demo Mode ---
 const createMockGameState = (): GameState => ({
@@ -12,7 +12,12 @@ const createMockGameState = (): GameState => ({
     dice: [],
     turn: 'guest-1',
     score: { 'guest-1': 0, 'guest-2': 0 },
-    cubeValue: 1
+    cubeValue: 1,
+    availableMoves: [],
+    doubleValue: 1,
+    canDouble: true,
+    matchLength: 5,
+    currentPlayer: 1
 });
 
 const createMockRooms = (): Room[] => [
@@ -43,7 +48,6 @@ export const useGameSocket = () => {
         setIsConnected,
         setRoomsList,
         setRoom,
-        setPlayers,
         updateGame,
         addMessage,
         resetGame,
@@ -67,8 +71,8 @@ export const useGameSocket = () => {
 
         // 1. Listen to Rooms list updates
         const roomsChannel = supabase.channel('public:rooms')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, (payload) => {
-                fetchRooms(); // Refresh list on change
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+                fetchRooms();
             })
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') setIsConnected(true);
@@ -83,7 +87,7 @@ export const useGameSocket = () => {
 
     // --- Fetch Rooms Helper ---
     const fetchRooms = async () => {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('rooms')
             .select('*, profiles:created_by(username, avatar_url)')
             .order('created_at', { ascending: false });
@@ -93,7 +97,7 @@ export const useGameSocket = () => {
                 id: r.id,
                 name: r.name,
                 status: r.status,
-                players: [] // TODO: Fetch participants count
+                players: []
             }));
             setRoomsList(formattedRooms);
         }
@@ -102,7 +106,6 @@ export const useGameSocket = () => {
     // --- Join Room & Subscribe to Game State ---
     const joinRoom = useCallback(async (roomId: string) => {
         if (DEMO_MODE) {
-            // ... Demo logic ...
             const room = roomsList.find(r => r.id === roomId);
             if (room) {
                 const updatedRoom = { ...room, status: 'playing' as const };
@@ -112,40 +115,40 @@ export const useGameSocket = () => {
             return;
         }
 
-        // 1. Join Room in DB
         if (user) {
             await supabase.from('room_participants').insert({ room_id: roomId, user_id: user.id }).select();
         }
 
-        // 2. Fetch Room Details
         const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single();
         if (roomData) setRoom(roomData);
 
-        // 3. Subscribe to Game & Chat
         if (channelRef.current) supabase.removeChannel(channelRef.current);
 
         const channel = supabase.channel(`room:${roomId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `room_id=eq.${roomId}` }, (payload) => {
-                // Game State Update
-                const newGame = payload.new;
+                const newGame = payload.new as any;
                 if (newGame && newGame.board_state) {
                     updateGame(newGame.board_state);
                 }
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, (payload) => {
-                // Chat Message
-                addMessage(payload.new);
+                const msg = payload.new as any;
+                addMessage({
+                    id: msg.id,
+                    userId: msg.user_id,
+                    username: 'Unknown', // TODO: Fetch username
+                    text: msg.content,
+                    timestamp: new Date(msg.created_at).getTime()
+                });
             })
             .subscribe();
 
         channelRef.current = channel;
 
-        // 4. Load Initial Game State
         const { data: gameData } = await supabase.from('games').select('*').eq('room_id', roomId).single();
         if (gameData) {
             updateGame(gameData.board_state);
         } else {
-            // Create new game if none exists
             const initialState = createMockGameState();
             await supabase.from('games').insert({
                 room_id: roomId,
@@ -167,10 +170,7 @@ export const useGameSocket = () => {
     }, [currentRoom, user, resetGame]);
 
     const createRoom = useCallback(async (roomName: string) => {
-        if (DEMO_MODE) {
-            // ... Demo logic ...
-            return;
-        }
+        if (DEMO_MODE) { return; }
         if (user) {
             const { data } = await supabase.from('rooms').insert({ name: roomName, created_by: user.id }).select().single();
             if (data) joinRoom(data.id);
@@ -191,10 +191,9 @@ export const useGameSocket = () => {
         }
     }, [currentRoom, user, addMessage]);
 
-    // --- Game Actions (Move, Roll, etc.) ---
+    // --- Game Actions ---
     const sendGameAction = useCallback(async (action: string, payload: any) => {
-        // Local State Calculation first (Optimistic UI)
-        let newState = { ...gameState };
+        let newState = { ...gameState } as GameState;
 
         if (action === 'rollDice') {
             setHistory([]);
@@ -203,9 +202,8 @@ export const useGameSocket = () => {
             newState.dice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
         } else if (action === 'move') {
             const { from, to } = payload;
-            const playerColor = 1; // TODO: Get real player color
+            const playerColor = 1;
 
-            // Drag Inverse (Undo)
             const isBackwardMove = to > from;
             if (isBackwardMove && history.length > 0) {
                 undoMove();
@@ -213,12 +211,13 @@ export const useGameSocket = () => {
             }
 
             const distance = from - to;
-            const dieIndex = newState.dice.indexOf(distance);
+            const currentDice = newState.dice || [];
+            const dieIndex = currentDice.indexOf(distance);
 
             if (dieIndex > -1) {
                 setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
                 const newBoard = makeMove(newState.board, playerColor, from, to);
-                const newDice = [...newState.dice];
+                const newDice = [...currentDice];
                 newDice.splice(dieIndex, 1);
 
                 newState.board = newBoard;
@@ -226,19 +225,17 @@ export const useGameSocket = () => {
             }
         }
 
-        // Update Local Store
-        updateGame(newState);
+        if (newState.board) {
+            updateGame(newState);
+        }
 
-        // Persist to Supabase
-        if (!DEMO_MODE && currentRoom) {
+        if (!DEMO_MODE && currentRoom && newState.board) {
             await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
         }
 
-    }, [gameState, updateGame, history, currentRoom]);
+    }, [gameState, updateGame, history, currentRoom, undoMove]);
 
     const handleCheckerClick = useCallback((index: number) => {
-        // ... (Keep existing Smart Move logic, calling sendGameAction or updating state directly)
-        // For simplicity, reusing the logic but ensuring it saves to DB
         if (!gameState || !user) return;
         const playerColor = 1;
         const point = gameState.board.points[index];
@@ -273,13 +270,11 @@ export const useGameSocket = () => {
     }, [history, updateGame, currentRoom]);
 
     const playVsBot = useCallback(() => {
-        // Keep existing Bot logic (local only)
-        // ...
         return 'bot-room-id';
     }, []);
 
     return {
-        socket: null, // No socket anymore
+        socket: null,
         isConnected,
         rooms: roomsList,
         currentRoom,
