@@ -59,6 +59,7 @@ export function useAuth() {
       }
     });
     if (error) console.error('Google login error:', error);
+    return { error };
   };
 
   const loginAsGuest = async () => {

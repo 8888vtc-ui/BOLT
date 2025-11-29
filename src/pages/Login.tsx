@@ -8,8 +8,9 @@ export default function Login() {
   const { loginWithGoogle, loginAsGuest } = useAuth();
   const [error, setError] = useState('');
 
-  const handleGoogleLogin = () => {
-    loginWithGoogle();
+  const handleGoogleLogin = async () => {
+    const { error } = await loginWithGoogle();
+    if (error) setError(error.message);
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
