@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { GameToaster } from './components/common/Toast';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import GurugammonLanding from './pages/GurugammonLanding';
@@ -11,9 +12,6 @@ import Lobby from './pages/Lobby';
 import GameRoom from './pages/GameRoom';
 import Tournaments from './pages/Tournaments';
 import Leaderboard from './pages/Leaderboard';
-
-// Components
-import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   const { loading } = useAuth();
@@ -34,52 +32,18 @@ function App() {
           <Route path="/" element={<GurugammonLanding />} />
           <Route path="/login" element={<Login />} />
 
-          {/* Protected Routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/lobby"
-            element={
-              <ProtectedRoute>
-                <Lobby />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/game/:roomId"
-            element={
-              <ProtectedRoute>
-                <GameRoom />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Legacy / Other Routes */}
-          <Route
-            path="/tournaments"
-            element={
-              <ProtectedRoute>
-                <Tournaments />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/leaderboard"
-            element={
-              <ProtectedRoute>
-                <Leaderboard />
-              </ProtectedRoute>
-            }
-          />
+          {/* Protected Routes Wrapper */}
+          <Route element={
+            <ProtectedRoute>
+              <Outlet />
+            </ProtectedRoute>
+          }>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/lobby" element={<Lobby />} />
+            <Route path="/game/:roomId" element={<GameRoom />} />
+            <Route path="/tournaments" element={<Tournaments />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+          </Route>
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
