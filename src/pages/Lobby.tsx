@@ -201,24 +201,32 @@ const Lobby = () => {
                                     alert("Vous devez être connecté pour jouer.");
                                     return;
                                 }
-                                // Créer une salle d'entraînement rapide
-                                const { data, error } = await supabase
-                                    .from('rooms')
-                                    .insert({
-                                        name: `Entraînement ${user?.username || 'Solo'}`,
-                                        created_by: user?.id,
-                                        status: 'playing'
-                                    })
-                                    .select()
-                                    .single();
 
-                                if (error) {
-                                    console.error("Erreur création salle:", error);
-                                    alert(`Erreur création salle: ${error.message}`);
-                                }
+                                try {
+                                    // Créer une salle d'entraînement rapide
+                                    const { data, error } = await supabase
+                                        .from('rooms')
+                                        .insert({
+                                            name: `Entraînement ${user.username}`,
+                                            created_by: user.id,
+                                            status: 'playing'
+                                        })
+                                        .select()
+                                        .single();
 
-                                if (data) {
-                                    navigate(`/game/${data.id}`);
+                                    if (error) {
+                                        console.error("Erreur création salle:", error);
+                                        alert(`Erreur lors de la création de la salle: ${error.message}`);
+                                        return;
+                                    }
+
+                                    if (data) {
+                                        // Force navigation to the game room
+                                        navigate(`/game/${data.id}`);
+                                    }
+                                } catch (err) {
+                                    console.error("Exception création salle:", err);
+                                    alert("Une erreur inattendue est survenue.");
                                 }
                             }}
                             className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group"

@@ -32,7 +32,10 @@ export interface GameState {
     turn: string; // ID du joueur
     score: { [playerId: string]: number };
     cubeValue: number;
-    // Ajoute ici d'autres champs si nécessaire (bar, off, etc.)
+    doubleValue?: number;
+    canDouble?: boolean;
+    matchLength?: number;
+    currentPlayer?: number;
 }
 
 export interface ChatMessage {

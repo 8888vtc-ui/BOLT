@@ -132,7 +132,7 @@ const GameRoom = () => {
         addLog('Demande d\'analyse au Coach...', 'info');
 
         try {
-            const analysis = await analyzeMove(gameState, gameState.dice);
+            const analysis = await analyzeMove(gameState, gameState.dice, playerColor);
             setAiAnalysis(analysis);
             addLog('Analyse reçue !', 'success');
         } catch (e) {
@@ -319,8 +319,8 @@ const GameRoom = () => {
                                 <span className="text-sm font-bold text-[#FFD700]">{score.player1 || 0} - {score.player2 || 0}</span>
                             </div>
                         </div>
-                        
-                        <button 
+
+                        <button
                             onClick={handleAskCoach}
                             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 group"
                         >
@@ -336,7 +336,7 @@ const GameRoom = () => {
                     <div className="flex-1 relative flex items-center justify-center p-4 md:p-8">
                         {/* Cadre du plateau */}
                         <div className="relative w-full max-w-[1000px] aspect-[4/3] bg-[#0a3d1d] rounded-xl shadow-2xl border-[16px] border-[#3d2b1f] flex overflow-hidden">
-                            
+
                             {/* Texture bois du cadre */}
                             <div className="absolute inset-0 border-[16px] border-[#3d2b1f] pointer-events-none z-10 rounded-xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]"></div>
 
@@ -355,7 +355,7 @@ const GameRoom = () => {
                             {/* Barre Centrale (Bar) */}
                             <div className="w-16 bg-[#2a1d15] flex flex-col items-center justify-center border-x-2 border-[#1a120d] shadow-inner relative z-0">
                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-30 mix-blend-overlay"></div>
-                                
+
                                 {/* Pions capturés (Bar) */}
                                 <div className="flex-1 flex flex-col justify-center gap-1 py-4">
                                     {/* Player 1 Bar */}

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState } from '../stores/gameStore';
-import { INITIAL_BOARD, getSmartMove, makeMove } from '../lib/gameLogic';
+import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
+import { analyzeMove, AIAnalysis } from '../lib/aiService';
 
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
@@ -221,7 +222,7 @@ export const useGameSocket = () => {
     }, [history, updateGame, currentRoom]);
 
     // --- Game Actions ---
-    const sendGameAction = useCallback(async (action: string, payload: any) => {
+    const sendGameAction = useCallback(async (action: string, payload: any, forcePlayerColor?: number) => {
         const addLog = useDebugStore.getState().addLog;
         addLog(`Action: ${action}`, 'info', payload);
 
@@ -237,8 +238,8 @@ export const useGameSocket = () => {
             const { from, to } = payload;
 
             // Déterminer la couleur du joueur
-            let playerColor = 1;
-            if (user && players && players.length > 0) {
+            let playerColor = forcePlayerColor || 1;
+            if (!forcePlayerColor && user && players && players.length > 0) {
                 // Si je suis le créateur/premier joueur -> Blanc (1)
                 // Sinon -> Noir (2)
                 if (players[0]?.id === user.id) playerColor = 1;
@@ -246,14 +247,14 @@ export const useGameSocket = () => {
             }
 
             // Hack pour le mode demo/guest si on joue seul
-            if (DEMO_MODE || (players && players.length === 0)) {
+            if (!forcePlayerColor && (DEMO_MODE || (players && players.length === 0))) {
                 playerColor = 1;
             }
 
             addLog(`Player Color: ${playerColor}`, 'info');
 
             const isBackwardMove = to > from;
-            if (isBackwardMove && history.length > 0) {
+            if (isBackwardMove && history.length > 0 && !forcePlayerColor) {
                 undoMove();
                 return;
             }
@@ -270,8 +271,10 @@ export const useGameSocket = () => {
             const dieIndex = currentDice.indexOf(dieUsed);
 
             if (dieIndex > -1) {
-                setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
-                const newBoard = makeMove(newState.board, playerColor, from, to);
+                if (!forcePlayerColor) {
+                    setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
+                }
+                const newBoard = makeMove(newState.board, playerColor as PlayerColor, from, to);
                 const newDice = [...currentDice];
                 newDice.splice(dieIndex, 1);
 
@@ -281,6 +284,21 @@ export const useGameSocket = () => {
             } else {
                 addLog('Invalid move or no matching die', 'error', { from, to, dieUsed, dice: currentDice, playerColor });
                 return;
+            }
+        }
+
+        // Switch turn if no dice left
+        if (newState.dice.length === 0 && action === 'move') {
+            // Simple turn switch logic for now
+            // In a real game, we need to check if moves are possible even with dice left
+            // But for MVP, let's switch when dice are empty
+            const currentPlayerId = newState.turn;
+            // If current is user, switch to 'bot' or other player
+            if (players && players.length > 1) {
+                newState.turn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
+            } else {
+                // Solo/Bot mode
+                newState.turn = currentPlayerId === user?.id ? 'bot' : user?.id || 'guest-1';
             }
         }
 
@@ -301,6 +319,83 @@ export const useGameSocket = () => {
 
     }, [gameState, updateGame, history, currentRoom, undoMove, players, user]);
 
+    // --- Bot Logic ---
+    useEffect(() => {
+        if (!currentRoom || !gameState || !user) return;
+
+        // Check if it's a solo training game
+        // We assume it's solo if the name starts with 'Entraînement' OR if there is only 1 player and we are playing
+        const isSoloGame = currentRoom.name.startsWith('Entraînement') || (currentRoom.players && currentRoom.players.length <= 1);
+
+        if (!isSoloGame) return;
+
+        // Check if it's Bot's turn
+        // Bot is 'bot' or any ID that is not me
+        const isBotTurn = gameState.turn !== user.id;
+
+        if (isBotTurn) {
+            const performBotMove = async () => {
+                const addLog = useDebugStore.getState().addLog;
+
+                // 1. Roll Dice if needed
+                if (gameState.dice.length === 0) {
+                    addLog('🤖 Bot: Rolling dice...', 'info');
+                    await new Promise(r => setTimeout(r, 1000));
+                    sendGameAction('rollDice', {}, 2); // Force Player 2 (Black)
+                    return;
+                }
+
+                // 2. Analyze and Move
+                addLog('🤖 Bot: Thinking...', 'info');
+                // await new Promise(r => setTimeout(r, 1500));
+
+                try {
+                    // We need to pass the board from the perspective of the bot (Player 2)
+                    // The analyzeMove function expects standard board, but we need to ensure it knows who is playing.
+                    // Actually analyzeMove takes gameState which has 'turn'.
+                    // We need to make sure 'turn' is correctly interpreted.
+
+                    // Temporary hack: Ensure turn is set to something that analyzeMove understands as "not white" if needed
+                    // But analyzeMove uses gameState.turn.
+
+                    // We need to pass the board from the perspective of the bot (Player 2)
+                    const analysis = await analyzeMove(gameState, gameState.dice, 2);
+
+                    if (analysis.bestMove && analysis.bestMove.length > 0) {
+                        const move = analysis.bestMove[0]; // Take the first move of the sequence
+                        // Note: bestMove is an array of moves {from, to}. 
+                        // But the API usually returns a sequence for the whole turn?
+                        // Let's check aiService.ts. It returns {from, to}[].
+                        // If it returns multiple moves (e.g. 24->18, 18->13), we should execute them one by one.
+                        // But here we are in a useEffect loop.
+                        // If we execute one move, the state updates, and the useEffect triggers again.
+                        // So we should only execute the *first* available move from the analysis relative to the current state.
+
+                        // However, the AI analyzes the *starting* position of the turn.
+                        // If we have already made a move, the AI might get confused if we send the intermediate state?
+                        // Yes, we should send the current intermediate state.
+
+                        addLog(`🤖 Bot: Moving ${move.from} -> ${move.to}`, 'info');
+                        await new Promise(r => setTimeout(r, 1000));
+                        sendGameAction('move', { from: move.from, to: move.to }, 2);
+                    } else {
+                        addLog('🤖 Bot: No moves found or turn done.', 'info');
+                        // Force turn switch if no moves possible?
+                        // For now, let's assume the dice check handles the turn switch if dice are empty.
+                        // But if dice are NOT empty and no moves?
+                        // We need to consume the dice or pass.
+                        // Let's just force clear dice to switch turn as a fallback
+                        await new Promise(r => setTimeout(r, 2000));
+                        // sendGameAction('pass', {}, 2); // Not implemented
+                    }
+                } catch (e) {
+                    addLog('🤖 Bot: Error', 'error', e);
+                }
+            };
+            performBotMove();
+        }
+    }, [gameState, currentRoom, user, sendGameAction]);
+
     const handleCheckerClick = useCallback((index: number) => {
         if (!gameState || !user) return;
 
@@ -314,10 +409,10 @@ export const useGameSocket = () => {
         const point = gameState.board.points[index];
         if (point.player !== playerColor || point.count === 0) return;
 
-        const smartMove = getSmartMove(gameState.board, playerColor, index, gameState.dice);
+        const smartMove = getSmartMove(gameState.board, playerColor as PlayerColor, index, gameState.dice);
         if (smartMove) {
             setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
-            const newBoard = makeMove(gameState.board, playerColor, index, smartMove.to);
+            const newBoard = makeMove(gameState.board, playerColor as PlayerColor, index, smartMove.to);
             const newDice = [...gameState.dice];
             const dieIndex = newDice.indexOf(smartMove.dieUsed);
             if (dieIndex > -1) newDice.splice(dieIndex, 1);

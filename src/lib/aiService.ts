@@ -17,31 +17,40 @@ export interface AIAnalysis {
 
 export const analyzeMove = async (
     gameState: GameState,
-    dice: number[]
+    dice: number[],
+    playerColor?: number // 1 for White, 2 for Black
 ): Promise<AIAnalysis> => {
     const addLog = useDebugStore.getState().addLog;
 
     try {
-        addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn });
+        // Determine player color if not provided
+        // Default logic: if turn is 'white' or 1 -> 1, else 2
+        // But gameState.turn is usually a UUID.
+        // We rely on the caller passing the correct color.
+        // If not passed, we default to 2 (Black/Bot) as a fallback for existing calls.
+        const activePlayer = playerColor || (gameState.turn === 'white' ? 1 : 2);
+
+        addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn, activePlayer });
 
         // Préparer le payload pour l'API BotGammon
         const payload = {
             dice: dice,
             boardState: {
-                points: gameState.board.points.map(p => ({
-                    player: p.player === 'white' ? 1 : p.player === 'black' ? 2 : 0,
+                points: gameState.board.points.map((p: any) => ({
+                    // Fix: p.player is 1 or 2, not 'white' or 'black'
+                    player: p.player === 1 ? 1 : p.player === 2 ? 2 : 0,
                     count: p.count
                 })),
                 bar: {
-                    white: gameState.board.bar.white,
-                    black: gameState.board.bar.black
+                    white: gameState.board.bar.player1 || gameState.board.bar.white || 0,
+                    black: gameState.board.bar.player2 || gameState.board.bar.black || 0
                 },
                 off: {
-                    white: gameState.board.off.white,
-                    black: gameState.board.off.black
+                    white: gameState.board.off.player1 || gameState.board.off.white || 0,
+                    black: gameState.board.off.player2 || gameState.board.off.black || 0
                 }
             },
-            player: gameState.turn === 'white' ? 1 : 2,
+            player: activePlayer,
             context: {
                 gamePhase: 'middle',
                 matchScore: '0-0',
