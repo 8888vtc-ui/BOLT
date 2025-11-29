@@ -88,57 +88,92 @@ export const useGameSocket = () => {
 
     // --- Join Room & Subscribe to Game State ---
     const joinRoom = useCallback(async (roomId: string) => {
+        console.log('Joining room:', roomId);
+
         if (DEMO_MODE) {
-            const room = roomsList.find(r => r.id === roomId);
-            if (room) {
-                const updatedRoom = { ...room, status: 'playing' as const };
-                setRoom(updatedRoom);
-                updateGame(createMockGameState());
-            }
+            console.log('Demo mode join');
+            const room = roomsList.find(r => r.id === roomId) || {
+                id: roomId,
+                name: 'Salle Demo',
+                status: 'playing',
+                players: []
+            };
+            setRoom(room as Room);
+            updateGame(createMockGameState());
             return;
         }
 
-        if (user) {
-            await supabase.from('room_participants').insert({ room_id: roomId, user_id: user.id }).select();
-        }
+        try {
+            if (user) {
+                await supabase.from('room_participants').upsert({ room_id: roomId, user_id: user.id }).select();
+            }
 
-        const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-        if (roomData) setRoom(roomData);
+            const { data: roomData, error: roomError } = await supabase.from('rooms').select('*').eq('id', roomId).single();
 
-        if (channelRef.current) supabase.removeChannel(channelRef.current);
+            if (roomError) {
+                console.error('Error fetching room:', roomError);
+                // Fallback si on ne peut pas récupérer la salle (ex: latence)
+                setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
+            } else if (roomData) {
+                setRoom(roomData);
+            }
 
-        const channel = supabase.channel(`room:${roomId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `room_id=eq.${roomId}` }, (payload) => {
-                const newGame = payload.new as any;
-                if (newGame && newGame.board_state) {
-                    updateGame(newGame.board_state);
-                }
-            })
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, (payload) => {
-                const msg = payload.new as any;
-                addMessage({
-                    id: msg.id,
-                    userId: msg.user_id,
-                    username: 'Unknown', // TODO: Fetch username
-                    text: msg.content,
-                    timestamp: new Date(msg.created_at).getTime()
+            if (channelRef.current) supabase.removeChannel(channelRef.current);
+
+            const channel = supabase.channel(`room:${roomId}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `room_id=eq.${roomId}` }, (payload) => {
+                    const newGame = payload.new as any;
+                    if (newGame && newGame.board_state) {
+                        updateGame(newGame.board_state);
+                    }
+                })
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, (payload) => {
+                    const msg = payload.new as any;
+                    addMessage({
+                        id: msg.id,
+                        userId: msg.user_id,
+                        username: 'Joueur', // On améliorera ça plus tard
+                        text: msg.content,
+                        timestamp: new Date(msg.created_at).getTime()
+                    });
+                })
+                .subscribe((status) => {
+                    console.log('Subscription status:', status);
                 });
-            })
-            .subscribe();
 
-        channelRef.current = channel;
+            channelRef.current = channel;
 
-        const { data: gameData } = await supabase.from('games').select('*').eq('room_id', roomId).single();
-        if (gameData) {
-            updateGame(gameData.board_state);
-        } else {
-            const initialState = createMockGameState();
-            await supabase.from('games').insert({
-                room_id: roomId,
-                board_state: initialState,
-                white_player_id: user?.id
-            });
-            updateGame(initialState);
+            // Récupération ou Création de l'état du jeu
+            const { data: gameData, error: gameError } = await supabase.from('games').select('*').eq('room_id', roomId).single();
+
+            if (gameData) {
+                console.log('Game found, updating state');
+                updateGame(gameData.board_state);
+            } else {
+                console.log('No game found, creating new game');
+                const initialState = createMockGameState();
+                // On essaie de créer, si ça échoue (race condition), on ignore
+                const { error: insertError } = await supabase.from('games').insert({
+                    room_id: roomId,
+                    board_state: initialState,
+                    white_player_id: user?.id
+                });
+
+                if (insertError) {
+                    console.warn('Error creating game (might already exist):', insertError);
+                    // Retry fetch
+                    const { data: retryGame } = await supabase.from('games').select('*').eq('room_id', roomId).single();
+                    if (retryGame) updateGame(retryGame.board_state);
+                    else updateGame(initialState); // Fallback ultime
+                } else {
+                    updateGame(initialState);
+                }
+            }
+        } catch (err) {
+            console.error('Critical error joining room:', err);
+            // Pour ne pas bloquer l'UI
+            setRoom({ id: roomId, name: 'Erreur Connexion', status: 'playing', players: [] });
+            updateGame(createMockGameState());
         }
 
     }, [user, roomsList, setRoom, updateGame, addMessage]);
