@@ -1,183 +1,244 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Wifi, WifiOff, Search, Trophy } from 'lucide-react';
-import { useGameSocket } from '../hooks/useGameSocket';
+import { Search, Trophy, LogOut, Swords, Users } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useGameStore } from '../stores/gameStore';
-import RoomCard from '../components/lobby/RoomCard';
-import CreateRoomModal from '../components/lobby/CreateRoomModal';
+import { supabase } from '../lib/supabase';
 
 const Lobby = () => {
     const navigate = useNavigate();
-    const { isConnected, createRoom, joinRoom } = useGameSocket();
-    const { roomsList } = useGameStore();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const { user, logout } = useAuth();
+    const { roomsList, setRoomsList } = useGameStore();
+    const [isSearching, setIsSearching] = useState(false);
+    const [queueTime, setQueueTime] = useState(0);
 
-    // Simuler un chargement initial pour l'effet skeleton
+    // Fetch active rooms
     useEffect(() => {
-        const timer = setTimeout(() => setIsLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
+        const fetchRooms = async () => {
+            const { data } = await supabase
+                .from('rooms')
+                .select('*, profiles:created_by(username, avatar_url)')
+                .eq('status', 'waiting')
+                .order('created_at', { ascending: false });
 
-    const handleCreateRoom = (name: string) => {
-        createRoom(name);
-        setIsModalOpen(false);
+            if (data) {
+                setRoomsList(data.map(r => ({ ...r, players: [] })));
+            }
+        };
+
+        fetchRooms();
+
+        // Subscribe to room updates
+        const channel = supabase.channel('lobby_rooms')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+                fetchRooms();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [setRoomsList]);
+
+    // Matchmaking Timer
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isSearching) {
+            interval = setInterval(() => setQueueTime(t => t + 1), 1000);
+        } else {
+            setQueueTime(0);
+        }
+        return () => clearInterval(interval);
+    }, [isSearching]);
+
+    const handleFindMatch = async () => {
+        if (!user) return;
+        setIsSearching(true);
+
+        try {
+            const { data, error } = await supabase.rpc('find_match', { p_user_id: user.id });
+
+            if (error) throw error;
+
+            const result = data[0];
+
+            if (result && result.room_id) {
+                setIsSearching(false);
+                navigate(`/game/${result.room_id}`);
+            } else {
+                const pollInterval = setInterval(async () => {
+                    const { data: myRooms } = await supabase
+                        .from('room_participants')
+                        .select('room_id')
+                        .eq('user_id', user.id)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (myRooms && myRooms.length > 0) {
+                        clearInterval(pollInterval);
+                        setIsSearching(false);
+                        navigate(`/game/${myRooms[0].room_id}`);
+                    }
+                }, 3000);
+            }
+
+        } catch (err) {
+            console.error('Matchmaking error:', err);
+            setIsSearching(false);
+            alert('Erreur lors de la recherche de partie.');
+        }
     };
 
-    const handleJoinRoom = (roomId: string) => {
-        joinRoom(roomId);
-        navigate(`/game/${roomId}`);
+    const handleCancelSearch = async () => {
+        if (!user) return;
+        setIsSearching(false);
+        await supabase.from('matchmaking_queue').delete().eq('user_id', user.id);
     };
 
-    const filteredRooms = roomsList.filter(room =>
-        room.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white p-6 relative overflow-hidden font-sans selection:bg-[#FFD700] selection:text-black">
-            {/* Background patterns */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#1a1a1a] via-black to-black opacity-60 pointer-events-none" />
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#FFD700] to-transparent opacity-50" />
+        <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
+            {/* Header */}
+            <header className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-[#111]">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#FFD700] rounded-lg flex items-center justify-center text-black font-black text-xl">
+                        G
+                    </div>
+                    <h1 className="text-2xl font-bold tracking-tight">GuruGammon</h1>
+                </div>
 
-            <div className="max-w-7xl mx-auto relative z-10">
-                {/* Header */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
-                    <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5 }}
-                    >
-                        <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-[#FFD700] via-[#FDB931] to-[#B8860B] tracking-tight drop-shadow-sm">
-                            Lobby
-                        </h1>
-                        <p className="text-gray-400 mt-2 text-lg font-light flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#FFD700] animate-pulse" />
-                            Parties en cours
-                        </p>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5, delay: 0.1 }}
-                        className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto"
-                    >
-                        {/* Status Indicator */}
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-md transition-colors ${isConnected
-                            ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                            : 'border-red-500/30 bg-red-500/10 text-red-400'
-                            }`}>
-                            {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                            <span className="text-sm font-medium uppercase tracking-wider">
-                                {isConnected ? 'Online' : 'Offline'}
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold overflow-hidden">
+                            {user?.avatar ? (
+                                <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" />
+                            ) : (
+                                user?.username?.substring(0, 2).toUpperCase()
+                            )}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-bold">{user?.username}</span>
+                            <span className="text-[10px] text-[#FFD700] flex items-center gap-1">
+                                <Trophy className="w-3 h-3" /> 1200 ELO
                             </span>
                         </div>
-
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-[#FFD700] to-[#FDB931] hover:from-[#FDB931] hover:to-[#FFD700] text-black px-8 py-3 rounded-xl font-bold text-lg transition-all transform hover:scale-105 hover:shadow-[0_0_20px_rgba(255,215,0,0.4)] active:scale-95"
-                        >
-                            <Plus className="w-6 h-6" />
-                            Créer une partie
-                        </button>
-                    </motion.div>
-                </header>
-
-                {/* Search Bar */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="mb-10 relative max-w-md"
-                >
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Search className="h-5 w-5 text-gray-500" />
                     </div>
-                    <input
-                        type="text"
-                        className="block w-full pl-12 pr-4 py-4 bg-[#111] border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/50 focus:border-transparent transition-all"
-                        placeholder="Rechercher une table..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </motion.div>
 
-                {/* Content */}
-                <AnimatePresence mode="wait">
-                    {isLoading ? (
-                        <motion.div
-                            key="loading"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                        >
-                            {[1, 2, 3, 4, 5, 6].map((i) => (
-                                <div key={i} className="bg-[#111] rounded-2xl p-6 border border-white/5 h-64 animate-pulse">
-                                    <div className="h-8 bg-white/10 rounded-md w-3/4 mb-4" />
-                                    <div className="h-4 bg-white/5 rounded-md w-1/2 mb-8" />
-                                    <div className="space-y-3">
-                                        <div className="h-10 bg-white/5 rounded-full w-full" />
-                                        <div className="h-10 bg-white/5 rounded-full w-full" />
+                    <button
+                        onClick={logout}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                        <LogOut className="w-5 h-5" />
+                    </button>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="flex-1 max-w-7xl mx-auto w-full p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                {/* Left Column: Actions */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Hero Section / Matchmaking */}
+                    <div className="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] rounded-3xl p-8 border border-white/10 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFD700]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-[#FFD700]/10 transition-all duration-700" />
+
+                        <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                            <Swords className="w-8 h-8 text-[#FFD700]" />
+                            Partie Classée
+                        </h2>
+                        <p className="text-gray-400 mb-8 max-w-md">
+                            Affrontez des joueurs du monde entier, montez dans le classement et devenez le Guru du Backgammon.
+                        </p>
+
+                        {isSearching ? (
+                            <div className="flex flex-col items-center justify-center py-8 gap-6">
+                                <div className="relative">
+                                    <div className="w-24 h-24 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />
+                                    <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xl">
+                                        {formatTime(queueTime)}
                                     </div>
                                 </div>
-                            ))}
-                        </motion.div>
-                    ) : filteredRooms.length === 0 ? (
-                        <motion.div
-                            key="empty"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.4 }}
-                            className="text-center py-24 bg-[#111]/50 backdrop-blur-sm rounded-3xl border border-white/10 flex flex-col items-center"
-                        >
-                            <div className="w-24 h-24 bg-[#FFD700]/10 rounded-full flex items-center justify-center mb-6 border border-[#FFD700]/20 shadow-[0_0_30px_rgba(255,215,0,0.1)]">
-                                <Trophy className="w-10 h-10 text-[#FFD700]" />
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold text-white mb-1">Recherche d'adversaire...</h3>
+                                    <p className="text-gray-500 text-sm">Estimation: 0:30</p>
+                                </div>
+                                <button
+                                    onClick={handleCancelSearch}
+                                    className="px-6 py-2 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-bold"
+                                >
+                                    Annuler
+                                </button>
                             </div>
-                            <h3 className="text-3xl font-bold text-white mb-2">Aucune partie en cours</h3>
-                            <p className="text-gray-400 max-w-md mx-auto mb-8 text-lg">
-                                Le lobby est calme... Soyez le premier à lancer les dés et à défier le monde !
-                            </p>
+                        ) : (
                             <button
-                                onClick={() => setIsModalOpen(true)}
-                                className="text-[#FFD700] hover:text-white font-bold text-lg underline underline-offset-8 decoration-2 decoration-[#FFD700]/50 hover:decoration-[#FFD700] transition-all"
+                                onClick={handleFindMatch}
+                                className="w-full sm:w-auto px-12 py-5 bg-[#FFD700] hover:bg-[#FDB931] text-black font-black text-xl rounded-2xl shadow-[0_0_30px_rgba(255,215,0,0.2)] hover:shadow-[0_0_50px_rgba(255,215,0,0.4)] hover:scale-105 transition-all flex items-center justify-center gap-3"
                             >
-                                Créer la première table maintenant
+                                <Search className="w-6 h-6" />
+                                TROUVER UNE PARTIE
                             </button>
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="grid"
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                        >
-                            <AnimatePresence>
-                                {filteredRooms.map((room, index) => (
-                                    <motion.div
-                                        key={room.id}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9 }}
-                                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                                    >
-                                        <RoomCard
-                                            room={room}
-                                            onJoin={() => handleJoinRoom(room.id)}
-                                        />
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+                        )}
+                    </div>
 
-            <CreateRoomModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onCreate={handleCreateRoom}
-            />
+                    {/* Quick Actions */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <button className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group">
+                            <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <Users className="w-6 h-6" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-1">Jouer avec un ami</h3>
+                            <p className="text-sm text-gray-500">Créez une salle privée et invitez un ami.</p>
+                        </button>
+
+                        <button className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group">
+                            <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <Trophy className="w-6 h-6" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-1">Tournois</h3>
+                            <p className="text-sm text-gray-500">Rejoignez les tournois quotidiens.</p>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Right Column: Active Rooms / Leaderboard */}
+                <div className="bg-[#111] rounded-3xl border border-white/10 p-6 flex flex-col">
+                    <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        Salles en attente
+                    </h3>
+
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        {roomsList.length === 0 ? (
+                            <div className="text-center py-12 text-gray-600">
+                                Aucune salle publique en attente.
+                                <br />
+                                Créez-en une !
+                            </div>
+                        ) : (
+                            roomsList.map(room => (
+                                <div key={room.id} className="p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors flex items-center justify-between group">
+                                    <div>
+                                        <div className="font-bold text-sm mb-1">{room.name}</div>
+                                        <div className="text-xs text-gray-500">Par {room.profiles?.username || 'Anonyme'}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate(`/game/${room.id}`)}
+                                        className="px-4 py-2 rounded-lg bg-[#FFD700]/10 text-[#FFD700] text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#FFD700] hover:text-black"
+                                    >
+                                        REJOINDRE
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+            </main>
         </div>
     );
 };

@@ -20,6 +20,10 @@ export interface Room {
     name: string;
     players: Player[];
     status: 'waiting' | 'playing';
+    profiles?: {
+        username: string;
+        avatar_url: string;
+    };
 }
 
 export interface GameState {
