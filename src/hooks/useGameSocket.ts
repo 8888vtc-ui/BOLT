@@ -376,17 +376,21 @@ export const useGameSocket = () => {
                         // Yes, we should send the current intermediate state.
 
                         addLog(`🤖 Bot: Moving ${move.from} -> ${move.to}`, 'info');
-                        await new Promise(r => setTimeout(r, 1000));
+                        await new Promise(r => setTimeout(r, 600));
                         sendGameAction('move', { from: move.from, to: move.to }, 2);
                     } else {
                         addLog('🤖 Bot: No moves found or turn done.', 'info');
-                        // Force turn switch if no moves possible?
-                        // For now, let's assume the dice check handles the turn switch if dice are empty.
-                        // But if dice are NOT empty and no moves?
-                        // We need to consume the dice or pass.
-                        // Let's just force clear dice to switch turn as a fallback
+                        // Force turn switch if no moves possible
                         await new Promise(r => setTimeout(r, 2000));
-                        // sendGameAction('pass', {}, 2); // Not implemented
+
+                        // Clear dice to force turn switch in the next render cycle
+                        const newState = { ...gameState, dice: [] };
+                        updateGame(newState);
+
+                        // Also update DB to ensure sync
+                        if (!DEMO_MODE && currentRoom) {
+                            supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                        }
                     }
                 } catch (e) {
                     addLog('🤖 Bot: Error', 'error', e);

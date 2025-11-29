@@ -44,6 +44,7 @@ const GameRoom = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
     const [showAnalysis, setShowAnalysis] = useState(false);
+    const [coachMode, setCoachMode] = useState<'text' | 'video'>('text');
 
     // Rejoindre la room au montage
     useEffect(() => {
@@ -241,52 +242,97 @@ const GameRoom = () => {
                                     <h3 className="text-xl font-bold text-white">L'avis du Coach</h3>
                                 </div>
 
+                                {/* Mode Toggle */}
+                                <div className="flex justify-center mb-6">
+                                    <div className="bg-black/40 p-1 rounded-full flex items-center border border-white/10">
+                                        <button
+                                            onClick={() => setCoachMode('text')}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${coachMode === 'text'
+                                                ? 'bg-[#FFD700] text-black shadow-lg'
+                                                : 'text-gray-400 hover:text-white'
+                                                }`}
+                                        >
+                                            Texte
+                                        </button>
+                                        <button
+                                            onClick={() => setCoachMode('video')}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${coachMode === 'video'
+                                                ? 'bg-[#FFD700] text-black shadow-lg'
+                                                : 'text-gray-400 hover:text-white'
+                                                }`}
+                                        >
+                                            Avatar Vidéo
+                                        </button>
+                                    </div>
+                                </div>
+
                                 {isAnalyzing ? (
                                     <div className="py-8 flex flex-col items-center gap-4">
                                         <div className="w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
                                         <p className="text-gray-400 animate-pulse">Analyse de la position...</p>
                                     </div>
                                 ) : aiAnalysis ? (
-                                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                                        {/* Meilleur Coup */}
-                                        <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Meilleur Coup</div>
-                                            <div className="text-lg font-mono text-[#FFD700]">
-                                                {aiAnalysis.bestMove.map(m => `${m.from + 1} → ${m.to + 1}`).join(', ')}
+                                    coachMode === 'text' ? (
+                                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                            {/* Meilleur Coup */}
+                                            <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                                                <div className="text-xs text-gray-500 uppercase font-bold mb-1">Meilleur Coup</div>
+                                                <div className="text-lg font-mono text-[#FFD700]">
+                                                    {aiAnalysis.bestMove.map(m => `${m.from + 1} → ${m.to + 1}`).join(', ')}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Stratégie Recommandée */}
-                                        {aiAnalysis.strategicAdvice && (
-                                            <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-4 rounded-xl border border-blue-500/20">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <div className="text-xs text-blue-400 uppercase font-bold">Stratégie</div>
-                                                    {aiAnalysis.strategicAdvice.riskLevel && (
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded border ${aiAnalysis.strategicAdvice.riskLevel === 'high' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-                                                            aiAnalysis.strategicAdvice.riskLevel === 'low' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-                                                                'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
-                                                            }`}>
-                                                            RISQUE: {aiAnalysis.strategicAdvice.riskLevel.toUpperCase()}
-                                                        </span>
-                                                    )}
+                                            {/* Stratégie Recommandée */}
+                                            {aiAnalysis.strategicAdvice && (
+                                                <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-4 rounded-xl border border-blue-500/20">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <div className="text-xs text-blue-400 uppercase font-bold">Stratégie</div>
+                                                        {aiAnalysis.strategicAdvice.riskLevel && (
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded border ${aiAnalysis.strategicAdvice.riskLevel === 'high' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                                                                aiAnalysis.strategicAdvice.riskLevel === 'low' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                                                                    'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                                                                }`}>
+                                                                RISQUE: {aiAnalysis.strategicAdvice.riskLevel.toUpperCase()}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm font-bold text-white mb-1">
+                                                        {aiAnalysis.strategicAdvice.recommendedStrategy}
+                                                    </div>
+                                                    <p className="text-xs text-gray-300 leading-relaxed">
+                                                        {aiAnalysis.strategicAdvice.explanation}
+                                                    </p>
                                                 </div>
-                                                <div className="text-sm font-bold text-white mb-1">
-                                                    {aiAnalysis.strategicAdvice.recommendedStrategy}
-                                                </div>
-                                                <p className="text-xs text-gray-300 leading-relaxed">
-                                                    {aiAnalysis.strategicAdvice.explanation}
+                                            )}
+
+                                            {/* Explication */}
+                                            <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                                                <div className="text-xs text-gray-500 uppercase font-bold mb-1">Analyse détaillée</div>
+                                                <p className="text-sm text-gray-300 leading-relaxed">
+                                                    {aiAnalysis.explanation}
                                                 </p>
                                             </div>
-                                        )}
-
-                                        {/* Explication */}
-                                        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                                            <div className="text-xs text-gray-500 uppercase font-bold mb-1">Analyse détaillée</div>
-                                            <p className="text-sm text-gray-300 leading-relaxed">
-                                                {aiAnalysis.explanation}
-                                            </p>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                                            <div className="w-48 h-48 bg-black/50 rounded-full border-4 border-[#FFD700]/20 flex items-center justify-center overflow-hidden relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                                                {/* Placeholder Avatar */}
+                                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 z-10"></div>
+                                                <UserIcon className="w-24 h-24 text-gray-600" />
+                                                <div className="absolute bottom-4 z-20 px-4 text-center">
+                                                    <div className="text-[10px] text-[#FFD700] uppercase tracking-widest font-bold animate-pulse">
+                                                        En train de parler...
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white/5 p-4 rounded-xl border border-white/5 w-full text-center">
+                                                <p className="text-sm text-gray-300 italic">
+                                                    "{aiAnalysis.strategicAdvice?.speechScript || aiAnalysis.explanation.slice(0, 100) + '...'}"
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )
                                 ) : (
                                     <div className="text-center py-8 text-gray-500">
                                         Impossible de charger l'analyse.
@@ -326,6 +372,7 @@ const GameRoom = () => {
                         >
                             <Lightbulb className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
                             <span className="text-sm font-bold">Coach AI</span>
+                            <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded font-bold ml-1">BETA</span>
                         </button>
                     </div>
                 </div>

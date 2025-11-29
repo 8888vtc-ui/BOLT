@@ -143,57 +143,17 @@ const Lobby = () => {
 
                 {/* Left Column: Actions */}
                 <div className="lg:col-span-2 space-y-8">
-                    {/* Hero Section / Matchmaking */}
+                    {/* Hero Section / Bot Mode (Now the Main Focus) */}
                     <div className="bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] rounded-3xl p-8 border border-white/10 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFD700]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-[#FFD700]/10 transition-all duration-700" />
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-green-500/10 transition-all duration-700" />
 
                         <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                            <Swords className="w-8 h-8 text-[#FFD700]" />
-                            Partie Classée
+                            <Swords className="w-8 h-8 text-green-500" />
+                            Jouer contre le Guru
                         </h2>
                         <p className="text-gray-400 mb-8 max-w-md">
-                            Affrontez des joueurs du monde entier, montez dans le classement et devenez le Guru du Backgammon.
+                            Affrontez notre IA Superhumaine avec son Avatar Coach. C'est l'expérience ultime pour progresser.
                         </p>
-
-                        {isSearching ? (
-                            <div className="flex flex-col items-center justify-center py-8 gap-6">
-                                <div className="relative">
-                                    <div className="w-24 h-24 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />
-                                    <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-xl">
-                                        {formatTime(queueTime)}
-                                    </div>
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold text-white mb-1">Recherche d'adversaire...</h3>
-                                    <p className="text-gray-500 text-sm">Estimation: 0:30</p>
-                                </div>
-                                <button
-                                    onClick={handleCancelSearch}
-                                    className="px-6 py-2 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-bold"
-                                >
-                                    Annuler
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={handleFindMatch}
-                                className="w-full sm:w-auto px-12 py-5 bg-[#FFD700] hover:bg-[#FDB931] text-black font-black text-xl rounded-2xl shadow-[0_0_30px_rgba(255,215,0,0.2)] hover:shadow-[0_0_50px_rgba(255,215,0,0.4)] hover:scale-105 transition-all flex items-center justify-center gap-3"
-                            >
-                                <Search className="w-6 h-6" />
-                                TROUVER UNE PARTIE
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <button className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group">
-                            <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                <Users className="w-6 h-6" />
-                            </div>
-                            <h3 className="font-bold text-lg mb-1">Jouer avec un ami</h3>
-                            <p className="text-sm text-gray-500">Créez une salle privée et invitez un ami.</p>
-                        </button>
 
                         <button
                             onClick={async () => {
@@ -201,13 +161,11 @@ const Lobby = () => {
                                     alert("Vous devez être connecté pour jouer.");
                                     return;
                                 }
-
                                 try {
-                                    // Créer une salle d'entraînement rapide
                                     const { data, error } = await supabase
                                         .from('rooms')
                                         .insert({
-                                            name: `Entraînement ${user.username}`,
+                                            name: `Dojo ${user.username}`,
                                             created_by: user.id,
                                             status: 'playing'
                                         })
@@ -219,65 +177,90 @@ const Lobby = () => {
                                         alert(`Erreur lors de la création de la salle: ${error.message}`);
                                         return;
                                     }
-
-                                    if (data) {
-                                        // Force navigation to the game room
-                                        navigate(`/game/${data.id}`);
-                                    }
+                                    if (data) navigate(`/game/${data.id}`);
                                 } catch (err) {
                                     console.error("Exception création salle:", err);
                                     alert("Une erreur inattendue est survenue.");
                                 }
                             }}
-                            className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group"
+                            className="w-full sm:w-auto px-12 py-5 bg-green-500 hover:bg-green-400 text-black font-black text-xl rounded-2xl shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:shadow-[0_0_50px_rgba(34,197,94,0.4)] hover:scale-105 transition-all flex items-center justify-center gap-3"
                         >
-                            <div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                <Swords className="w-6 h-6" />
+                            <Swords className="w-6 h-6" />
+                            DÉFIER LE BOT
+                        </button>
+                    </div>
+
+                    {/* Other Modes (Disabled / Coming Soon) */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <button className="p-6 bg-[#111] border border-white/5 rounded-2xl text-left group opacity-50 cursor-not-allowed relative overflow-hidden">
+                            <div className="absolute top-2 right-2 bg-[#FFD700] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                BIENTÔT
                             </div>
-                            <h3 className="font-bold text-lg mb-1">Entraînement Solo</h3>
-                            <p className="text-sm text-gray-500">Testez le Coach IA sans pression.</p>
+                            <div className="w-12 h-12 bg-[#FFD700]/10 text-[#FFD700] rounded-xl flex items-center justify-center mb-4">
+                                <Search className="w-6 h-6" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-1">Partie Classée</h3>
+                            <p className="text-sm text-gray-500">Matchmaking mondial.</p>
                         </button>
 
-                        <button className="p-6 bg-[#111] hover:bg-[#161616] border border-white/5 hover:border-white/10 rounded-2xl transition-all text-left group opacity-50 cursor-not-allowed">
+                        <button className="p-6 bg-[#111] border border-white/5 rounded-2xl text-left group opacity-50 cursor-not-allowed relative overflow-hidden">
+                            <div className="absolute top-2 right-2 bg-[#FFD700] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                BIENTÔT
+                            </div>
+                            <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center mb-4">
+                                <Users className="w-6 h-6" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-1">Jouer avec un ami</h3>
+                            <p className="text-sm text-gray-500">Salles privées.</p>
+                        </button>
+
+                        <button className="p-6 bg-[#111] border border-white/5 rounded-2xl text-left group opacity-50 cursor-not-allowed relative overflow-hidden col-span-2">
+                            <div className="absolute top-2 right-2 bg-[#FFD700] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                BIENTÔT
+                            </div>
                             <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center mb-4">
                                 <Trophy className="w-6 h-6" />
                             </div>
                             <h3 className="font-bold text-lg mb-1">Tournois</h3>
-                            <p className="text-sm text-gray-500">Bientôt disponible.</p>
+                            <p className="text-sm text-gray-500">Compétitions officielles.</p>
                         </button>
                     </div>
                 </div>
 
-                {/* Right Column: Active Rooms / Leaderboard */}
-                <div className="bg-[#111] rounded-3xl border border-white/10 p-6 flex flex-col">
-                    <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                {/* Right Column: Active Rooms (Disabled / Coming Soon) */}
+                <div className="bg-[#111] rounded-3xl border border-white/10 p-6 flex flex-col relative overflow-hidden">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-6">
+                        <div className="w-16 h-16 bg-[#FFD700]/10 rounded-full flex items-center justify-center mb-4">
+                            <Users className="w-8 h-8 text-[#FFD700]" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Lobby Multijoueur</h3>
+                        <p className="text-gray-400 text-sm">
+                            Le lobby public ouvrira ses portes très prochainement. Préparez-vous !
+                        </p>
+                        <span className="mt-4 px-4 py-1 bg-[#FFD700] text-black text-xs font-bold rounded-full">
+                            COMING SOON
+                        </span>
+                    </div>
+
+                    <h3 className="font-bold text-lg mb-6 flex items-center gap-2 opacity-30">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
                         Salles en attente
                     </h3>
 
-                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                        {roomsList.length === 0 ? (
-                            <div className="text-center py-12 text-gray-600">
-                                Aucune salle publique en attente.
-                                <br />
-                                Créez-en une !
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar opacity-30 pointer-events-none">
+                        {/* Fake content for visual background */}
+                        <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                            <div>
+                                <div className="font-bold text-sm mb-1">Salle #124</div>
+                                <div className="text-xs text-gray-500">Par Player1</div>
                             </div>
-                        ) : (
-                            roomsList.map(room => (
-                                <div key={room.id} className="p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors flex items-center justify-between group">
-                                    <div>
-                                        <div className="font-bold text-sm mb-1">{room.name}</div>
-                                        <div className="text-xs text-gray-500">Par {room.profiles?.username || 'Anonyme'}</div>
-                                    </div>
-                                    <button
-                                        onClick={() => navigate(`/game/${room.id}`)}
-                                        className="px-4 py-2 rounded-lg bg-[#FFD700]/10 text-[#FFD700] text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#FFD700] hover:text-black"
-                                    >
-                                        REJOINDRE
-                                    </button>
-                                </div>
-                            ))
-                        )}
+                        </div>
+                        <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                            <div>
+                                <div className="font-bold text-sm mb-1">Salle #125</div>
+                                <div className="text-xs text-gray-500">Par Player2</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

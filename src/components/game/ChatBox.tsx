@@ -27,14 +27,28 @@ const ChatBox = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#111] border-l border-white/10">
+        <div className="flex flex-col h-full bg-[#111] border-l border-white/10 relative overflow-hidden">
+            {/* Coming Soon Overlay */}
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6">
+                <div className="w-12 h-12 bg-[#FFD700]/10 rounded-full flex items-center justify-center mb-3">
+                    <Send className="w-6 h-6 text-[#FFD700]" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Chat Global</h3>
+                <p className="text-gray-400 text-xs mb-4">
+                    Discutez avec les autres joueurs et le Guru. Bientôt disponible.
+                </p>
+                <span className="px-3 py-1 bg-[#FFD700] text-black text-[10px] font-bold rounded-full">
+                    COMING SOON
+                </span>
+            </div>
+
             {/* Header */}
-            <div className="p-4 border-b border-white/10 bg-[#0a0a0a]">
+            <div className="p-4 border-b border-white/10 bg-[#0a0a0a] opacity-30">
                 <h3 className="text-gray-400 text-xs uppercase tracking-wider font-bold">Chat en direct</h3>
             </div>
 
             {/* Messages List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent opacity-30 pointer-events-none">
                 <AnimatePresence initial={false}>
                     {messages.map((msg, index) => {
                         const isMe = msg.userId === currentUser?.id;
@@ -56,8 +70,8 @@ const ChatBox = () => {
                                 </div>
                                 <div
                                     className={`px-3 py-2 rounded-xl text-sm max-w-[90%] break-words shadow-sm ${isMe
-                                            ? 'bg-[#FFD700] text-black rounded-tr-none font-medium'
-                                            : 'bg-white/10 text-gray-200 rounded-tl-none'
+                                        ? 'bg-[#FFD700] text-black rounded-tr-none font-medium'
+                                        : 'bg-white/10 text-gray-200 rounded-tl-none'
                                         }`}
                                 >
                                     {msg.text}
@@ -70,7 +84,7 @@ const ChatBox = () => {
             </div>
 
             {/* Input Area */}
-            <form onSubmit={handleSubmit} className="p-3 bg-[#0a0a0a] border-t border-white/10">
+            <form onSubmit={handleSubmit} className="p-3 bg-[#0a0a0a] border-t border-white/10 opacity-30 pointer-events-none">
                 <div className="relative">
                     <input
                         type="text"

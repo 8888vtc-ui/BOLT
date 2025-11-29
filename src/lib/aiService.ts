@@ -10,8 +10,10 @@ export interface AIAnalysis {
     equity?: number;
     strategicAdvice?: {
         analysis: string;
+        speechScript?: string;
         recommendedStrategy: string;
         riskLevel: string;
+        explanation?: string;
     };
 }
 
@@ -112,6 +114,7 @@ export const analyzeMove = async (
             equity: 0,
             strategicAdvice: {
                 analysis: "Le serveur d'analyse est indisponible. Veuillez réessayer plus tard.",
+                speechScript: "Désolé, je ne peux pas analyser cette position pour le moment.",
                 recommendedStrategy: "Jeu prudent",
                 riskLevel: "N/A"
             }
