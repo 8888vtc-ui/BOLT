@@ -340,6 +340,8 @@ export const useGameSocket = () => {
     }, [gameState, updateGame, history, currentRoom, undoMove, players, user]);
 
     // --- Bot Logic ---
+    const botIsThinking = useRef(false);
+    
     useEffect(() => {
         if (!currentRoom || !gameState) return;
 
@@ -356,8 +358,9 @@ export const useGameSocket = () => {
         const myId = user?.id || 'guest-1';
         const isBotTurn = gameState.turn !== myId;
 
-        if (isBotTurn) {
+        if (isBotTurn && !botIsThinking.current) {
             const performBotMove = async () => {
+                botIsThinking.current = true;
                 const addLog = useDebugStore.getState().addLog;
 
                 // 1. Roll Dice if needed
@@ -365,6 +368,7 @@ export const useGameSocket = () => {
                     addLog('🤖 Bot: Rolling dice...', 'info');
                     await new Promise(r => setTimeout(r, 1000));
                     sendGameAction('rollDice', {}, 2); // Force Player 2 (Black)
+                    botIsThinking.current = false;
                     return;
                 }
 
@@ -404,6 +408,8 @@ export const useGameSocket = () => {
                     const newState = { ...gameState, dice: [] }; // Clear dice to force turn switch
                     updateGame(newState);
                 }
+                
+                botIsThinking.current = false;
             };
             performBotMove();
         }
