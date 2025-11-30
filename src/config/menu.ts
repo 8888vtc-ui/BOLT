@@ -12,17 +12,17 @@ export interface MenuItem {
 
 export const MAIN_MENU: MenuItem[] = [
     {
-        id: 'dashboard',
-        label: 'Accueil',
-        route: '/dashboard',
-        icon: Home,
+        id: 'play',
+        label: 'JOUER',
+        route: '/lobby',
+        icon: Users,
         roles: ['user', 'guest']
     },
     {
-        id: 'play',
-        label: 'Jouer',
-        route: '/lobby',
-        icon: Users,
+        id: 'dashboard',
+        label: 'Mon Espace',
+        route: '/dashboard',
+        icon: Home,
         roles: ['user', 'guest']
     },
     {

@@ -1,16 +1,15 @@
+functionsDirectory = "D:\\BOLT\\BOLT\\netlify\\functions"
+functionsDirectoryOrigin = "default"
+redirectsOrigin = "config"
 plugins = []
 headers = []
-redirects = []
-
-[functions]
-
-[functions."*"]
 
 [build]
-publish = "/tmp/cc-agent/60805932/project/dist"
-publishOrigin = "ui"
-commandOrigin = "ui"
+publish = "D:\\BOLT\\BOLT\\dist"
+publishOrigin = "config"
+commandOrigin = "config"
 command = "npm run build"
+functions = "D:\\BOLT\\BOLT\\netlify\\functions"
 
 [build.environment]
 
@@ -25,3 +24,19 @@ command = "npm run build"
 [build.processing.js]
 
 [build.services]
+
+[functions]
+
+[functions."*"]
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]

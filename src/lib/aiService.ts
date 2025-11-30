@@ -34,25 +34,36 @@ export const analyzeMove = async (
 
         addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn, activePlayer });
 
-        // Préparer le payload pour l'API BotGammon
+        // TRANSFORM BOARD FOR ENGINE
+        // Frontend: White 23->0, Black 0->23
+        // Engine: White 0->23, Black 23->0
+        // Solution: ALWAYS invert indices (i -> 23-i)
+
+        const invertedPoints = new Array(24).fill(null).map((_, i) => {
+            const originalPoint = gameState.board.points[23 - i];
+            return {
+                player: originalPoint.player,
+                count: originalPoint.count
+            };
+        });
+
         const payload = {
             dice: dice,
             boardState: {
-                points: gameState.board.points.map((p: any) => ({
-                    // Fix: p.player is 1 or 2, not 'white' or 'black'
+                points: invertedPoints.map((p: any) => ({
                     player: p.player === 1 ? 1 : p.player === 2 ? 2 : 0,
                     count: p.count
                 })),
                 bar: {
-                    white: gameState.board.bar.player1 || gameState.board.bar.white || 0,
-                    black: gameState.board.bar.player2 || gameState.board.bar.black || 0
+                    white: gameState.board.bar.player1 || 0,
+                    black: gameState.board.bar.player2 || 0
                 },
                 off: {
-                    white: gameState.board.off.player1 || gameState.board.off.white || 0,
-                    black: gameState.board.off.player2 || gameState.board.off.black || 0
+                    white: gameState.board.off.player1 || 0,
+                    black: gameState.board.off.player2 || 0
                 }
             },
-            player: activePlayer,
+            player: activePlayer, // Send actual player (1 or 2)
             context: {
                 gamePhase: 'middle',
                 matchScore: '0-0',
@@ -82,9 +93,32 @@ export const analyzeMove = async (
         addLog('🤖 AI Service: Analysis received', 'success');
 
         // Convertir la réponse de l'API au format attendu par le frontend
-        const bestMoves = data.bestMoves && data.bestMoves.length > 0
+        let bestMoves = data.bestMoves && data.bestMoves.length > 0
             ? [data.bestMoves[0]] // Prendre le meilleur coup
             : [];
+
+        // INVERT MOVES BACK TO FRONTEND COORDINATES
+        // Engine returns moves in its coordinate system (White 0->23, Black 23->0)
+        // Frontend expects White 23->0, Black 0->23
+        // So we must invert: i -> 23 - i
+        if (bestMoves.length > 0) {
+            bestMoves = bestMoves.map((move: any) => {
+                // Handle Bar (25) -> -1 or similar if needed. 
+                // Assuming API returns 0-23 indices or 1-24 points.
+                // If API returns 0-23 indices:
+                // 23 - from
+                // 23 - to
+
+                // Check if move is from Bar (often 24 or 25 in some APIs, or 'bar')
+                // For now assuming indices 0-23.
+
+                return {
+                    ...move,
+                    from: typeof move.from === 'number' && move.from >= 0 && move.from <= 23 ? 23 - move.from : move.from,
+                    to: typeof move.to === 'number' && move.to >= 0 && move.to <= 23 ? 23 - move.to : move.to
+                };
+            });
+        }
 
         // Construire une explication riche avec les conseils stratégiques
         let explanation = `Equity: ${data.evaluation?.equity?.toFixed(3) || 'N/A'}. Win: ${(data.evaluation?.winProbability * 100)?.toFixed(1)}%`;

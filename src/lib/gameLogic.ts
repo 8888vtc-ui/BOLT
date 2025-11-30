@@ -77,7 +77,9 @@ export function getValidMoves(
   if (barCount > 0) {
     const destinations: number[] = [];
     for (const die of dice) {
-      const dest = player === 1 ? die - 1 : 24 - die;
+      // Player 1 (White) enters from 24 (Index 23+1) -> 24-die (Indices 23..0)
+      // Player 2 (Red) enters from -1 (Index 0-1) -> -1+die (Indices 0..23)
+      const dest = player === 1 ? 24 - die : die - 1;
       if (canMoveTo(board, player, dest)) {
         destinations.push(dest);
       }
@@ -94,7 +96,8 @@ export function getValidMoves(
       const destinations: number[] = [];
 
       for (const die of dice) {
-        const dest = player === 1 ? from + die : from - die;
+        // Player 1 moves DOWN (-), Player 2 moves UP (+)
+        const dest = player === 1 ? from - die : from + die;
 
         if (dest < 0 || dest >= 24) {
           if (canBearOff(board, player, from, die)) {
@@ -124,19 +127,20 @@ function canMoveTo(board: BoardState, player: PlayerColor, pointIndex: number): 
   return false;
 }
 
-// ... (précédent code)
-
 // Amélioration de la règle de sortie (Bearing Off)
 function canBearOff(board: BoardState, player: PlayerColor, from: number, die: number): boolean {
-  const homeStart = player === 1 ? 18 : 0;
-  const homeEnd = player === 1 ? 24 : 6;
+  // Player 1 (Down): Home is 0-5
+  // Player 2 (Up): Home is 18-23
+  const homeStart = player === 1 ? 0 : 18;
+  const homeEnd = player === 1 ? 6 : 24;
 
   // 1. Vérifier si tous les pions sont dans la maison intérieure
   for (let i = 0; i < 24; i++) {
     const point = board.points[i];
     if (point.player === player && point.count > 0) {
-      if (player === 1 && i < homeStart) return false;
-      if (player === 2 && i >= homeEnd) return false;
+      // Si un pion est hors de la maison
+      if (player === 1 && i >= 6) return false; // P1 doit être dans 0-5
+      if (player === 2 && i < 18) return false; // P2 doit être dans 18-23
     }
   }
 
@@ -145,24 +149,27 @@ function canBearOff(board: BoardState, player: PlayerColor, from: number, die: n
     return false;
   }
 
-  const dest = player === 1 ? from + die : from - die;
+  const dest = player === 1 ? from - die : from + die;
 
   // 2. Sortie directe (le dé correspond exactement à la distance de sortie)
-  if (player === 1 && dest === 24) return true;
-  if (player === 2 && dest === -1) return true;
+  // P1: sort vers -1. P2: sort vers 24.
+  if (player === 1 && dest === -1) return true;
+  if (player === 2 && dest === 24) return true;
 
   // 3. Sortie avec un dé supérieur (si aucun pion sur les points plus éloignés)
-  if (player === 1 && dest > 24) {
-    // Vérifier s'il y a des pions sur les points précédents (19 à from-1)
-    for (let i = 18; i < from; i++) {
-      if (board.points[i].player === player && board.points[i].count > 0) return false; // On doit jouer les pions plus loin d'abord
+  if (player === 1 && dest < -1) {
+    // Vérifier s'il y a des pions sur les points précédents (plus loin que 'from')
+    // Pour P1 (Down), plus loin = indices plus grands (from+1 à 5)
+    for (let i = from + 1; i <= 5; i++) {
+      if (board.points[i].player === player && board.points[i].count > 0) return false;
     }
     return true;
   }
 
-  if (player === 2 && dest < -1) {
-    // Vérifier s'il y a des pions sur les points précédents (from+1 à 5)
-    for (let i = from + 1; i <= 5; i++) {
+  if (player === 2 && dest > 24) {
+    // Vérifier s'il y a des pions sur les points précédents (plus loin que 'from')
+    // Pour P2 (Up), plus loin = indices plus petits (18 à from-1)
+    for (let i = 18; i < from; i++) {
       if (board.points[i].player === player && board.points[i].count > 0) return false;
     }
     return true;
@@ -181,22 +188,10 @@ export function makeMove(
 
   // 1. Retirer le pion du point de départ
   if (from === -1) {
-    // Sortie de la barre (Barre n'est pas gérée comme index -1 ici normalement, mais pour compatibilité)
-    // TODO: Vérifier comment la barre est passée. Dans getValidMoves, on utilise -1 pour la barre ?
-    // Non, getValidMoves retourne une Map.
-    // Si from est un index de point (0-23), c'est bon.
-    // Si on vient de la barre, il faut une convention. Disons que la logique appelante gère ça.
-    // Mais attendons, makeMove est appelé avec 'index' qui vient du click.
-    // Si on clique sur la barre, c'est un autre handler ?
-    // Pour l'instant, assumons que from est un index valide 0-23.
-
-    // Si on veut gérer la barre via makeMove, il faut un index spécial ou une logique.
-    // Dans notre cas actuel, le click se fait sur un Point.
-  }
-
-  // Gestion Bar (si from est hors limites ou spécial)
-  // Pour l'instant, on gère les points normaux.
-  if (from >= 0 && from <= 23) {
+    // Sortie de la barre
+    if (player === 1) newBoard.bar.player1--;
+    else newBoard.bar.player2--;
+  } else if (from >= 0 && from <= 23) {
     newBoard.points[from].count--;
     if (newBoard.points[from].count === 0) {
       newBoard.points[from].player = null;
@@ -205,7 +200,8 @@ export function makeMove(
 
   // 2. Ajouter le pion au point d'arrivée
   // Gestion Sortie (Bear Off)
-  if ((player === 1 && to > 23) || (player === 2 && to < 0)) {
+  // P1 sort si to < 0. P2 sort si to > 23.
+  if ((player === 1 && to < 0) || (player === 2 && to > 23)) {
     if (player === 1) newBoard.off.player1++;
     else newBoard.off.player2++;
   }
@@ -240,8 +236,9 @@ export function checkWinType(board: BoardState, winner: PlayerColor): WinType {
 
   // Si le perdant n'a rien sorti -> Gammon ou Backgammon
   // Vérifier Backgammon : Pions dans la maison du vainqueur ou sur la barre
-  const winnerHomeStart = winner === 1 ? 18 : 0;
-  const winnerHomeEnd = winner === 1 ? 24 : 6;
+  // P1 Home: 0-5. P2 Home: 18-23.
+  const winnerHomeStart = winner === 1 ? 0 : 18;
+  const winnerHomeEnd = winner === 1 ? 6 : 24;
 
   let hasCheckerInWinnerHomeOrBar = false;
 
@@ -269,7 +266,8 @@ export function hasWon(board: BoardState, player: PlayerColor): boolean {
 }
 
 export function getDirection(player: PlayerColor): 1 | -1 {
-  return player === 1 ? 1 : -1;
+  // P1 moves Down (-), P2 moves Up (+)
+  return player === 1 ? -1 : 1;
 }
 
 export function getSmartMove(
@@ -282,12 +280,13 @@ export function getSmartMove(
   const sortedDice = [...dice].sort((a, b) => b - a);
 
   for (const die of sortedDice) {
-    const dest = player === 1 ? from + die : from - die;
+    // P1 moves Down (-), P2 moves Up (+)
+    const dest = player === 1 ? from - die : from + die;
 
     // Vérifier la sortie (Bearing Off)
-    if (player === 1 && dest >= 24) {
+    if (player === 1 && dest < 0) {
       if (canBearOff(board, player, from, die)) return { to: dest, dieUsed: die };
-    } else if (player === 2 && dest < 0) {
+    } else if (player === 2 && dest >= 24) {
       if (canBearOff(board, player, from, die)) return { to: dest, dieUsed: die };
     }
     // Vérifier le mouvement normal

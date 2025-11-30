@@ -333,7 +333,7 @@ export const useGameSocket = () => {
 
     // --- Bot Logic ---
     useEffect(() => {
-        if (!currentRoom || !gameState || !user) return;
+        if (!currentRoom || !gameState) return;
 
         // Check if it's a solo training game
         // We assume it's solo if the name starts with 'Entraînement' OR if there is only 1 player and we are playing
@@ -344,7 +344,9 @@ export const useGameSocket = () => {
 
         // Check if it's Bot's turn
         // Bot is 'bot' or any ID that is not me
-        const isBotTurn = gameState.turn !== user.id;
+        // Fix: If user is null (guest), myId is 'guest-1'
+        const myId = user?.id || 'guest-1';
+        const isBotTurn = gameState.turn !== myId;
 
         if (isBotTurn) {
             const performBotMove = async () => {
@@ -388,6 +390,10 @@ export const useGameSocket = () => {
                     }
                 } catch (e) {
                     addLog('🤖 Bot: Error', 'error', e);
+                    // Fallback: If bot crashes, switch turn after delay to avoid hanging
+                    await new Promise(r => setTimeout(r, 2000));
+                    const newState = { ...gameState, dice: [] }; // Clear dice to force turn switch
+                    updateGame(newState);
                 }
             };
             performBotMove();

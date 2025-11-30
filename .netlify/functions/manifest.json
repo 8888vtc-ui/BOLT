@@ -1,0 +1,1 @@
+{"functions":[{"bundler":"esbuild","buildData":{"runtimeAPIVersion":1},"mainFile":"D:\\BOLT\\BOLT\\netlify\\functions\\analyze-move.ts","name":"analyze-move","priority":10,"runtimeVersion":"nodejs22.x","path":"D:\\BOLT\\BOLT\\.netlify\\functions\\analyze-move.zip","runtime":"js"}],"system":{"arch":"x64","platform":"win32"},"timestamp":1764461294992,"version":1}
