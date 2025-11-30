@@ -34,60 +34,14 @@ export const analyzeMove = async (
 
         addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn, activePlayer });
 
-        // COORDINATE SYSTEM ALIGNMENT
-        // Frontend: P1 moves DOWN (23->0), P2 moves UP (0->23).
-        // Engine: White moves UP (0->23), Black moves DOWN (23->0).
-
-        // Strategy: Map Active Player to the Engine Player that moves in the same direction.
-        // If Active is P1 (Down) -> Map to Engine Black (Down).
-        // If Active is P2 (Up)   -> Map to Engine White (Up).
-
-        const targetEnginePlayer = activePlayer === 1 ? 2 : 1; // 1=White, 2=Black
-        const opponentEnginePlayer = targetEnginePlayer === 1 ? 2 : 1;
-
-        // Map Points
-        const mappedPoints = gameState.board.points.map((p: any) => {
-            let enginePlayer = 0;
-            if (p.player === activePlayer) enginePlayer = targetEnginePlayer;
-            else if (p.player !== null) enginePlayer = opponentEnginePlayer;
-
-            return {
-                player: enginePlayer,
-                count: p.count
-            };
-        });
-
-        // Map Bar and Off
-        // If target is White (1), then My Bar is White Bar.
-        // If target is Black (2), then My Bar is Black Bar.
-        const bar = { white: 0, black: 0 };
-        const off = { white: 0, black: 0 };
-
-        if (targetEnginePlayer === 1) { // I am White (Up) -> I am P2
-            bar.white = gameState.board.bar.player2 || 0;
-            bar.black = gameState.board.bar.player1 || 0;
-            off.white = gameState.board.off.player2 || 0;
-            off.black = gameState.board.off.player1 || 0;
-        } else { // I am Black (Down) -> I am P1
-            bar.black = gameState.board.bar.player1 || 0;
-            bar.white = gameState.board.bar.player2 || 0;
-            off.black = gameState.board.off.player1 || 0;
-            off.white = gameState.board.off.player2 || 0;
-        }
-
+        // Use the payload format requested by the user
+        // We send the board state AS IS, without complex mapping, as the API seems to handle it.
         const payload = {
+            board: gameState.board,
             dice: dice,
-            boardState: {
-                points: mappedPoints,
-                bar: bar,
-                off: off
-            },
-            player: targetEnginePlayer,
-            context: {
-                gamePhase: 'middle',
-                matchScore: '0-0',
-                opponentTendencies: 'unknown'
-            }
+            turn: 'bot',
+            activePlayer: activePlayer,
+            requestAllMoves: true
         };
 
         addLog('🤖 AI Service: Calling BotGammon API...', 'info', BOT_API_URL);
