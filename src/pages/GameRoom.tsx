@@ -67,24 +67,25 @@ const GameRoom = () => {
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
         if (!currentRoom || !gameState) {
-            addLog('Chargement de la partie...', 'info', {
-                hasRoom: !!currentRoom,
-                hasGameState: !!gameState,
-                roomId,
-                return(
-            <div className = "min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white" >
-                <DebugOverlay />
-                <div className="w-16 h-16 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin mb-6" />
-                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#B8860B]">
-                    Chargement de la partie...
-                </h2>
-                <p className="text-gray-500 mt-2">Synchronisation avec le serveur</p>
-                <p className="text-xs text-gray-700 mt-4 font-mono">
-                    {isConnected ? 'Connecté au socket' : 'Connexion socket en cours...'}
-                </p>
-            </div >
-        );
-    }
+        });
+}
+    }, [currentRoom, gameState, roomId]);
+
+if (!currentRoom || !gameState) {
+    return (
+        <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white">
+            <DebugOverlay />
+            <div className="w-16 h-16 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin mb-6" />
+            <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#B8860B]">
+                Chargement de la partie...
+            </h2>
+            <p className="text-gray-500 mt-2">Synchronisation avec le serveur</p>
+            <p className="text-xs text-gray-700 mt-4 font-mono">
+                {isConnected ? 'Connecté au socket' : 'Connexion socket en cours...'}
+            </p>
+        </div>
+    );
+}
 
 // Offline State
 if (!isConnected) {
