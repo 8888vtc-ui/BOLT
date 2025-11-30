@@ -377,11 +377,12 @@ export const useGameSocket = () => {
                     const analysis = await analyzeMove(gameState, gameState.dice, 2);
 
                     if (analysis.bestMove && analysis.bestMove.length > 0) {
-                        const move = analysis.bestMove[0]; // Take the first move of the sequence
-
-                        addLog(`🤖 Bot: Moving ${move.from} -> ${move.to}`, 'info');
-                        await new Promise(r => setTimeout(r, 600));
-                        sendGameAction('move', { from: move.from, to: move.to }, 2);
+                        // Play ALL moves in the sequence
+                        for (const move of analysis.bestMove) {
+                            addLog(`🤖 Bot: Moving ${move.from} -> ${move.to}`, 'info');
+                            await new Promise(r => setTimeout(r, 600));
+                            sendGameAction('move', { from: move.from, to: move.to }, 2);
+                        }
                     } else {
                         addLog('🤖 Bot: No moves found or turn done.', 'info');
                         // Force turn switch if no moves possible
