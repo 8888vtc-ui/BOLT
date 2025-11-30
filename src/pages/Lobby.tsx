@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Trophy, LogOut, Swords, Users } from 'lucide-react';
+import { Search, Trophy, Swords, Users } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useGameStore } from '../stores/gameStore';
 import { supabase } from '../lib/supabase';
 
 const Lobby = () => {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
-    const { roomsList, setRoomsList } = useGameStore();
-    const [isSearching, setIsSearching] = useState(false);
-    const [queueTime, setQueueTime] = useState(0);
+    const { user } = useAuth();
+    const { setRoomsList } = useGameStore();
 
     // Fetch active rooms
     useEffect(() => {
@@ -40,104 +38,8 @@ const Lobby = () => {
         };
     }, [setRoomsList]);
 
-    // Matchmaking Timer
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (isSearching) {
-            interval = setInterval(() => setQueueTime(t => t + 1), 1000);
-        } else {
-            setQueueTime(0);
-        }
-        return () => clearInterval(interval);
-    }, [isSearching]);
-
-    const handleFindMatch = async () => {
-        if (!user) return;
-        setIsSearching(true);
-
-        try {
-            const { data, error } = await supabase.rpc('find_match', { p_user_id: user.id });
-
-            if (error) throw error;
-
-            const result = data[0];
-
-            if (result && result.room_id) {
-                setIsSearching(false);
-                navigate(`/game/${result.room_id}`);
-            } else {
-                const pollInterval = setInterval(async () => {
-                    const { data: myRooms } = await supabase
-                        .from('room_participants')
-                        .select('room_id')
-                        .eq('user_id', user.id)
-                        .order('created_at', { ascending: false })
-                        .limit(1);
-
-                    if (myRooms && myRooms.length > 0) {
-                        clearInterval(pollInterval);
-                        setIsSearching(false);
-                        navigate(`/game/${myRooms[0].room_id}`);
-                    }
-                }, 3000);
-            }
-
-        } catch (err) {
-            console.error('Matchmaking error:', err);
-            setIsSearching(false);
-            alert('Erreur lors de la recherche de partie.');
-        }
-    };
-
-    const handleCancelSearch = async () => {
-        if (!user) return;
-        setIsSearching(false);
-        await supabase.from('matchmaking_queue').delete().eq('user_id', user.id);
-    };
-
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
     return (
         <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
-            {/* Header */}
-            <header className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-[#111]">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#FFD700] rounded-lg flex items-center justify-center text-black font-black text-xl">
-                        G
-                    </div>
-                    <h1 className="text-2xl font-bold tracking-tight">GuruGammon</h1>
-                </div>
-
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold overflow-hidden">
-                            {user?.avatar ? (
-                                <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" />
-                            ) : (
-                                user?.username?.substring(0, 2).toUpperCase()
-                            )}
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-bold">{user?.username}</span>
-                            <span className="text-[10px] text-[#FFD700] flex items-center gap-1">
-                                <Trophy className="w-3 h-3" /> 1200 ELO
-                            </span>
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={logout}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                        <LogOut className="w-5 h-5" />
-                    </button>
-                </div>
-            </header>
-
             {/* Main Content */}
             <main className="flex-1 max-w-7xl mx-auto w-full p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
@@ -173,14 +75,17 @@ const Lobby = () => {
                                         .single();
 
                                     if (error) {
-                                        console.error("Erreur création salle:", error);
-                                        alert(`Erreur lors de la création de la salle: ${error.message}`);
+                                        console.error("Erreur création salle (Supabase):", error);
+                                        // Fallback to offline mode if DB permission fails
+                                        console.log("Falling back to offline bot mode...");
+                                        navigate(`/game/offline-bot`);
                                         return;
                                     }
                                     if (data) navigate(`/game/${data.id}`);
                                 } catch (err) {
                                     console.error("Exception création salle:", err);
-                                    alert("Une erreur inattendue est survenue.");
+                                    // Fallback to offline mode
+                                    navigate(`/game/offline-bot`);
                                 }
                             }}
                             className="w-full sm:w-auto px-12 py-5 bg-green-500 hover:bg-green-400 text-black font-black text-xl rounded-2xl shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:shadow-[0_0_50px_rgba(34,197,94,0.4)] hover:scale-105 transition-all flex items-center justify-center gap-3"

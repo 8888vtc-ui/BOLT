@@ -106,6 +106,18 @@ export const useGameSocket = () => {
         }
 
         try {
+            if (roomId === 'offline-bot') {
+                addLog('Initializing Offline Bot Mode', 'info');
+                setRoom({
+                    id: 'offline-bot',
+                    name: 'Entraînement Solo (Offline)',
+                    status: 'playing',
+                    players: [{ id: user?.id || 'guest', username: user?.username || 'Guest', avatar_url: null }]
+                });
+                updateGame(createMockGameState(user?.id));
+                return;
+            }
+
             if (user) {
                 await supabase.from('room_participants').upsert({ room_id: roomId, user_id: user.id }).select();
             }
@@ -308,7 +320,7 @@ export const useGameSocket = () => {
             addLog('Local game state updated', 'success');
         }
 
-        if (!DEMO_MODE && currentRoom && newState.board) {
+        if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot' && newState.board) {
             const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
             if (error) {
                 addLog('Error updating game in DB', 'error', { message: error.message, details: error.details, hint: error.hint, code: error.code });
@@ -325,7 +337,8 @@ export const useGameSocket = () => {
 
         // Check if it's a solo training game
         // We assume it's solo if the name starts with 'Entraînement' OR if there is only 1 player and we are playing
-        const isSoloGame = currentRoom.name.startsWith('Entraînement') || (currentRoom.players && currentRoom.players.length <= 1);
+        // Also explicitly check for 'offline-bot' ID
+        const isSoloGame = currentRoom.id === 'offline-bot' || currentRoom.name.startsWith('Entraînement') || (currentRoom.players && currentRoom.players.length <= 1);
 
         if (!isSoloGame) return;
 
@@ -351,29 +364,10 @@ export const useGameSocket = () => {
 
                 try {
                     // We need to pass the board from the perspective of the bot (Player 2)
-                    // The analyzeMove function expects standard board, but we need to ensure it knows who is playing.
-                    // Actually analyzeMove takes gameState which has 'turn'.
-                    // We need to make sure 'turn' is correctly interpreted.
-
-                    // Temporary hack: Ensure turn is set to something that analyzeMove understands as "not white" if needed
-                    // But analyzeMove uses gameState.turn.
-
-                    // We need to pass the board from the perspective of the bot (Player 2)
                     const analysis = await analyzeMove(gameState, gameState.dice, 2);
 
                     if (analysis.bestMove && analysis.bestMove.length > 0) {
                         const move = analysis.bestMove[0]; // Take the first move of the sequence
-                        // Note: bestMove is an array of moves {from, to}. 
-                        // But the API usually returns a sequence for the whole turn?
-                        // Let's check aiService.ts. It returns {from, to}[].
-                        // If it returns multiple moves (e.g. 24->18, 18->13), we should execute them one by one.
-                        // But here we are in a useEffect loop.
-                        // If we execute one move, the state updates, and the useEffect triggers again.
-                        // So we should only execute the *first* available move from the analysis relative to the current state.
-
-                        // However, the AI analyzes the *starting* position of the turn.
-                        // If we have already made a move, the AI might get confused if we send the intermediate state?
-                        // Yes, we should send the current intermediate state.
 
                         addLog(`🤖 Bot: Moving ${move.from} -> ${move.to}`, 'info');
                         await new Promise(r => setTimeout(r, 600));
@@ -387,8 +381,8 @@ export const useGameSocket = () => {
                         const newState = { ...gameState, dice: [] };
                         updateGame(newState);
 
-                        // Also update DB to ensure sync
-                        if (!DEMO_MODE && currentRoom) {
+                        // Also update DB to ensure sync (SKIP for offline-bot)
+                        if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
                             supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
                         }
                     }

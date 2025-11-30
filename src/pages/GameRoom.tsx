@@ -48,10 +48,24 @@ const GameRoom = () => {
 
     // Rejoindre la room au montage
     useEffect(() => {
-        if (roomId && isConnected && !currentRoom) {
+        if (roomId === 'offline-bot') {
+            // Initialize offline mode
+            const mockRoom = {
+                id: 'offline-bot',
+                name: 'Entraînement Solo (Offline)',
+                status: 'playing',
+                players: [{ id: user?.id || 'guest', username: user?.username || 'Guest', avatar_url: null }]
+            };
+            // We need to manually trigger the join logic for offline
+            // But useGameSocket might expect a real socket join.
+            // Let's rely on useGameSocket to handle "offline-bot" ID specially if needed, 
+            // OR just set the state here directly if useGameSocket doesn't support it yet.
+            // Actually, let's update useGameSocket to handle this special ID.
+            joinRoom('offline-bot');
+        } else if (roomId && isConnected && !currentRoom) {
             joinRoom(roomId);
         }
-    }, [roomId, isConnected, currentRoom, joinRoom]);
+    }, [roomId, isConnected, currentRoom, joinRoom, user]);
 
     // Loading State Logs
     useEffect(() => {
