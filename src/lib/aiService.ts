@@ -34,36 +34,55 @@ export const analyzeMove = async (
 
         addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn, activePlayer });
 
-        // TRANSFORM BOARD FOR ENGINE
-        // Frontend: White 23->0, Black 0->23
-        // Engine: White 0->23, Black 23->0
-        // Solution: ALWAYS invert indices (i -> 23-i)
+        // COORDINATE SYSTEM ALIGNMENT
+        // Frontend: P1 moves DOWN (23->0), P2 moves UP (0->23).
+        // Engine: White moves UP (0->23), Black moves DOWN (23->0).
 
-        const invertedPoints = new Array(24).fill(null).map((_, i) => {
-            const originalPoint = gameState.board.points[23 - i];
+        // Strategy: Map Active Player to the Engine Player that moves in the same direction.
+        // If Active is P1 (Down) -> Map to Engine Black (Down).
+        // If Active is P2 (Up)   -> Map to Engine White (Up).
+
+        const targetEnginePlayer = activePlayer === 1 ? 2 : 1; // 1=White, 2=Black
+        const opponentEnginePlayer = targetEnginePlayer === 1 ? 2 : 1;
+
+        // Map Points
+        const mappedPoints = gameState.board.points.map((p: any) => {
+            let enginePlayer = 0;
+            if (p.player === activePlayer) enginePlayer = targetEnginePlayer;
+            else if (p.player !== null) enginePlayer = opponentEnginePlayer;
+
             return {
-                player: originalPoint.player,
-                count: originalPoint.count
+                player: enginePlayer,
+                count: p.count
             };
         });
+
+        // Map Bar and Off
+        // If target is White (1), then My Bar is White Bar.
+        // If target is Black (2), then My Bar is Black Bar.
+        const bar = { white: 0, black: 0 };
+        const off = { white: 0, black: 0 };
+
+        if (targetEnginePlayer === 1) { // I am White (Up) -> I am P2
+            bar.white = gameState.board.bar.player2 || 0;
+            bar.black = gameState.board.bar.player1 || 0;
+            off.white = gameState.board.off.player2 || 0;
+            off.black = gameState.board.off.player1 || 0;
+        } else { // I am Black (Down) -> I am P1
+            bar.black = gameState.board.bar.player1 || 0;
+            bar.white = gameState.board.bar.player2 || 0;
+            off.black = gameState.board.off.player1 || 0;
+            off.white = gameState.board.off.player2 || 0;
+        }
 
         const payload = {
             dice: dice,
             boardState: {
-                points: invertedPoints.map((p: any) => ({
-                    player: p.player === 1 ? 1 : p.player === 2 ? 2 : 0,
-                    count: p.count
-                })),
-                bar: {
-                    white: gameState.board.bar.player1 || 0,
-                    black: gameState.board.bar.player2 || 0
-                },
-                off: {
-                    white: gameState.board.off.player1 || 0,
-                    black: gameState.board.off.player2 || 0
-                }
+                points: mappedPoints,
+                bar: bar,
+                off: off
             },
-            player: activePlayer, // Send actual player (1 or 2)
+            player: targetEnginePlayer,
             context: {
                 gamePhase: 'middle',
                 matchScore: '0-0',
@@ -97,25 +116,15 @@ export const analyzeMove = async (
             ? [data.bestMoves[0]] // Prendre le meilleur coup
             : [];
 
-        // INVERT MOVES BACK TO FRONTEND COORDINATES
-        // Engine returns moves in its coordinate system (White 0->23, Black 23->0)
-        // Frontend expects White 23->0, Black 0->23
-        // So we must invert: i -> 23 - i
+        // MOVES ARE NOW COMPATIBLE AS-IS
+        // Because we mapped to the Engine player moving in the same direction,
+        // the returned moves (from/to indices) match our board.
         if (bestMoves.length > 0) {
             bestMoves = bestMoves.map((move: any) => {
-                // Handle Bar (25) -> -1 or similar if needed. 
-                // Assuming API returns 0-23 indices or 1-24 points.
-                // If API returns 0-23 indices:
-                // 23 - from
-                // 23 - to
-
-                // Check if move is from Bar (often 24 or 25 in some APIs, or 'bar')
-                // For now assuming indices 0-23.
-
                 return {
                     ...move,
-                    from: typeof move.from === 'number' && move.from >= 0 && move.from <= 23 ? 23 - move.from : move.from,
-                    to: typeof move.to === 'number' && move.to >= 0 && move.to <= 23 ? 23 - move.to : move.to
+                    from: typeof move.from === 'number' && move.from >= 0 && move.from <= 23 ? move.from : move.from,
+                    to: typeof move.to === 'number' && move.to >= 0 && move.to <= 23 ? move.to : move.to
                 };
             });
         }
