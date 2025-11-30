@@ -9,7 +9,12 @@ import { analyzeMove, AIAnalysis } from '../lib/aiService';
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
 // --- Mock Data for Demo Mode ---
-const createMockGameState = (userId?: string): GameState => ({
+interface GameOptions {
+    mode: 'money' | 'match';
+    matchLength: number;
+}
+
+const createMockGameState = (userId?: string, options?: GameOptions): GameState => ({
     board: INITIAL_BOARD,
     dice: [],
     turn: userId || 'guest-1', // Le tour est au joueur par défaut
@@ -17,7 +22,7 @@ const createMockGameState = (userId?: string): GameState => ({
     cubeValue: 1,
     doubleValue: 1,
     canDouble: true,
-    matchLength: 5,
+    matchLength: options?.mode === 'match' ? options.matchLength : 0, // 0 = Money Game
     currentPlayer: 1
 });
 
@@ -88,9 +93,9 @@ export const useGameSocket = () => {
     };
 
     // --- Join Room & Subscribe to Game State ---
-    const joinRoom = useCallback(async (roomId: string) => {
+    const joinRoom = useCallback(async (roomId: string, options?: GameOptions) => {
         const addLog = useDebugStore.getState().addLog;
-        addLog(`Joining room: ${roomId}`, 'info');
+        addLog(`Joining room: ${roomId}`, 'info', options);
 
         if (DEMO_MODE) {
             addLog('Demo mode join', 'info');
@@ -101,7 +106,7 @@ export const useGameSocket = () => {
                 players: []
             };
             setRoom(room as Room);
-            updateGame(createMockGameState(user?.id));
+            updateGame(createMockGameState(user?.id, options));
             return;
         }
 
@@ -114,7 +119,7 @@ export const useGameSocket = () => {
                     status: 'playing',
                     players: [{ id: user?.id || 'guest', username: user?.username || 'Guest', avatar_url: null }]
                 });
-                updateGame(createMockGameState(user?.id));
+                updateGame(createMockGameState(user?.id, options));
                 return;
             }
 
@@ -167,7 +172,7 @@ export const useGameSocket = () => {
                 updateGame(gameData.board_state);
             } else {
                 addLog('No game found, creating new game...', 'info');
-                const initialState = createMockGameState(user?.id);
+                const initialState = createMockGameState(user?.id, options);
                 const { error: insertError } = await supabase.from('games').insert({
                     room_id: roomId,
                     board_state: initialState,
@@ -308,11 +313,14 @@ export const useGameSocket = () => {
             // If current is user, switch to 'bot' or other player
             if (players && players.length > 1) {
                 newState.turn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
-            } else {
                 // Solo/Bot mode
-                newState.turn = currentPlayerId === user?.id ? 'bot' : user?.id || 'guest-1';
+                const myId = user?.id || 'guest-1';
+                newState.turn = currentPlayerId === myId ? 'bot' : myId;
             }
         }
+
+        // TODO: DOUBLE CUBE CHECK - Implement logic here if needed
+        // if (action === 'double') { ... }
 
         if (newState.board) {
             addLog('Updating local game state...', 'info');

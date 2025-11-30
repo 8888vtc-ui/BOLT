@@ -231,26 +231,29 @@ export function checkWinType(board: BoardState, winner: PlayerColor): WinType {
   const loser = winner === 1 ? 2 : 1;
   const loserOff = loser === 1 ? board.off.player1 : board.off.player2;
 
-  // Si le perdant a sorti au moins un pion -> Victoire Simple
+  // 1. Simple Victory: The loser has borne off at least one checker.
   if (loserOff > 0) return 'simple';
 
-  // Si le perdant n'a rien sorti -> Gammon ou Backgammon
-  // Vérifier Backgammon : Pions dans la maison du vainqueur ou sur la barre
+  // 2. Gammon or Backgammon: The loser has NOT borne off any checkers.
+
+  // Check for Backgammon:
+  // Loser has at least one checker in the Winner's Home Board OR on the Bar.
   // P1 Home: 0-5. P2 Home: 18-23.
   const winnerHomeStart = winner === 1 ? 0 : 18;
   const winnerHomeEnd = winner === 1 ? 6 : 24;
 
   let hasCheckerInWinnerHomeOrBar = false;
 
-  // Vérifier la barre
+  // Check Bar
   if ((loser === 1 && board.bar.player1 > 0) || (loser === 2 && board.bar.player2 > 0)) {
     hasCheckerInWinnerHomeOrBar = true;
   }
 
-  // Vérifier la maison du vainqueur
+  // Check Winner's Home Board
   if (!hasCheckerInWinnerHomeOrBar) {
     for (let i = winnerHomeStart; i < winnerHomeEnd; i++) {
-      if (board.points[i].player === loser && board.points[i].count > 0) {
+      const point = board.points[i];
+      if (point.player === loser && point.count > 0) {
         hasCheckerInWinnerHomeOrBar = true;
         break;
       }

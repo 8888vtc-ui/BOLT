@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { TouchBackend } from 'react-dnd-touch-backend';
@@ -26,6 +26,7 @@ const backend = isTouchDevice ? TouchBackend : HTML5Backend;
 const GameRoom = () => {
     const { roomId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const {
         isConnected,
@@ -46,26 +47,21 @@ const GameRoom = () => {
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [coachMode, setCoachMode] = useState<'text' | 'video'>('text');
 
+    // Parse Game Options from URL
+    const searchParams = new URLSearchParams(location.search);
+    const mode = searchParams.get('mode') as 'money' | 'match' | null;
+    const length = parseInt(searchParams.get('length') || '0');
+
     // Rejoindre la room au montage
     useEffect(() => {
+        const options = mode ? { mode, matchLength: length } : undefined;
+
         if (roomId === 'offline-bot') {
-            // Initialize offline mode
-            const mockRoom = {
-                id: 'offline-bot',
-                name: 'Entraînement Solo (Offline)',
-                status: 'playing',
-                players: [{ id: user?.id || 'guest', username: user?.username || 'Guest', avatar_url: null }]
-            };
-            // We need to manually trigger the join logic for offline
-            // But useGameSocket might expect a real socket join.
-            // Let's rely on useGameSocket to handle "offline-bot" ID specially if needed, 
-            // OR just set the state here directly if useGameSocket doesn't support it yet.
-            // Actually, let's update useGameSocket to handle this special ID.
-            joinRoom('offline-bot');
+            joinRoom('offline-bot', options);
         } else if (roomId && isConnected && !currentRoom) {
-            joinRoom(roomId);
+            joinRoom(roomId, options);
         }
-    }, [roomId, isConnected, currentRoom, joinRoom, user]);
+    }, [roomId, isConnected, currentRoom, joinRoom, user, mode, length]);
 
     // Loading State Logs
     useEffect(() => {

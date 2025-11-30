@@ -10,6 +10,11 @@ const Lobby = () => {
     const { user } = useAuth();
     const { setRoomsList } = useGameStore();
 
+    // Bot Setup State
+    const [showBotSetup, setShowBotSetup] = useState(false);
+    const [gameMode, setGameMode] = useState<'money' | 'match'>('match');
+    const [matchLength, setMatchLength] = useState(5);
+
     // Fetch active rooms
     useEffect(() => {
         const fetchRooms = async () => {
@@ -58,42 +63,122 @@ const Lobby = () => {
                         </p>
 
                         <button
-                            onClick={async () => {
-                                if (!user) {
-                                    alert("Vous devez être connecté pour jouer.");
-                                    return;
-                                }
-                                try {
-                                    const { data, error } = await supabase
-                                        .from('rooms')
-                                        .insert({
-                                            name: `Dojo ${user.username}`,
-                                            created_by: user.id,
-                                            status: 'playing'
-                                        })
-                                        .select()
-                                        .single();
-
-                                    if (error) {
-                                        console.error("Erreur création salle (Supabase):", error);
-                                        // Fallback to offline mode if DB permission fails
-                                        console.log("Falling back to offline bot mode...");
-                                        navigate(`/game/offline-bot`);
-                                        return;
-                                    }
-                                    if (data) navigate(`/game/${data.id}`);
-                                } catch (err) {
-                                    console.error("Exception création salle:", err);
-                                    // Fallback to offline mode
-                                    navigate(`/game/offline-bot`);
-                                }
-                            }}
+                            onClick={() => setShowBotSetup(true)}
                             className="w-full sm:w-auto px-12 py-5 bg-green-500 hover:bg-green-400 text-black font-black text-xl rounded-2xl shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:shadow-[0_0_50px_rgba(34,197,94,0.4)] hover:scale-105 transition-all flex items-center justify-center gap-3"
                         >
                             <Swords className="w-6 h-6" />
                             DÉFIER LE BOT
                         </button>
                     </div>
+
+                    {/* Bot Setup Modal */}
+                    {showBotSetup && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl p-8 max-w-md w-full space-y-6 relative">
+                                <button
+                                    onClick={() => setShowBotSetup(false)}
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                                >
+                                    ✕
+                                </button>
+
+                                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                                    <Swords className="w-6 h-6 text-green-500" />
+                                    Configuration du Match
+                                </h3>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm text-gray-400 font-medium">Mode de Jeu</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button
+                                                onClick={() => setGameMode('money')}
+                                                className={`p-4 rounded-xl border transition-all ${gameMode === 'money'
+                                                    ? 'bg-green-500/20 border-green-500 text-white'
+                                                    : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <div className="font-bold mb-1">Money Game</div>
+                                                <div className="text-xs opacity-70">Partie simple, points illimités</div>
+                                            </button>
+                                            <button
+                                                onClick={() => setGameMode('match')}
+                                                className={`p-4 rounded-xl border transition-all ${gameMode === 'match'
+                                                    ? 'bg-green-500/20 border-green-500 text-white'
+                                                    : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <div className="font-bold mb-1">Match Play</div>
+                                                <div className="text-xs opacity-70">Jouer jusqu'à X points</div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {gameMode === 'match' && (
+                                        <div className="space-y-2">
+                                            <label className="text-sm text-gray-400 font-medium">Longueur du Match: {matchLength} points</label>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="15"
+                                                step="2"
+                                                value={matchLength}
+                                                onChange={(e) => setMatchLength(parseInt(e.target.value))}
+                                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                                            />
+                                            <div className="flex justify-between text-xs text-gray-500 px-1">
+                                                <span>1</span>
+                                                <span>3</span>
+                                                <span>5</span>
+                                                <span>7</span>
+                                                <span>9</span>
+                                                <span>11</span>
+                                                <span>13</span>
+                                                <span>15</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={async () => {
+                                        if (!user) {
+                                            alert("Vous devez être connecté pour jouer.");
+                                            return;
+                                        }
+                                        try {
+                                            const { data, error } = await supabase
+                                                .from('rooms')
+                                                .insert({
+                                                    name: `Dojo ${user.username}`,
+                                                    created_by: user.id,
+                                                    status: 'playing'
+                                                })
+                                                .select()
+                                                .single();
+
+                                            const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
+
+                                            if (error) {
+                                                console.error("Erreur création salle (Supabase):", error);
+                                                console.log("Falling back to offline bot mode...");
+                                                navigate(`/game/offline-bot${queryParams}`);
+                                                return;
+                                            }
+                                            if (data) navigate(`/game/${data.id}${queryParams}`);
+                                        } catch (err) {
+                                            console.error("Exception création salle:", err);
+                                            const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
+                                            navigate(`/game/offline-bot${queryParams}`);
+                                        }
+                                    }}
+                                    className="w-full py-4 bg-green-500 hover:bg-green-400 text-black font-bold text-lg rounded-xl shadow-lg shadow-green-500/20 transition-all"
+                                >
+                                    COMMENCER LE MATCH
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Other Modes (Disabled / Coming Soon) */}
                     <div className="grid grid-cols-2 gap-4">
