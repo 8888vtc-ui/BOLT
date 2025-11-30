@@ -112,9 +112,9 @@ export const analyzeMove = async (
         addLog('🤖 AI Service: Analysis received', 'success');
 
         // Convertir la réponse de l'API au format attendu par le frontend
-        let bestMoves = data.bestMoves && data.bestMoves.length > 0
-            ? [data.bestMoves[0]] // Prendre le meilleur coup
-            : [];
+        // Convertir la réponse de l'API au format attendu par le frontend
+        // data.bestMoves est supposé être un tableau d'objets {from, to, die} représentant la SÉQUENCE du meilleur coup.
+        let bestMoves = data.bestMoves || [];
 
         // MOVES ARE NOW COMPATIBLE AS-IS
         // Because we mapped to the Engine player moving in the same direction,
