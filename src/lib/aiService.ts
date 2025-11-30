@@ -44,7 +44,7 @@ export const analyzeMove = async (
             requestAllMoves: true
         };
 
-        addLog('🤖 AI Service: Calling BotGammon API...', 'info', BOT_API_URL);
+        addLog('🤖 AI Service: Calling BotGammon API...', 'info', JSON.stringify(payload));
 
         const response = await fetch(BOT_API_URL, {
             method: 'POST',
@@ -63,7 +63,14 @@ export const analyzeMove = async (
         }
 
         const data = await response.json();
-        addLog('🤖 AI Service: Analysis received', 'success');
+        addLog('🤖 AI Service: Raw Data received', 'info', JSON.stringify(data));
+
+        // Check specifically for bestMoves
+        if (!data.bestMoves) {
+            addLog('🤖 AI Service: WARNING - No bestMoves in response', 'warning');
+        } else {
+            addLog(`🤖 AI Service: Received ${data.bestMoves.length} moves`, 'success');
+        }
 
         // Convertir la réponse de l'API au format attendu par le frontend
         // Convertir la réponse de l'API au format attendu par le frontend
