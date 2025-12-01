@@ -1,47 +1,85 @@
-import { GameState } from '../stores/gameStore';
-import { useDebugStore } from '../stores/debugStore';
+import { BoardState, GameState, Move } from './gameLogic';
 
 const BOT_API_URL = 'https://botgammon.netlify.app/.netlify/functions/analyze';
 
-export interface AIAnalysis {
-    bestMove: { from: number; to: number }[];
+interface AIAnalysisResult {
+    bestMove: Move[];
     explanation: string;
     winProbability: number;
-    equity?: number;
+    equity: number;
     strategicAdvice?: {
         analysis: string;
-        speechScript?: string;
+        speechScript: string;
         recommendedStrategy: string;
         riskLevel: string;
-        explanation?: string;
     };
 }
 
 export const analyzeMove = async (
     gameState: GameState,
     dice: number[],
-    playerColor?: number // 1 for White, 2 for Black
-): Promise<AIAnalysis> => {
-    const addLog = useDebugStore.getState().addLog;
-
+    playerColor?: number
+): Promise<AIAnalysisResult> => {
     try {
-        // Determine player color if not provided
-        // Default logic: if turn is 'white' or 1 -> 1, else 2
-        // But gameState.turn is usually a UUID.
-        // We rely on the caller passing the correct color.
-        // If not passed, we default to 2 (Black/Bot) as a fallback for existing calls.
+        // 1. Determine Active Player
         const activePlayer = playerColor || (gameState.turn === 'white' ? 1 : 2);
 
         addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn, activePlayer });
 
-        // Use the payload format requested by the user
-        // We send the board state AS IS, without complex mapping, as the API seems to handle it.
+        // 2. COORDINATE SYSTEM ALIGNMENT (Old Logic restored)
+        // Frontend: P1 moves DOWN (23->0), P2 moves UP (0->23).
+        // Engine: White moves UP (0->23), Black moves DOWN (23->0).
+
+        // Strategy: Map Active Player to the Engine Player that moves in the same direction.
+        // If Active is P1 (Down) -> Map to Engine Black (Down).
+        // If Active is P2 (Up)   -> Map to Engine White (Up).
+
+        const targetEnginePlayer = activePlayer === 1 ? 2 : 1; // 1=White, 2=Black
+        const opponentEnginePlayer = targetEnginePlayer === 1 ? 2 : 1;
+
+        // Map Points
+        const mappedPoints = gameState.board.points.map((p: any) => {
+            let enginePlayer = 0;
+            if (p.player === activePlayer) enginePlayer = targetEnginePlayer;
+            else if (p.player !== null) enginePlayer = opponentEnginePlayer;
+
+            return {
+                player: enginePlayer,
+                count: p.count
+            };
+        });
+
+        // Map Bar and Off
+        const bar = { white: 0, black: 0 };
+        const off = { white: 0, black: 0 };
+
+        if (targetEnginePlayer === 1) { // I am White (Up) -> I am P2
+            bar.white = gameState.board.bar.player2 || 0;
+            bar.black = gameState.board.bar.player1 || 0;
+            off.white = gameState.board.off.player2 || 0;
+            off.black = gameState.board.off.player1 || 0;
+        } else { // I am Black (Down) -> I am P1
+            bar.black = gameState.board.bar.player1 || 0;
+            bar.white = gameState.board.bar.player2 || 0;
+            off.black = gameState.board.off.player1 || 0;
+            off.white = gameState.board.off.player2 || 0;
+        }
+
+        // 3. Construct Payload (Old Format + requestAllMoves)
         const payload = {
-            board: gameState.board,
             dice: dice,
-            turn: 'bot',
-            activePlayer: activePlayer,
-            requestAllMoves: true
+            boardState: {
+                points: mappedPoints,
+                bar: bar,
+                off: off
+            },
+            player: targetEnginePlayer,
+            requestAllMoves: true, // CRITICAL FIX
+            context: {
+                gamePhase: 'middle',
+                matchScore: '0-0',
+                opponentTendencies: 'unknown'
+            }
         };
 
         addLog('🤖 AI Service: Calling BotGammon API...', 'info', JSON.stringify(payload));
@@ -54,43 +92,29 @@ export const analyzeMove = async (
             body: JSON.stringify(payload),
         });
 
-        addLog(`🤖 AI Service: Response status: ${response.status}`, response.ok ? 'success' : 'error');
-
         if (!response.ok) {
             const errorText = await response.text();
-            addLog('🤖 AI Service: Error response', 'error', errorText);
             throw new Error(`BotGammon API Error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
         addLog('🤖 AI Service: Raw Data received', 'info', JSON.stringify(data));
 
-        // Check specifically for bestMoves
-        if (!data.bestMoves) {
-            addLog('🤖 AI Service: WARNING - No bestMoves in response', 'warning');
-        } else {
-            addLog(`🤖 AI Service: Received ${data.bestMoves.length} moves`, 'success');
-        }
-
-        // Convertir la réponse de l'API au format attendu par le frontend
-        // Convertir la réponse de l'API au format attendu par le frontend
-        // data.bestMoves est supposé être un tableau d'objets {from, to, die} représentant la SÉQUENCE du meilleur coup.
         let bestMoves = data.bestMoves || [];
 
-        // MOVES ARE NOW COMPATIBLE AS-IS
-        // Because we mapped to the Engine player moving in the same direction,
-        // the returned moves (from/to indices) match our board.
+        // 4. Map moves back to Frontend coordinates if necessary
+        // The API returns moves in 0-23 coordinates.
+        // Since we mapped P2 (Up) to White (Up), the coordinates should match 1:1.
+        // But we should ensure they are valid.
+
         if (bestMoves.length > 0) {
-            bestMoves = bestMoves.map((move: any) => {
-                return {
-                    ...move,
-                    from: typeof move.from === 'number' && move.from >= 0 && move.from <= 23 ? move.from : move.from,
-                    to: typeof move.to === 'number' && move.to >= 0 && move.to <= 23 ? move.to : move.to
-                };
-            });
+            bestMoves = bestMoves.map((move: any) => ({
+                ...move,
+                from: typeof move.from === 'number' ? move.from : move.from,
+                to: typeof move.to === 'number' ? move.to : move.to
+            }));
         }
 
-        // Construire une explication riche avec les conseils stratégiques
         let explanation = `Equity: ${data.evaluation?.equity?.toFixed(3) || 'N/A'}. Win: ${(data.evaluation?.winProbability * 100)?.toFixed(1)}%`;
 
         if (data.strategicAdvice) {
@@ -104,24 +128,32 @@ export const analyzeMove = async (
             explanation: explanation,
             winProbability: (data.evaluation?.winProbability || 0.5) * 100,
             equity: data.evaluation?.equity,
-            strategicAdvice: data.strategicAdvice // Passer l'objet complet pour l'UI
+            strategicAdvice: data.strategicAdvice
         };
 
     } catch (error) {
         addLog('❌ AI Analysis Failed', 'error', error);
-
-        // Fallback pour ne pas casser l'UI
         return {
             bestMove: [],
             explanation: "Impossible de contacter le coach. Vérifiez votre connexion.",
             winProbability: 50,
             equity: 0,
             strategicAdvice: {
-                analysis: "Le serveur d'analyse est indisponible. Veuillez réessayer plus tard.",
-                speechScript: "Désolé, je ne peux pas analyser cette position pour le moment.",
+                analysis: "Le serveur d'analyse est indisponible.",
+                speechScript: "Désolé, je ne peux pas analyser cette position.",
                 recommendedStrategy: "Jeu prudent",
                 riskLevel: "N/A"
             }
         };
+    }
+};
+
+// Helper for logs
+import { useDebugStore } from '../store/debugStore';
+const addLog = (msg: string, type: 'info' | 'success' | 'error' | 'warning' = 'info', data?: any) => {
+    try {
+        useDebugStore.getState().addLog(msg, type, data);
+    } catch (e) {
+        console.log(`[${type.toUpperCase()}] ${msg}`, data || '');
     }
 };
