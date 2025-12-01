@@ -102,6 +102,22 @@ export const analyzeMove = async (
 
         let bestMoves = data.bestMoves || [];
 
+        // CRITICAL FIX FOR DOUBLES
+        // When dice are doubles (e.g., 3-3), the API returns only 2 unique moves
+        // We need to duplicate them to get 4 moves total
+        const isDouble = dice.length === 2 && dice[0] === dice[1];
+
+        if (isDouble && bestMoves.length === 2) {
+            addLog('🎲 Doubles detected - duplicating moves', 'info');
+            // Duplicate the moves: [move1, move2] becomes [move1, move2, move1, move2]
+            bestMoves = [
+                bestMoves[0],
+                bestMoves[1],
+                bestMoves[0],
+                bestMoves[1]
+            ];
+        }
+
         // 4. Map moves back to Frontend coordinates if necessary
         // The API returns moves in 0-23 coordinates.
         // Since we mapped P2 (Up) to White (Up), the coordinates should match 1:1.
