@@ -645,7 +645,7 @@ export const useGameSocket = () => {
                 playerColor = 1;
             }
 
-            addLog(`Player Color: ${playerColor}`, 'info');
+            addLog(`Player Color: ${playerColor}`, 'info', { from, to, die, payload });
 
             const isBackwardMove = to > from;
             if (isBackwardMove && history.length > 0 && !forcePlayerColor) {
@@ -656,7 +656,16 @@ export const useGameSocket = () => {
             const currentDice = newState.dice || [];
 
             // Utiliser le die fourni par l'API si disponible, sinon le calculer
-            let dieUsed = die !== undefined ? die : -1;
+            let dieUsed = (die !== undefined && die !== null && die > 0) ? die : -1;
+            
+            addLog(`🔍 [MOVE] Calcul dieUsed`, 'info', { 
+                dieFromPayload: die, 
+                dieUsed, 
+                from, 
+                to, 
+                playerColor,
+                currentDice 
+            });
             
             if (dieUsed === -1) {
                 // Calculer le die si non fourni
@@ -673,6 +682,7 @@ export const useGameSocket = () => {
                         dieUsed = from - to; // Mouvement vers le bas depuis le point 23
                     }
                 }
+                addLog(`🔍 [MOVE] Die calculé: ${dieUsed}`, 'info', { from, to, playerColor });
             }
 
             const dieIndex = currentDice.indexOf(dieUsed);
@@ -1019,7 +1029,10 @@ export const useGameSocket = () => {
                         // Play ALL moves in the sequence, en attendant la confirmation de chaque coup
                         for (let i = 0; i < analysis.bestMove.length; i++) {
                             const move = analysis.bestMove[i];
-                            addLog(`🤖 Bot: Playing move ${i + 1}/${analysis.bestMove.length}: ${move.from} -> ${move.to}`, 'info');
+                            addLog(`🤖 Bot: Playing move ${i + 1}/${analysis.bestMove.length}: ${move.from} -> ${move.to}`, 'info', {
+                                move: { from: move.from, to: move.to, die: move.die },
+                                availableDice: gameState.dice
+                            });
                             
                             // Attendre un peu avant chaque coup pour la visualisation
                             await new Promise(r => setTimeout(r, 800));

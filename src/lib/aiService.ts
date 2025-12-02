@@ -177,8 +177,10 @@ export const analyzeMove = async (
             bestMoves = bestMoves.map((move: any) => ({
                 ...move,
                 from: typeof move.from === 'number' ? move.from : move.from,
-                to: typeof move.to === 'number' ? move.to : move.to
+                to: typeof move.to === 'number' ? move.to : move.to,
+                die: move.die !== undefined ? move.die : (move.dieUsed !== undefined ? move.dieUsed : undefined) // Préserver le die
             }));
+            addLog('🤖 AI Service: Mapped moves', 'info', bestMoves.map((m: any) => ({ from: m.from, to: m.to, die: m.die })));
         }
 
         let explanation = `Equity: ${data.evaluation?.equity?.toFixed(3) || 'N/A'}. Win: ${(data.evaluation?.winProbability * 100)?.toFixed(1)}%`;
