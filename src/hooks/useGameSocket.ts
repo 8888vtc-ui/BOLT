@@ -746,6 +746,7 @@ export const useGameSocket = () => {
     // --- Bot Logic ---
     const botIsThinking = useRef(false);
     const botTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const botAnalysisInProgress = useRef<string | null>(null); // Verrou pour éviter les appels multiples
 
     useEffect(() => {
         if (!currentRoom || !gameState) {
@@ -781,6 +782,9 @@ export const useGameSocket = () => {
         const currentTurn = gameState.turn;
         const isBotTurn = currentTurn !== myId && currentTurn !== undefined && currentTurn !== null;
 
+        // Créer une clé unique pour cette analyse (turn + dice)
+        const analysisKey = `${currentTurn}-${gameState.dice.join(',')}`;
+
         // Logs détaillés pour diagnostiquer
         const addLog = useDebugStore.getState().addLog;
         addLog('🤖 Bot: Checking turn...', 'info', {
@@ -788,27 +792,32 @@ export const useGameSocket = () => {
             myId,
             isBotTurn,
             botIsThinking: botIsThinking.current,
+            analysisInProgress: botAnalysisInProgress.current,
+            analysisKey,
             players: players?.map(p => ({ id: p.id, username: p.username }))
         });
 
-        if (isBotTurn && !botIsThinking.current) {
+        // Vérifier si une analyse est déjà en cours pour cette position exacte
+        if (isBotTurn && !botIsThinking.current && botAnalysisInProgress.current !== analysisKey) {
             // Clear any existing timeout
             if (botTimeoutRef.current) {
                 clearTimeout(botTimeoutRef.current);
                 botTimeoutRef.current = null;
             }
 
-            // Safety timeout: débloquer le bot après 30 secondes
+            // Safety timeout: débloquer le bot après 45 secondes (plus long que le timeout API de 30s)
             botTimeoutRef.current = setTimeout(() => {
-                addLog('🤖 Bot: TIMEOUT - Forcing unlock after 30s', 'error');
+                addLog('🤖 Bot: TIMEOUT - Forcing unlock after 45s', 'error');
                 botIsThinking.current = false;
+                botAnalysisInProgress.current = null;
                 if (botTimeoutRef.current) {
                     clearTimeout(botTimeoutRef.current);
                     botTimeoutRef.current = null;
                 }
-            }, 30000);
+            }, 45000);
             const performBotMove = async () => {
                 botIsThinking.current = true;
+                botAnalysisInProgress.current = analysisKey; // Marquer cette analyse comme en cours
                 const addLog = useDebugStore.getState().addLog;
 
                 // 0. Check if Bot needs to respond to a double offer
@@ -933,6 +942,7 @@ export const useGameSocket = () => {
                                 }
 
                                 botIsThinking.current = false;
+                                botAnalysisInProgress.current = null;
                                 return; // Attendre la réponse du joueur
                             }
                         } catch (e) {
@@ -953,6 +963,7 @@ export const useGameSocket = () => {
                         botTimeoutRef.current = null;
                     }
                     botIsThinking.current = false;
+                    botAnalysisInProgress.current = null;
                     return;
                 }
 
@@ -963,13 +974,8 @@ export const useGameSocket = () => {
                 });
 
                 try {
-                    // Timeout pour l'API (10 secondes max)
-                    const analysisPromise = analyzeMove(gameState, gameState.dice, 2);
-                    const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('API timeout after 10s')), 10000)
-                    );
-
-                    const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
+                    // L'API a son propre timeout de 30s avec retry, pas besoin de timeout supplémentaire ici
+                    const analysis = await analyzeMove(gameState, gameState.dice, 2);
 
                     if (analysis.bestMove && analysis.bestMove.length > 0) {
                         addLog(`🤖 Bot: Found ${analysis.bestMove.length} move(s)`, 'success', {
@@ -1013,23 +1019,55 @@ export const useGameSocket = () => {
                         // Also update DB to ensure sync (SKIP for offline-bot)
                         if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
                             supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                            }
                         }
-                    }
-                } catch (e: any) {
-                    addLog('🤖 Bot: API Error, using fallback', 'error', e);
-                    
-                    // FALLBACK: Utiliser une logique heuristique simple
-                    try {
-                        const { findAnyValidMove } = await import('../lib/gameLogic');
-                        const fallbackMove = findAnyValidMove(gameState.board, 2, gameState.dice);
+                    } catch (e: any) {
+                        addLog('🤖 Bot: API Error, using fallback', 'error', e);
                         
-                        if (fallbackMove) {
-                            addLog(`🤖 Bot: Fallback move found: ${fallbackMove.from} -> ${fallbackMove.to} (dé: ${fallbackMove.dieUsed})`, 'warning');
-                            await new Promise(r => setTimeout(r, 1000));
-                            sendGameAction('move', { from: fallbackMove.from, to: fallbackMove.to }, 2);
-                        } else {
-                            addLog('🤖 Bot: No fallback move available, switching turn', 'error');
-                            // Switch turn if no moves possible
+                        // FALLBACK: Utiliser une logique heuristique améliorée
+                        try {
+                            const { findAnyValidMove, getAllValidMoves } = await import('../lib/gameLogic');
+                            
+                            // Essayer de trouver le meilleur coup parmi tous les coups valides
+                            const allMoves = getAllValidMoves ? getAllValidMoves(gameState.board, 2, gameState.dice) : null;
+                            
+                            let fallbackMove = null;
+                            
+                            if (allMoves && allMoves.length > 0) {
+                                // Préférer les coups qui avancent vers l'avant (bear-off)
+                                // Pour le joueur 2 (noir), on veut aller de 0 vers 23
+                                fallbackMove = allMoves.reduce((best: any, move: any) => {
+                                    if (!best) return move;
+                                    // Préférer les coups qui avancent le plus
+                                    const bestProgress = best.to - best.from;
+                                    const moveProgress = move.to - move.from;
+                                    if (moveProgress > bestProgress) return move;
+                                    // En cas d'égalité, préférer les coups qui créent des points
+                                    return best;
+                                }, null);
+                            } else {
+                                // Fallback simple si getAllValidMoves n'existe pas
+                                fallbackMove = findAnyValidMove(gameState.board, 2, gameState.dice);
+                            }
+                            
+                            if (fallbackMove) {
+                                addLog(`🤖 Bot: Fallback move found: ${fallbackMove.from} -> ${fallbackMove.to} (dé: ${fallbackMove.dieUsed || 'N/A'})`, 'warning');
+                                await new Promise(r => setTimeout(r, 1000));
+                                sendGameAction('move', { from: fallbackMove.from, to: fallbackMove.to }, 2);
+                            } else {
+                                addLog('🤖 Bot: No fallback move available, switching turn', 'error');
+                                // Switch turn if no moves possible
+                                await new Promise(r => setTimeout(r, 2000));
+                                const newState = { ...gameState, dice: [] };
+                                updateGame(newState);
+                                
+                                if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                                    supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                                }
+                            }
+                        } catch (fallbackError) {
+                            addLog('🤖 Bot: Fallback also failed, switching turn', 'error', fallbackError);
+                            // Last resort: switch turn
                             await new Promise(r => setTimeout(r, 2000));
                             const newState = { ...gameState, dice: [] };
                             updateGame(newState);
@@ -1038,18 +1076,7 @@ export const useGameSocket = () => {
                                 supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
                             }
                         }
-                    } catch (fallbackError) {
-                        addLog('🤖 Bot: Fallback also failed, switching turn', 'error', fallbackError);
-                        // Last resort: switch turn
-                        await new Promise(r => setTimeout(r, 2000));
-                        const newState = { ...gameState, dice: [] };
-                        updateGame(newState);
-                        
-                        if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
-                            supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
-                        }
                     }
-                }
 
                 // Clear timeout on success
                 if (botTimeoutRef.current) {
@@ -1057,8 +1084,13 @@ export const useGameSocket = () => {
                     botTimeoutRef.current = null;
                 }
                 botIsThinking.current = false;
+                botAnalysisInProgress.current = null; // Libérer le verrou
             };
             performBotMove();
+        } else if (isBotTurn && botAnalysisInProgress.current === analysisKey) {
+            // Une analyse est déjà en cours pour cette position, ne rien faire
+            const addLog = useDebugStore.getState().addLog;
+            addLog('🤖 Bot: Analysis already in progress, skipping duplicate call', 'info', { analysisKey });
         }
 
         // Cleanup function

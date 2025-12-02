@@ -103,7 +103,8 @@ export const analyzeMove = async (
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+                // Augmenter le timeout à 30s pour DeepSeek/Ollama qui peut prendre plus de temps
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
                 response = await fetch(BOT_API_URL, {
                     method: 'POST',
