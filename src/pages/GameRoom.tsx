@@ -287,6 +287,40 @@ const GameRoom = () => {
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
     
+    // DIAGNOSTIC - Vérifier la structure du board
+    useEffect(() => {
+        const addLog = useDebugStore.getState().addLog;
+        if (board && board.points) {
+            const totalCheckers = board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
+            addLog(`🔍 [DIAGNOSTIC] Board structure:`, 'info', {
+                hasBoard: !!board,
+                hasPoints: !!board?.points,
+                pointsLength: board?.points?.length,
+                totalCheckers,
+                firstPoint: board?.points?.[0],
+                point5: board?.points?.[5], // Devrait avoir 5 checkers blancs
+                point11: board?.points?.[11], // Devrait avoir 5 checkers rouges
+                point12: board?.points?.[12], // Devrait avoir 5 checkers blancs
+                point23: board?.points?.[23], // Devrait avoir 2 checkers blancs
+                allPointsWithCheckers: board?.points?.map((p: any, i: number) => ({ 
+                    index: i, 
+                    player: p?.player, 
+                    count: p?.count 
+                })).filter((p: any) => p.count > 0)
+            });
+            
+            // Si le board est vide, forcer réinitialisation
+            if (totalCheckers === 0) {
+                addLog(`❌ [GAME_ROOM] Board vide détecté - Réinitialisation FORCÉE`, 'error');
+                const fixedState = {
+                    ...gameState,
+                    board: INITIAL_BOARD
+                };
+                updateGame(fixedState);
+            }
+        }
+    }, [board, gameState, updateGame]);
+    
     // Vérifier que board.points existe et est valide
     if (!board.points || !Array.isArray(board.points) || board.points.length !== 24) {
         const addLog = useDebugStore.getState().addLog;
@@ -443,7 +477,7 @@ const GameRoom = () => {
             <Point
                 key={i}
                 index={i}
-                point={board.points[i]}
+                point={board.points[i] || { player: null, count: 0 }}
                 isTop={true}
                 isValidDestination={false}
                 onDrop={onDrop}
@@ -461,7 +495,7 @@ const GameRoom = () => {
             <Point
                 key={i}
                 index={i}
-                point={board.points[i]}
+                point={board.points[i] || { player: null, count: 0 }}
                 isTop={false}
                 isValidDestination={false}
                 onDrop={onDrop}

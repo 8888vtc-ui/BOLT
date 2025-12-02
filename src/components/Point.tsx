@@ -26,6 +26,11 @@ export default function Point({
   canMove,
   onClick
 }: PointProps) {
+  // Protection contre point null/undefined
+  if (!point) {
+    point = { player: null, count: 0 };
+  }
+  
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: 'CHECKER',
@@ -38,7 +43,8 @@ export default function Point({
   );
 
   const checkers = [];
-  const displayCount = Math.min(point.count, 5);
+  // Vérifier que point.count existe et est > 0
+  const displayCount = point && point.count > 0 ? Math.min(point.count, 5) : 0;
 
   for (let i = 0; i < displayCount; i++) {
     const isLastVisible = i === displayCount - 1;

@@ -219,21 +219,38 @@ export const useGameSocket = () => {
                 
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 const botState = createMockGameState(user?.id, options);
+                
+                // Vérifier que le board est valide AVANT les logs
+                if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
+                    addLog(`❌ [JOIN_ROOM] Board invalide, utilisation INITIAL_BOARD`, 'error');
+                    const { INITIAL_BOARD } = await import('../lib/gameLogic');
+                    botState.board = INITIAL_BOARD;
+                }
+                
+                // Vérifier que le board a des jetons
+                const totalCheckers = botState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
+                if (totalCheckers === 0) {
+                    addLog(`❌ [JOIN_ROOM] Board vide, utilisation INITIAL_BOARD`, 'error');
+                    const { INITIAL_BOARD } = await import('../lib/gameLogic');
+                    botState.board = INITIAL_BOARD;
+                }
+                
                 addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
                     dice: botState.dice, 
                     turn: botState.turn,
                     hasBoard: !!botState.board,
                     hasPoints: !!botState.board?.points,
                     pointsLength: botState.board?.points?.length,
-                    pointsWithCheckers: botState.board?.points?.filter((p: any) => p.count > 0).length
+                    totalCheckers,
+                    pointsWithCheckers: botState.board?.points?.filter((p: any) => p.count > 0).length,
+                    samplePoints: {
+                        point0: botState.board?.points?.[0],
+                        point5: botState.board?.points?.[5],
+                        point11: botState.board?.points?.[11],
+                        point12: botState.board?.points?.[12],
+                        point23: botState.board?.points?.[23]
+                    }
                 });
-                
-                // Vérifier que le board est valide avant de l'envoyer
-                if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
-                    addLog(`❌ [JOIN_ROOM] Board invalide, utilisation INITIAL_BOARD`, 'error');
-                    const { INITIAL_BOARD } = await import('../lib/gameLogic');
-                    botState.board = INITIAL_BOARD;
-                }
                 
                 updateGame(botState);
                 addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ`, 'success');
