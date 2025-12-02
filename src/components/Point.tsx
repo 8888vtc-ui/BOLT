@@ -43,8 +43,14 @@ export default function Point({
   );
 
   const checkers = [];
+
   // Vérifier que point.count existe et est > 0
   const displayCount = point && point.count > 0 ? Math.min(point.count, 5) : 0;
+
+  // DEBUG: Log si des pions devraient être affichés
+  if (displayCount > 0) {
+    console.log(`🎯 [POINT ${index}] Rendering ${displayCount} checkers, player=${point.player}`);
+  }
 
   for (let i = 0; i < displayCount; i++) {
     const isLastVisible = i === displayCount - 1;
@@ -97,7 +103,16 @@ export default function Point({
       />
 
       {/* Conteneur des pions */}
-      <div className={`relative z-10 flex items-center w-full py-2 ${isTop ? 'flex-col' : 'flex-col-reverse'}`}>
+      <div
+        className={`relative z-10 flex items-center w-full py-2 ${isTop ? 'flex-col' : 'flex-col-reverse'}`}
+        style={{
+          minHeight: displayCount > 0 ? '50px' : '0',
+          visibility: 'visible',
+          opacity: 1,
+          zIndex: 50,
+          overflow: 'visible'  // ✅ CRITIQUE
+        }}
+      >
         {/* flex-col: Haut vers Bas (Top Row) */}
         {/* flex-col-reverse: Bas vers Haut (Bottom Row) */}
         {checkers}

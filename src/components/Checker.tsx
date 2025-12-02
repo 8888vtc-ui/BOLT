@@ -43,9 +43,13 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
       style={{
         width: '100%',
         height: '100%',
-        zIndex: index,
+        zIndex: index + 100,  // ✅ Z-index élevé
         opacity: isDragging ? 0.3 : 1,
-        // Positionnement géré par le parent (Point.tsx) via Flexbox + Marges négatives
+        visibility: 'visible',  // ✅ FORCER
+        display: 'block',       // ✅ FORCER
+        // backgroundColor: player === 1 ? 'white' : 'black',  // ✅ DEBUG: couleur visible
+        // borderRadius: '50%',
+        // border: '2px solid gold'  // ✅ DEBUG: bordure visible
       }}
       animate={{
         scale: draggable ? [1, 1.05, 1] : 1,

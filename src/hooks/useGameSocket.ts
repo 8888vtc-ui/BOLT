@@ -42,7 +42,7 @@ const createMockGameState = (userId?: string, options?: GameOptions): GameState 
     return {
         board: boardCopy,
         dice: [],
-        turn: userId || 'guest-1', // Le tour est au joueur par défaut
+        turn: userId || 'guest', // Le tour est au joueur par défaut (cohérent avec players[0].id)
         score: {},
         cubeValue: 1,
         cubeOwner: null, // Cube au centre au début
@@ -299,9 +299,14 @@ export const useGameSocket = () => {
                         { id: botId, username: 'Bot IA', avatar: undefined }
                     ]
                     : [
-                        { id: 'guest-1', username: 'Invité', avatar: undefined },
+                        { id: 'guest', username: 'Invité', avatar: undefined },
                         { id: botId, username: 'Bot IA', avatar: undefined }
                     ];
+                // VÉRIFICATION CRITIQUE
+                console.log('🎮 [JOIN_ROOM] Joueurs créés:', soloPlayers.length, soloPlayers);
+                if (soloPlayers.length !== 2) {
+                    console.error('❌ ERREUR: Doit avoir 2 joueurs !');
+                }
                 addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', {
                     count: soloPlayers.length,
                     players: soloPlayers,
@@ -757,7 +762,7 @@ export const useGameSocket = () => {
                 // Switch turn if no dice left
                 if (newState.dice.length === 0) {
                     const currentPlayerId = newState.turn;
-                    const myId = user?.id || 'guest-1';
+                    // const myId = user?.id || 'guest-1'; // Supprimé car redéclaré plus bas
 
                     // Determine current player color
                     let currentPlayerColor = 1;
@@ -768,27 +773,32 @@ export const useGameSocket = () => {
                     }
 
                     // Switch to other player
-                    if (players && players.length > 1) {
-                        // Multiplayer: switch between players[0] and players[1]
-                        const newTurn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
-                        newState.turn = newTurn;
-                        addLog(`🔄 [MOVE] Tour alterné: ${currentPlayerId} → ${newTurn}`, 'info', {
-                            players: players.map(p => p.id),
-                            currentPlayerId,
-                            newTurn
-                        });
+                    // FORCER l'alternance avec logique robuste
+                    const myId = user?.id || (players && players.length > 0 ? players[0].id : 'guest');
+                    const botId = players && players.length > 1 ? players[1].id : 'bot';
+
+                    let newTurn: string;
+                    // Vérifier si c'est le tour du joueur (avec toutes les variations possibles)
+                    const isPlayerTurn = currentPlayerId === myId || 
+                                        currentPlayerId === 'guest' || 
+                                        currentPlayerId === 'guest-1' ||
+                                        currentPlayerId === players?.[0]?.id;
+                    
+                    if (isPlayerTurn) {
+                        newTurn = botId;  // C'est au bot
                     } else {
-                        // Solo/Bot mode: switch between user and bot
-                        const botId = 'bot';
-                        const newTurn = currentPlayerId === myId ? botId : myId;
-                        newState.turn = newTurn;
-                        addLog(`🔄 [MOVE] Tour alterné (fallback): ${currentPlayerId} → ${newTurn}`, 'warning', {
-                            myId,
-                            botId,
-                            currentPlayerId,
-                            newTurn
-                        });
+                        newTurn = myId;  // C'est au joueur
                     }
+
+                    newState.turn = newTurn;
+                    addLog(`🔄 [MOVE] Tour alterné: ${currentPlayerId} → ${newTurn}`, 'success', {
+                        players: players?.map(p => p.id),
+                        currentPlayerId,
+                        newTurn,
+                        myId,
+                        botId,
+                        isPlayerTurn
+                    });
                 }
             }
         }
@@ -847,16 +857,32 @@ export const useGameSocket = () => {
             return;
         }
 
+        // CRITIQUE : Vérifier que players contient 2 joueurs avant de continuer
+        if (!players || players.length < 2) {
+            const addLog = useDebugStore.getState().addLog;
+            addLog('🤖 Bot: Waiting for players to be set (need 2)', 'warning', {
+                playersCount: players?.length || 0,
+                players: players?.map(p => ({ id: p.id, username: p.username }))
+            });
+            return; // Attendre que les 2 joueurs soient définis
+        }
+
         // Check if it's Bot's turn
         // Bot is 'bot' or any ID that is not me
-        // Fix: If user is null (guest), myId is 'guest-1'
-        const myId = user?.id || 'guest-1';
+        // Fix: Utiliser l'ID du premier joueur (players[0]) pour cohérence
+        const myId = user?.id || (players.length > 0 ? players[0].id : 'guest');
         const currentTurn = gameState.turn;
 
         // CRITIQUE : Identifier le bot depuis la liste des joueurs
         // Le bot est toujours le deuxième joueur dans offline-bot mode
         const botId = players && players.length > 1 ? players[1].id : 'bot';
-        const isBotTurn = currentTurn === botId || currentTurn === 'bot';
+        // Vérifier TOUTES les conditions possibles pour le tour du bot
+        const isBotTurn = (
+            currentTurn === botId ||
+            currentTurn === 'bot' ||
+            (players && players.length > 1 && currentTurn === players[1].id)
+        );
+        // console.log('🤖 [BOT] Détection tour:', { currentTurn, botId, isBotTurn, players: players?.map(p => p.id) });
 
         // Créer une clé unique pour cette analyse (turn + dice)
         // Gérer le cas où les dés sont vides (avant le premier lancer)
