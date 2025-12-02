@@ -283,9 +283,9 @@ export const useGameSocket = () => {
                 // FORCER isConnected à true pour mode offline-bot
                 setIsConnected(true);
                 
-                // Vérifier si on est déjà dans cette room
-                if (currentRoom && currentRoom.id === 'offline-bot') {
-                    addLog(`✅ [JOIN_ROOM] Déjà dans offline-bot, skip`, 'info');
+                // Vérifier si on est déjà dans cette room ET que gameState existe
+                if (currentRoom && currentRoom.id === 'offline-bot' && gameState && gameState.board) {
+                    addLog(`✅ [JOIN_ROOM] Déjà dans offline-bot avec gameState, skip`, 'info');
                     return;
                 }
                 
@@ -301,6 +301,8 @@ export const useGameSocket = () => {
                     players: []
                 };
                 addLog(`✅ [JOIN_ROOM] Room définie (bot): ${botRoom.name}`, 'success');
+                
+                // SET ROOM ET PLAYERS IMMÉDIATEMENT (synchrone)
                 setRoom(botRoom);
                 setPlayers(soloPlayers);
                 
@@ -355,8 +357,13 @@ export const useGameSocket = () => {
                     }
                 });
                 
+                // UPDATE GAME IMMÉDIATEMENT (synchrone) - CRITIQUE pour éviter écran noir
                 updateGame(botState);
-                addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ`, 'success');
+                addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ - Room et GameState définis`, 'success', {
+                    roomSet: true,
+                    gameStateSet: true,
+                    hasBoard: !!botState.board
+                });
                 return;
             }
 

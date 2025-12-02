@@ -254,11 +254,33 @@ const GameRoom = () => {
     const isOfflineMode = currentRoom?.id === 'offline-bot' || roomId === 'offline-bot';
     const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
     
-    // Check if game is loaded
+    // Check if game is loaded - FORCER l'initialisation si manquant
     if (!currentRoom || !gameState) {
+        const addLog = useDebugStore.getState().addLog;
+        
+        // Si on est en mode offline-bot, forcer l'initialisation immédiatement
+        if (roomId === 'offline-bot' && (!currentRoom || !gameState)) {
+            addLog(`⚠️ [GAME_ROOM] Room ou gameState manquant en mode offline-bot - Initialisation forcée`, 'warning', { 
+                hasRoom: !!currentRoom, 
+                hasGameState: !!gameState,
+                roomId 
+            });
+            
+            // Forcer l'initialisation immédiatement
+            if (joinRoom && !hasJoinedRef.current) {
+                hasJoinedRef.current = roomId;
+                const options = mode ? { mode, matchLength: length } : undefined;
+                joinRoom('offline-bot', options).catch((err: any) => {
+                    addLog(`❌ [GAME_ROOM] Erreur initialisation forcée: ${err?.message}`, 'error', err);
+                    hasJoinedRef.current = null;
+                });
+            }
+        }
+        
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white">
                 <DebugOverlay />
+                <BrowserConsole />
                 <div className="w-16 h-16 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin mb-6" />
                 <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#B8860B]">
                     Chargement de la partie...
@@ -268,6 +290,9 @@ const GameRoom = () => {
                 </p>
                 <p className="text-xs text-gray-700 mt-4 font-mono">
                     {isOfflineMode || DEMO_MODE ? 'Mode hors ligne' : (isConnected ? 'Connecté au socket' : 'Connexion socket en cours...')}
+                </p>
+                <p className="text-xs text-red-500 mt-2 font-mono">
+                    Room: {currentRoom ? 'OK' : 'MANQUANT'} | GameState: {gameState ? 'OK' : 'MANQUANT'}
                 </p>
             </div>
         );
@@ -291,24 +316,45 @@ const GameRoom = () => {
     }
 
     // --- Game Logic ---
-    // Vérifier que gameState existe et a un board valide
+    // Vérifier que gameState existe et a un board valide - FORCER l'initialisation si manquant
     if (!gameState || !gameState.board) {
         const addLog = useDebugStore.getState().addLog;
-        addLog(`⚠️ [GAME_ROOM] gameState ou board manquant - Réinitialisation...`, 'error', { gameState, hasBoard: !!gameState?.board });
+        addLog(`⚠️ [GAME_ROOM] gameState ou board manquant - Réinitialisation FORCÉE...`, 'error', { 
+            gameState, 
+            hasBoard: !!gameState?.board,
+            roomId,
+            currentRoom: currentRoom?.id 
+        });
         
-        // Réinitialiser avec INITIAL_BOARD si gameState est null ou board manquant
+        // FORCER l'initialisation immédiatement avec offline-bot
         if (joinRoom && roomId) {
+            const targetRoomId = roomId === 'offline-bot' ? 'offline-bot' : 'offline-bot'; // Toujours offline-bot
             const options = mode ? { mode, matchLength: length } : undefined;
-            joinRoom(roomId, options).catch((err: any) => {
-                addLog(`❌ [GAME_ROOM] Erreur réinitialisation: ${err?.message}`, 'error');
-            });
+            
+            if (!hasJoinedRef.current || hasJoinedRef.current !== targetRoomId) {
+                hasJoinedRef.current = targetRoomId;
+                addLog(`🔄 [GAME_ROOM] Réinitialisation forcée - joinRoom(${targetRoomId})`, 'info');
+                joinRoom(targetRoomId, options)
+                    .then(() => {
+                        addLog(`✅ [GAME_ROOM] Réinitialisation réussie`, 'success');
+                    })
+                    .catch((err: any) => {
+                        addLog(`❌ [GAME_ROOM] Erreur réinitialisation: ${err?.message}`, 'error', err);
+                        hasJoinedRef.current = null;
+                    });
+            }
         }
         
         return (
             <div className="h-screen bg-[#050505] text-white flex items-center justify-center">
+                <DebugOverlay />
+                <BrowserConsole />
                 <div className="text-center">
                     <div className="w-16 h-16 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-[#FFD700] font-medium">Initialisation du jeu...</p>
+                    <p className="text-xs text-red-500 mt-2 font-mono">
+                        GameState: {gameState ? 'EXISTS' : 'NULL'} | Board: {gameState?.board ? 'EXISTS' : 'NULL'}
+                    </p>
                 </div>
             </div>
         );
