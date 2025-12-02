@@ -8,6 +8,17 @@ import { analyzeMove } from '../lib/aiService';
 
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
+// --- Helper pour gérer les erreurs Supabase ---
+const handleSupabaseError = (error: any, context: string, addLog: (msg: string, type: string, data?: any) => void): boolean => {
+    // Retourne true si c'est une erreur de permissions (on peut continuer)
+    if (error?.code === '42501' || error?.message?.includes('permission denied')) {
+        addLog(`⚠️ [SUPABASE] Permissions refusées (${context}) - Continuation en mode offline`, 'warning', error);
+        return true; // Erreur de permissions, on peut continuer
+    }
+    addLog(`❌ [SUPABASE] Erreur (${context}): ${error?.message || 'Unknown error'}`, 'error', error);
+    return false; // Autre erreur
+};
+
 // --- Mock Data for Demo Mode ---
 interface GameOptions {
     mode: 'money' | 'match';
@@ -76,37 +87,92 @@ export const useGameSocket = () => {
 
         if (!user) return;
 
-        // 1. Listen to Rooms list updates
-        const roomsChannel = supabase.channel('public:rooms')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
-                fetchRooms();
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') setIsConnected(true);
+        // Protection contre les erreurs de permissions Supabase
+        try {
+            // 1. Listen to Rooms list updates
+            const roomsChannel = supabase.channel('public:rooms')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+                    fetchRooms().catch((err: any) => {
+                        const addLog = useDebugStore.getState().addLog;
+                        addLog(`⚠️ [SUPABASE] Erreur fetchRooms: ${err.message}`, 'warning', err);
+                        // En cas d'erreur de permissions, passer en mode démo
+                        if (err.code === '42501' || err.message?.includes('permission denied')) {
+                            addLog(`⚠️ [SUPABASE] Permissions refusées - Passage en mode démo`, 'warning');
+                            setIsConnected(true);
+                            setRoomsList(createMockRooms());
+                        }
+                    });
+                })
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        setIsConnected(true);
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        const addLog = useDebugStore.getState().addLog;
+                        addLog(`⚠️ [SUPABASE] Erreur channel: ${status} - Passage en mode démo`, 'warning');
+                        setIsConnected(true);
+                        setRoomsList(createMockRooms());
+                    }
+                });
+
+            fetchRooms().catch((err: any) => {
+                const addLog = useDebugStore.getState().addLog;
+                addLog(`⚠️ [SUPABASE] Erreur fetchRooms initial: ${err.message}`, 'warning', err);
+                if (err.code === '42501' || err.message?.includes('permission denied')) {
+                    addLog(`⚠️ [SUPABASE] Permissions refusées - Passage en mode démo`, 'warning');
+                    setIsConnected(true);
+                    setRoomsList(createMockRooms());
+                }
             });
 
-        fetchRooms();
-
-        return () => {
-            supabase.removeChannel(roomsChannel);
-        };
+            return () => {
+                try {
+                    supabase.removeChannel(roomsChannel);
+                } catch (err) {
+                    // Ignorer les erreurs de cleanup
+                }
+            };
+        } catch (error: any) {
+            const addLog = useDebugStore.getState().addLog;
+            addLog(`❌ [SUPABASE] Erreur critique: ${error.message} - Passage en mode démo`, 'error', error);
+            setIsConnected(true);
+            setRoomsList(createMockRooms());
+        }
     }, [user]);
 
     // --- Fetch Rooms Helper ---
     const fetchRooms = async () => {
-        const { data } = await supabase
-            .from('rooms')
-            .select('*, profiles:created_by(username, avatar_url)')
-            .order('created_at', { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('*, profiles:created_by(username, avatar_url)')
+                .order('created_at', { ascending: false });
 
-        if (data) {
-            const formattedRooms: Room[] = data.map(r => ({
-                id: r.id,
-                name: r.name,
-                status: r.status,
-                players: []
-            }));
-            setRoomsList(formattedRooms);
+            if (error) {
+                const addLog = useDebugStore.getState().addLog;
+                addLog(`⚠️ [SUPABASE] Erreur fetchRooms: ${error.message}`, 'warning', error);
+                
+                // Si erreur de permissions, retourner liste vide
+                if (error.code === '42501' || error.message?.includes('permission denied')) {
+                    addLog(`⚠️ [SUPABASE] Permissions refusées - Liste vide`, 'warning');
+                    setRoomsList([]);
+                    return;
+                }
+                throw error;
+            }
+
+            if (data) {
+                const formattedRooms: Room[] = data.map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    status: r.status,
+                    players: []
+                }));
+                setRoomsList(formattedRooms);
+            }
+        } catch (error: any) {
+            const addLog = useDebugStore.getState().addLog;
+            addLog(`❌ [SUPABASE] Erreur fetchRooms: ${error.message}`, 'error', error);
+            setRoomsList([]);
         }
     };
 
@@ -312,7 +378,7 @@ export const useGameSocket = () => {
                 addLog(`⚠️ [JOIN_ROOM] Pas d'utilisateur, skip upsert`, 'info');
             }
 
-            // Étape 2: Fetch players
+            // Étape 2: Fetch players (avec protection permissions)
             addLog(`📡 [JOIN_ROOM] Étape 2: Récupération des joueurs...`, 'info');
             let roomPlayers: Player[] = [];
             try {
@@ -322,12 +388,18 @@ export const useGameSocket = () => {
                 ]);
                 addLog(`✅ [JOIN_ROOM] Joueurs récupérés: ${roomPlayers.length}`, 'success', roomPlayers);
             } catch (err: any) {
-                addLog(`⚠️ [JOIN_ROOM] Erreur fetch players (fallback): ${err.message}`, 'error', err);
-                roomPlayers = user ? [{ id: user.id, username: user.username || 'Guest', avatar: user.avatar }] : [];
+                // Si erreur de permissions, utiliser joueur local
+                if (err.code === '42501' || err.message?.includes('permission denied')) {
+                    addLog(`⚠️ [JOIN_ROOM] Permissions refusées - Utilisation joueur local`, 'warning', err);
+                    roomPlayers = user ? [{ id: user.id, username: user.username || 'Guest', avatar: user.avatar }] : [];
+                } else {
+                    addLog(`⚠️ [JOIN_ROOM] Erreur fetch players (fallback): ${err.message}`, 'error', err);
+                    roomPlayers = user ? [{ id: user.id, username: user.username || 'Guest', avatar: user.avatar }] : [];
+                }
             }
             setPlayers(roomPlayers);
 
-            // Étape 3: Fetch room data
+            // Étape 3: Fetch room data (avec protection permissions)
             addLog(`📡 [JOIN_ROOM] Étape 3: Récupération des données de la room...`, 'info');
             try {
                 const roomResult = await Promise.race([
@@ -338,14 +410,25 @@ export const useGameSocket = () => {
                 const { data: roomData, error: roomError } = roomResult;
 
                 if (roomError) {
-                    addLog(`⚠️ [JOIN_ROOM] Erreur fetch room (fallback): ${roomError.message}`, 'error', roomError);
-                    setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
+                    // Si erreur de permissions, utiliser room par défaut
+                    if (roomError.code === '42501' || roomError.message?.includes('permission denied')) {
+                        addLog(`⚠️ [JOIN_ROOM] Permissions refusées - Room par défaut`, 'warning', roomError);
+                        setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
+                    } else {
+                        addLog(`⚠️ [JOIN_ROOM] Erreur fetch room (fallback): ${roomError.message}`, 'error', roomError);
+                        setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
+                    }
                 } else if (roomData) {
                     addLog(`✅ [JOIN_ROOM] Room récupérée: ${roomData.name}`, 'success', roomData);
                     setRoom({ ...roomData, players: [] });
                 }
             } catch (err: any) {
-                addLog(`⚠️ [JOIN_ROOM] Erreur fetch room (catch): ${err.message}`, 'error', err);
+                // Si erreur de permissions, utiliser room par défaut
+                if (err.code === '42501' || err.message?.includes('permission denied')) {
+                    addLog(`⚠️ [JOIN_ROOM] Permissions refusées - Room par défaut`, 'warning', err);
+                } else {
+                    addLog(`⚠️ [JOIN_ROOM] Erreur fetch room (catch): ${err.message}`, 'error', err);
+                }
                 setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
             }
 
@@ -640,11 +723,14 @@ export const useGameSocket = () => {
         }
 
         if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot' && newState.board) {
-            const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
-            if (error) {
-                addLog('Error updating game in DB', 'error', { message: error.message, details: error.details, hint: error.hint, code: error.code });
-            } else {
-                addLog('Game updated in DB', 'success');
+            if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                const { error } = await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                if (error) {
+                    handleSupabaseError(error, 'update game', addLog);
+                    // Continuer quand même, même en cas d'erreur
+                } else {
+                    addLog('Game updated in DB', 'success');
+                }
             }
         }
 
