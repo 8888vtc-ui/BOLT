@@ -97,8 +97,9 @@ export default function Point({
       />
 
       {/* Conteneur des pions */}
-      <div className="relative z-10 flex flex-col items-center w-full py-2">
-        {/* Pas de reverse() ici car flex-col-reverse gère déjà l'ordre visuel pour le bas */}
+      <div className={`relative z-10 flex items-center w-full py-2 ${isTop ? 'flex-col' : 'flex-col-reverse'}`}>
+        {/* flex-col: Haut vers Bas (Top Row) */}
+        {/* flex-col-reverse: Bas vers Haut (Bottom Row) */}
         {checkers}
       </div>
 

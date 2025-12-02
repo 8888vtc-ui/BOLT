@@ -37,7 +37,7 @@ const GameRoom = () => {
     const { roomId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const {
         isConnected,
         joinRoom,
@@ -96,36 +96,42 @@ const GameRoom = () => {
     // Rejoindre la room au montage - VERSION CORRIGÉE avec toutes les dépendances
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
-        
+
         // Si pas de roomId, rediriger immédiatement
         if (!roomId) {
             addLog(`⚠️ [GAME_ROOM] Pas de roomId, redirection lobby`, 'warning');
             navigate('/lobby');
             return;
         }
-        
+
+        // Attendre que l'auth soit chargée pour éviter de créer un guest temporaire
+        if (loading) {
+            // addLog(`⏳ [GAME_ROOM] Chargement auth...`, 'info'); // Trop verbeux
+            return;
+        }
+
         // Si déjà rejoint cette room, skip
         if (hasJoinedRef.current === roomId) {
             addLog(`✅ [GAME_ROOM] Déjà rejoint ${roomId}, skip`, 'info');
             return;
         }
-        
+
         // Si déjà dans la bonne room, skip
         if (currentRoom && currentRoom.id === roomId) {
             hasJoinedRef.current = roomId;
             addLog(`✅ [GAME_ROOM] Déjà dans la room ${roomId}, skip`, 'info');
             return;
         }
-        
+
         addLog(`🎮 [GAME_ROOM] Démarrage join - roomId: ${roomId}`, 'info');
-        
+
         // Marquer comme en cours
         hasJoinedRef.current = roomId;
-        
+
         // TOUJOURS utiliser offline-bot pour éviter les blocages Supabase
         const options = mode ? { mode, matchLength: length } : undefined;
         const queryParams = location.search || '';
-        
+
         // Si c'est déjà offline-bot, joindre directement
         if (roomId === 'offline-bot') {
             addLog(`🤖 [GAME_ROOM] Mode offline-bot détecté`, 'info');
@@ -141,48 +147,48 @@ const GameRoom = () => {
                 });
             return;
         }
-        
+
         // Pour TOUTES les autres rooms, utiliser offline-bot en fallback
         addLog(`⚠️ [GAME_ROOM] Room ${roomId} → Fallback offline-bot`, 'info');
         navigate(`/game/offline-bot${queryParams}`);
-        
-    }, [roomId, mode, length, location.search, joinRoom, navigate]); // Retirer currentRoom?.id pour éviter boucle
+
+    }, [roomId, mode, length, location.search, joinRoom, navigate, loading]); // Retirer currentRoom?.id pour éviter boucle
 
     // Detect game end and calculate match score (avec protection contre boucle infinie)
     const gameEndProcessedRef = useRef<string | null>(null);
-    
+
     // VALIDATION UNIFIÉE DU BOARD - Déclarer AVANT les returns (règle React hooks)
     const boardValidationRef = useRef({ fixed: false, lastBoardHash: '' });
-    
+
     // Validation du board - useEffect AVANT les returns
     useEffect(() => {
         if (!gameState || !gameState.board || !gameState.board.points) return;
-        
+
         try {
             const isValidStructure = Array.isArray(gameState.board.points) && gameState.board.points.length === 24;
             const totalCheckers = gameState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
-            
+
             // Créer un hash du board pour détecter les changements
             const boardHash = JSON.stringify(gameState.board.points);
-            
+
             // Si le board a changé, réinitialiser le flag fixed
             if (boardHash !== boardValidationRef.current.lastBoardHash) {
                 boardValidationRef.current.fixed = false;
                 boardValidationRef.current.lastBoardHash = boardHash;
             }
-            
+
             // Ne réinitialiser QUE si le board est vraiment invalide ET qu'on n'a pas déjà fixé ce board
             if ((!isValidStructure || totalCheckers === 0) && !boardValidationRef.current.fixed) {
                 const addLog = useDebugStore.getState().addLog;
-                addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', { 
-                    isValidStructure, 
+                addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', {
+                    isValidStructure,
                     totalCheckers,
                     boardHash: boardHash.substring(0, 50)
                 });
-                
+
                 // Marquer comme fixé AVANT de réinitialiser pour éviter les boucles
                 boardValidationRef.current.fixed = true;
-                
+
                 try {
                     const fixedBoard = JSON.parse(JSON.stringify(INITIAL_BOARD));
                     const currentGameState = useGameStore.getState().gameState;
@@ -222,7 +228,7 @@ const GameRoom = () => {
             // Ignorer les erreurs de validation
         }
     }, [gameState?.board, updateGame]);
-    
+
     useEffect(() => {
         if (!gameState || !gameState.board) return;
 
@@ -232,22 +238,22 @@ const GameRoom = () => {
         if (player1Won || player2Won) {
             const winner = player1Won ? 1 : 2;
             const winType = checkWinType(gameState.board, winner as PlayerColor);
-            
+
             // Créer une clé unique pour cette victoire
             const winKey = `${player1Won ? '1' : '2'}-${winType}-${JSON.stringify(gameState.score)}`;
-            
+
             // Éviter de traiter la même victoire plusieurs fois
             if (gameEndProcessedRef.current === winKey) {
                 return;
             }
-            
+
             gameEndProcessedRef.current = winKey;
-            
+
             // Determine winner player ID
-            const winnerPlayerId = winner === 1 
+            const winnerPlayerId = winner === 1
                 ? (players[0]?.id || 'player1')
                 : (players[1]?.id || 'player2');
-            
+
             // Calculate match score if match game
             if (gameState.matchLength && gameState.matchLength > 0 && players.length > 0) {
                 const newMatchScore = calculateMatchScore(
@@ -258,11 +264,11 @@ const GameRoom = () => {
                     winnerPlayerId,
                     players
                 );
-                
+
                 if (newMatchScore) {
                     // Vérifier si le score a vraiment changé avant de mettre à jour
                     const scoreChanged = JSON.stringify(gameState.score) !== JSON.stringify(newMatchScore);
-                    
+
                     if (scoreChanged) {
                         const { updateGame } = useGameStore.getState();
                         const updatedGameState = {
@@ -270,7 +276,7 @@ const GameRoom = () => {
                             score: newMatchScore
                         };
                         updateGame(updatedGameState);
-                        
+
                         // Sauvegarder en DB si nécessaire (async, ne bloque pas)
                         if (currentRoom && currentRoom.id !== 'offline-bot') {
                             import('../lib/supabase').then(({ supabase }) => {
@@ -289,12 +295,12 @@ const GameRoom = () => {
                                 addLog('Erreur import supabase', 'error', error);
                             });
                         }
-                        
+
                         // Check if match is complete
                         const matchComplete = Object.values(newMatchScore).some(
                             (points: number) => points >= gameState.matchLength!
                         );
-                        
+
                         if (matchComplete) {
                             const playerWon = (playerColor === 1 && player1Won) || (playerColor === 2 && player2Won);
                             setWinModal({
@@ -307,10 +313,10 @@ const GameRoom = () => {
                     }
                 }
             }
-            
+
             // Determine if player won
             const playerWon = (playerColor === 1 && player1Won) || (playerColor === 2 && player2Won);
-            
+
             setWinModal({
                 isOpen: true,
                 winner: playerWon ? 'player' : (players[1]?.id === 'bot' ? 'bot' : 'opponent'),
@@ -325,11 +331,11 @@ const GameRoom = () => {
     // Diagnostic du board pour les jetons - useEffect AVANT les returns
     useEffect(() => {
         if (!gameState || !gameState.board || !gameState.board.points) return;
-        
+
         const addLog = useDebugStore.getState().addLog;
         const totalCheckersOnBoard = gameState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
         const pointsWithCheckers = gameState.board.points.filter((p: any) => p?.count > 0).length;
-        
+
         if (gameState.board && gameState.board.points) {
             addLog(`🎯 [GAME_ROOM] Board pour rendu`, 'info', {
                 totalCheckers: totalCheckersOnBoard,
@@ -348,19 +354,19 @@ const GameRoom = () => {
     // Vérifier si on est en mode offline-bot (ne nécessite pas de connexion)
     const isOfflineMode = currentRoom?.id === 'offline-bot' || roomId === 'offline-bot';
     const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
+
     // Check if game is loaded - FORCER l'initialisation si manquant
     if (!currentRoom || !gameState) {
         const addLog = useDebugStore.getState().addLog;
-        
+
         // Si on est en mode offline-bot, forcer l'initialisation immédiatement
         if (roomId === 'offline-bot' && (!currentRoom || !gameState)) {
-            addLog(`⚠️ [GAME_ROOM] Room ou gameState manquant en mode offline-bot - Initialisation forcée`, 'warning', { 
-                hasRoom: !!currentRoom, 
+            addLog(`⚠️ [GAME_ROOM] Room ou gameState manquant en mode offline-bot - Initialisation forcée`, 'warning', {
+                hasRoom: !!currentRoom,
                 hasGameState: !!gameState,
-                roomId 
+                roomId
             });
-            
+
             // Forcer l'initialisation immédiatement
             if (joinRoom && !hasJoinedRef.current) {
                 hasJoinedRef.current = roomId;
@@ -371,7 +377,7 @@ const GameRoom = () => {
                 });
             }
         }
-        
+
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white">
                 <DebugOverlay />
@@ -414,18 +420,18 @@ const GameRoom = () => {
     // Vérifier que gameState existe et a un board valide - FORCER l'initialisation si manquant
     if (!gameState || !gameState.board) {
         const addLog = useDebugStore.getState().addLog;
-        addLog(`⚠️ [GAME_ROOM] gameState ou board manquant - Réinitialisation FORCÉE...`, 'error', { 
-            gameState, 
+        addLog(`⚠️ [GAME_ROOM] gameState ou board manquant - Réinitialisation FORCÉE...`, 'error', {
+            gameState,
             hasBoard: !!gameState?.board,
             roomId,
-            currentRoom: currentRoom?.id 
+            currentRoom: currentRoom?.id
         });
-        
+
         // FORCER l'initialisation immédiatement avec offline-bot
         if (joinRoom && roomId) {
             const targetRoomId = roomId === 'offline-bot' ? 'offline-bot' : 'offline-bot'; // Toujours offline-bot
             const options = mode ? { mode, matchLength: length } : undefined;
-            
+
             if (!hasJoinedRef.current || hasJoinedRef.current !== targetRoomId) {
                 hasJoinedRef.current = targetRoomId;
                 addLog(`🔄 [GAME_ROOM] Réinitialisation forcée - joinRoom(${targetRoomId})`, 'info');
@@ -439,7 +445,7 @@ const GameRoom = () => {
                     });
             }
         }
-        
+
         return (
             <div className="h-screen bg-[#050505] text-white flex items-center justify-center">
                 <DebugOverlay />
@@ -454,9 +460,9 @@ const GameRoom = () => {
             </div>
         );
     }
-    
+
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
-    
+
     // Fix isMyTurn: use players from store
     const isMyTurn = (() => {
         if (!user) return false;
@@ -504,7 +510,7 @@ const GameRoom = () => {
             const analysis = await analyzeMove(gameState, gameState.dice, playerColor);
             setAiAnalysis(analysis);
             addLog('Analyse reçue !', 'success');
-            
+
             // If desktop and video mode, generate video
             if (isDesktop && coachMode === 'video') {
                 setIsGeneratingVideo(true);
@@ -533,7 +539,7 @@ const GameRoom = () => {
     // Handle coach mode change
     const handleCoachModeChange = async (mode: 'text' | 'video') => {
         setCoachMode(mode);
-        
+
         // If switching to video and we have analysis, generate video
         if (mode === 'video' && aiAnalysis && isDesktop && !coachVideoUrl) {
             setIsGeneratingVideo(true);
@@ -610,7 +616,7 @@ const GameRoom = () => {
         const safePoint = point && typeof point === 'object' && 'count' in point
             ? point
             : { player: null, count: 0 };
-        
+
         topPoints.push(
             <Point
                 key={i}
@@ -634,7 +640,7 @@ const GameRoom = () => {
         const safePoint = point && typeof point === 'object' && 'count' in point
             ? point
             : { player: null, count: 0 };
-        
+
         bottomPoints.push(
             <Point
                 key={i}
@@ -707,7 +713,7 @@ const GameRoom = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                        
+
                                         {/* Personality Selection - Desktop only */}
                                         {coachMode === 'video' && (
                                             <div className="flex justify-center mb-4">
@@ -874,8 +880,8 @@ const GameRoom = () => {
                             <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/5">
                                 <div className="flex flex-col items-end">
                                     <span className="text-xs text-gray-400">
-                                        {gameState.matchLength && gameState.matchLength > 0 
-                                            ? `Match ${gameState.matchLength}` 
+                                        {gameState.matchLength && gameState.matchLength > 0
+                                            ? `Match ${gameState.matchLength}`
                                             : 'Money Game'}
                                     </span>
                                     <span className="text-sm font-bold text-[#FFD700]">
@@ -1037,7 +1043,7 @@ const GameRoom = () => {
                                         onClick={() => setIsChatOpen(false)}
                                         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
                                     />
-                                    
+
                                     {/* Drawer */}
                                     <motion.div
                                         initial={{ y: '100%' }}
@@ -1069,7 +1075,7 @@ const GameRoom = () => {
                                                 <X className="w-5 h-5 text-gray-400" />
                                             </button>
                                         </div>
-                                        
+
                                         <div className="flex-1 overflow-hidden">
                                             <ChatBox />
                                         </div>

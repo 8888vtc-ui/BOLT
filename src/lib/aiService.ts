@@ -1,4 +1,5 @@
 import { GameState } from '../stores/gameStore';
+import { useDebugStore } from '../stores/debugStore';
 
 // URL de l'API Bot - configurable via variable d'environnement
 const BOT_API_URL = import.meta.env.VITE_BOT_API_URL || 'https://botgammon.netlify.app/.netlify/functions/analyze';
@@ -28,6 +29,7 @@ export const analyzeMove = async (
     playerColor?: number
 ): Promise<AIAnalysis> => {
     try {
+        const addLog = useDebugStore.getState().addLog;
         // 1. Determine Active Player
         const activePlayer = playerColor || 1;
 
@@ -166,6 +168,14 @@ export const analyzeMove = async (
                 bestMoves[0],
                 bestMoves[1]
             ];
+        }
+
+        // CRITICAL FIX FOR OPENING MOVES (and general move count)
+        // Ensure we don't return more moves than expected
+        const expectedMoves = isDouble ? 4 : 2;
+        if (bestMoves.length > expectedMoves) {
+            addLog(`⚠️ [AI] Too many moves returned (${bestMoves.length}), truncating to ${expectedMoves}`, 'warning');
+            bestMoves = bestMoves.slice(0, expectedMoves);
         }
 
         // 4. Map moves back to Frontend coordinates if necessary

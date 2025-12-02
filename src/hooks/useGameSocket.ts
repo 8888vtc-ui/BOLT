@@ -293,17 +293,17 @@ export const useGameSocket = () => {
                 addLog(`📋 [JOIN_ROOM] Création joueurs locaux...`, 'info', { user: user?.id, hasUser: !!user });
                 // CRITIQUE : Ajouter le bot comme deuxième joueur
                 const botId = 'bot';
-                const soloPlayers = user 
+                const soloPlayers = user
                     ? [
                         { id: user.id, username: user.username || 'Joueur', avatar: user.avatar },
                         { id: botId, username: 'Bot IA', avatar: undefined }
-                      ]
+                    ]
                     : [
-                        { id: 'guest', username: 'Invité', avatar: undefined },
+                        { id: 'guest-1', username: 'Invité', avatar: undefined },
                         { id: botId, username: 'Bot IA', avatar: undefined }
-                      ];
-                addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', { 
-                    count: soloPlayers.length, 
+                    ];
+                addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', {
+                    count: soloPlayers.length,
                     players: soloPlayers,
                     botId,
                     userExists: !!user
@@ -772,7 +772,7 @@ export const useGameSocket = () => {
                         // Multiplayer: switch between players[0] and players[1]
                         const newTurn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
                         newState.turn = newTurn;
-                        addLog(`🔄 [MOVE] Tour alterné: ${currentPlayerId} → ${newTurn}`, 'info', { 
+                        addLog(`🔄 [MOVE] Tour alterné: ${currentPlayerId} → ${newTurn}`, 'info', {
                             players: players.map(p => p.id),
                             currentPlayerId,
                             newTurn
@@ -852,7 +852,7 @@ export const useGameSocket = () => {
         // Fix: If user is null (guest), myId is 'guest-1'
         const myId = user?.id || 'guest-1';
         const currentTurn = gameState.turn;
-        
+
         // CRITIQUE : Identifier le bot depuis la liste des joueurs
         // Le bot est toujours le deuxième joueur dans offline-bot mode
         const botId = players && players.length > 1 ? players[1].id : 'bot';
@@ -860,7 +860,7 @@ export const useGameSocket = () => {
 
         // Créer une clé unique pour cette analyse (turn + dice)
         // Gérer le cas où les dés sont vides (avant le premier lancer)
-        const analysisKey = gameState.dice.length > 0 
+        const analysisKey = gameState.dice.length > 0
             ? `${currentTurn}-${gameState.dice.join(',')}`
             : `${currentTurn}-no-dice`;
 
