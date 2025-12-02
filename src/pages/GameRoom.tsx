@@ -8,6 +8,7 @@ import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw, L
 
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useGameStore } from '../stores/gameStore';
+import { INITIAL_BOARD } from '../lib/gameLogic';
 import { useAuth } from '../hooks/useAuth';
 import { useDoublingCube } from '../hooks/useDoublingCube';
 import { analyzeMove, AIAnalysis } from '../lib/aiService';
@@ -46,7 +47,7 @@ const GameRoom = () => {
         canUndo
     } = useGameSocket();
 
-    const { currentRoom, gameState, players, messages } = useGameStore();
+    const { currentRoom, gameState, players, messages, updateGame } = useGameStore();
     const { offerDouble, acceptDouble, rejectDouble } = useDoublingCube(currentRoom, user);
     const { isDesktop, isMobile } = useDevice();
     const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
@@ -261,7 +262,51 @@ const GameRoom = () => {
     }
 
     // --- Game Logic ---
+    // Vérifier que gameState existe et a un board valide
+    if (!gameState || !gameState.board) {
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`⚠️ [GAME_ROOM] gameState ou board manquant - Réinitialisation...`, 'error', { gameState, hasBoard: !!gameState?.board });
+        
+        // Réinitialiser avec INITIAL_BOARD si gameState est null ou board manquant
+        if (joinRoom && roomId) {
+            const options = mode ? { mode, matchLength: length } : undefined;
+            joinRoom(roomId, options).catch((err: any) => {
+                addLog(`❌ [GAME_ROOM] Erreur réinitialisation: ${err?.message}`, 'error');
+            });
+        }
+        
+        return (
+            <div className="h-screen bg-[#050505] text-white flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-[#FFD700] font-medium">Initialisation du jeu...</p>
+                </div>
+            </div>
+        );
+    }
+    
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
+    
+    // Vérifier que board.points existe et est valide
+    if (!board.points || !Array.isArray(board.points) || board.points.length !== 24) {
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`❌ [GAME_ROOM] Board invalide - Réinitialisation avec INITIAL_BOARD`, 'error', { 
+            hasPoints: !!board.points, 
+            isArray: Array.isArray(board.points),
+            length: board.points?.length,
+            board: board
+        });
+        
+        // Forcer réinitialisation avec INITIAL_BOARD (synchronisé)
+        const fixedState = {
+            ...gameState,
+            board: INITIAL_BOARD
+        };
+        updateGame(fixedState);
+        addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
+        
+        // Ne pas retourner, laisser le re-render avec le nouveau board
+    }
     
     // Fix isMyTurn: use players from store
     const isMyTurn = (() => {
