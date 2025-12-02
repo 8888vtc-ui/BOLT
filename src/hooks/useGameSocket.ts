@@ -291,7 +291,17 @@ export const useGameSocket = () => {
 
                 // VERSION ULTRA-RAPIDE - Pas d'appel API qui peut bloquer
                 addLog(`📋 [JOIN_ROOM] Création joueurs locaux...`, 'info');
-                const soloPlayers = user ? [{ id: user.id, username: user.username || 'Joueur', avatar: user.avatar }] : [{ id: 'guest', username: 'Invité', avatar: undefined }];
+                // CRITIQUE : Ajouter le bot comme deuxième joueur
+                const botId = 'bot';
+                const soloPlayers = user 
+                    ? [
+                        { id: user.id, username: user.username || 'Joueur', avatar: user.avatar },
+                        { id: botId, username: 'Bot IA', avatar: undefined }
+                      ]
+                    : [
+                        { id: 'guest', username: 'Invité', avatar: undefined },
+                        { id: botId, username: 'Bot IA', avatar: undefined }
+                      ];
                 addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', soloPlayers);
 
                 const botRoom = {
@@ -824,10 +834,17 @@ export const useGameSocket = () => {
         // Fix: If user is null (guest), myId is 'guest-1'
         const myId = user?.id || 'guest-1';
         const currentTurn = gameState.turn;
-        const isBotTurn = currentTurn === 'bot';
+        
+        // CRITIQUE : Identifier le bot depuis la liste des joueurs
+        // Le bot est toujours le deuxième joueur dans offline-bot mode
+        const botId = players && players.length > 1 ? players[1].id : 'bot';
+        const isBotTurn = currentTurn === botId || currentTurn === 'bot';
 
         // Créer une clé unique pour cette analyse (turn + dice)
-        const analysisKey = `${currentTurn}-${gameState.dice.join(',')}`;
+        // Gérer le cas où les dés sont vides (avant le premier lancer)
+        const analysisKey = gameState.dice.length > 0 
+            ? `${currentTurn}-${gameState.dice.join(',')}`
+            : `${currentTurn}-no-dice`;
 
         // Logs détaillés pour diagnostiquer
         const addLog = useDebugStore.getState().addLog;

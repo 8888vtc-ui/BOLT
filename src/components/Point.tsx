@@ -81,8 +81,7 @@ export default function Point({
       ref={drop}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`relative h-full flex flex-col items-center justify-end group ${isTop ? 'flex-col' : 'flex-col-reverse'
-        }`}
+      className={`relative h-full flex items-center group ${isTop ? 'flex-col' : 'flex-col-reverse'}`}
     >
       {/* Triangle du point */}
       <div
@@ -98,9 +97,7 @@ export default function Point({
       />
 
       {/* Conteneur des pions */}
-      <div
-        className="relative z-10 flex flex-col items-center w-full h-full py-2 justify-start"
-      >
+      <div className="relative z-10 flex flex-col items-center w-full py-2">
         {/* Pas de reverse() ici car flex-col-reverse gère déjà l'ordre visuel pour le bas */}
         {checkers}
       </div>
