@@ -66,7 +66,7 @@ export default function Point({
         }}
       >
         <Checker
-          player={point.player!}
+          player={point.player || 1}
           draggable={isInteractive}
           onDragStart={() => onDragStart(index)}
           index={i}

@@ -90,7 +90,7 @@ const GameRoom = () => {
     // Flag pour éviter les appels multiples - PERSISTANT
     const hasJoinedRef = useRef<string | null>(null);
 
-    // Rejoindre la room au montage - VERSION ULTRA-SIMPLIFIÉE
+    // Rejoindre la room au montage - VERSION CORRIGÉE avec toutes les dépendances
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
         
@@ -140,13 +140,13 @@ const GameRoom = () => {
         }
         
         // Pour TOUTES les autres rooms, utiliser offline-bot en fallback
-        // Cela évite TOUS les blocages Supabase
-        addLog(`⚠️ [GAME_ROOM] Room ${roomId} → Fallback offline-bot pour éviter blocage`, 'info');
+        addLog(`⚠️ [GAME_ROOM] Room ${roomId} → Fallback offline-bot`, 'info');
         navigate(`/game/offline-bot${queryParams}`);
         
-    }, [roomId]); // SEULEMENT roomId dans les dépendances - le minimum absolu
+    }, [roomId, currentRoom?.id, mode, length, location.search, joinRoom, navigate]); // Toutes les dépendances nécessaires
 
-    // Detect game end and calculate match score
+    // Detect game end and calculate match score (avec protection contre boucle infinie)
+    const gameEndProcessedRef = useRef<string | null>(null);
     useEffect(() => {
         if (!gameState || !gameState.board) return;
 
@@ -156,6 +156,16 @@ const GameRoom = () => {
         if (player1Won || player2Won) {
             const winner = player1Won ? 1 : 2;
             const winType = checkWinType(gameState.board, winner as PlayerColor);
+            
+            // Créer une clé unique pour cette victoire
+            const winKey = `${player1Won ? '1' : '2'}-${winType}-${JSON.stringify(gameState.score)}`;
+            
+            // Éviter de traiter la même victoire plusieurs fois
+            if (gameEndProcessedRef.current === winKey) {
+                return;
+            }
+            
+            gameEndProcessedRef.current = winKey;
             
             // Determine winner player ID
             const winnerPlayerId = winner === 1 
@@ -174,44 +184,50 @@ const GameRoom = () => {
                 );
                 
                 if (newMatchScore) {
-                    // Update game state with new score
-                    const { updateGame } = useGameStore.getState();
-                    const updatedGameState = {
-                        ...gameState,
-                        score: newMatchScore
-                    };
-                    updateGame(updatedGameState);
+                    // Vérifier si le score a vraiment changé avant de mettre à jour
+                    const scoreChanged = JSON.stringify(gameState.score) !== JSON.stringify(newMatchScore);
                     
-                    // Sauvegarder en DB si nécessaire
-                    if (currentRoom && currentRoom.id !== 'offline-bot') {
-                        import('../lib/supabase').then(({ supabase }) => {
-                            supabase.from('games').update({ board_state: updatedGameState }).eq('room_id', currentRoom.id).then(() => {
-                                const addLog = useDebugStore.getState().addLog;
-                                addLog('Score de match sauvegardé', 'success');
+                    if (scoreChanged) {
+                        const { updateGame } = useGameStore.getState();
+                        const updatedGameState = {
+                            ...gameState,
+                            score: newMatchScore
+                        };
+                        updateGame(updatedGameState);
+                        
+                        // Sauvegarder en DB si nécessaire (async, ne bloque pas)
+                        if (currentRoom && currentRoom.id !== 'offline-bot') {
+                            import('../lib/supabase').then(({ supabase }) => {
+                                supabase.from('games').update({ board_state: updatedGameState })
+                                    .eq('room_id', currentRoom.id)
+                                    .then(() => {
+                                        const addLog = useDebugStore.getState().addLog;
+                                        addLog('Score de match sauvegardé', 'success');
+                                    })
+                                    .catch((error) => {
+                                        const addLog = useDebugStore.getState().addLog;
+                                        addLog('Erreur sauvegarde score', 'error', error);
+                                    });
                             }).catch((error) => {
                                 const addLog = useDebugStore.getState().addLog;
-                                addLog('Erreur sauvegarde score', 'error', error);
+                                addLog('Erreur import supabase', 'error', error);
                             });
-                        }).catch((error) => {
-                            const addLog = useDebugStore.getState().addLog;
-                            addLog('Erreur import supabase', 'error', error);
-                        });
-                    }
-                    
-                    // Check if match is complete
-                    const matchComplete = Object.values(newMatchScore).some(
-                        (points: number) => points >= gameState.matchLength!
-                    );
-                    
-                    if (matchComplete) {
-                        // Match is complete - show match win modal
-                        const playerWon = (playerColor === 1 && player1Won) || (playerColor === 2 && player2Won);
-                        setWinModal({
-                            isOpen: true,
-                            winner: playerWon ? 'player' : (players[1]?.id === 'bot' ? 'bot' : 'opponent'),
-                            winType: 'simple' // Match win is always simple
-                        });
-                        return;
+                        }
+                        
+                        // Check if match is complete
+                        const matchComplete = Object.values(newMatchScore).some(
+                            (points: number) => points >= gameState.matchLength!
+                        );
+                        
+                        if (matchComplete) {
+                            const playerWon = (playerColor === 1 && player1Won) || (playerColor === 2 && player2Won);
+                            setWinModal({
+                                isOpen: true,
+                                winner: playerWon ? 'player' : (players[1]?.id === 'bot' ? 'bot' : 'opponent'),
+                                winType: 'simple'
+                            });
+                            return;
+                        }
                     }
                 }
             }
@@ -224,8 +240,11 @@ const GameRoom = () => {
                 winner: playerWon ? 'player' : (players[1]?.id === 'bot' ? 'bot' : 'opponent'),
                 winType
             });
+        } else {
+            // Reset si plus de victoire
+            gameEndProcessedRef.current = null;
         }
-    }, [gameState, playerColor, players]);
+    }, [gameState?.board, gameState?.matchLength, gameState?.score, gameState?.cubeValue, playerColor, players, currentRoom?.id]);
 
 
     // Check if game is loaded
@@ -287,19 +306,44 @@ const GameRoom = () => {
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
     
-    // DIAGNOSTIC - Vérifier la structure du board (avec protection contre boucle infinie)
-    const boardFixedRef = useRef(false);
+    // VALIDATION UNIFIÉE DU BOARD - Un seul useEffect pour tout gérer
+    const boardValidationRef = useRef({ fixed: false, validated: false });
     useEffect(() => {
-        const addLog = useDebugStore.getState().addLog;
+        if (!board || !board.points) return;
         
-        // Éviter les appels multiples
-        if (boardFixedRef.current) return;
+        // Vérifier structure
+        const isValidStructure = Array.isArray(board.points) && board.points.length === 24;
+        const totalCheckers = board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
+        const isEmpty = totalCheckers === 0;
         
-        if (board && board.points) {
-            const totalCheckers = board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
+        // Si déjà validé et OK, skip
+        if (boardValidationRef.current.validated && isValidStructure && !isEmpty) {
+            return;
+        }
+        
+        // Si problème détecté et pas encore fixé
+        if ((!isValidStructure || isEmpty) && !boardValidationRef.current.fixed) {
+            boardValidationRef.current.fixed = true;
+            boardValidationRef.current.validated = true;
             
-            // Logs seulement la première fois
-            if (totalCheckers > 0) {
+            const addLog = useDebugStore.getState().addLog;
+            addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', { 
+                isValidStructure, 
+                totalCheckers,
+                pointsLength: board.points?.length
+            });
+            
+            const fixedState = {
+                ...gameState,
+                board: INITIAL_BOARD
+            };
+            updateGame(fixedState);
+            addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
+        } else if (isValidStructure && !isEmpty) {
+            boardValidationRef.current.validated = true;
+            // Log de succès seulement la première fois
+            if (!boardValidationRef.current.fixed) {
+                const addLog = useDebugStore.getState().addLog;
                 addLog(`🔍 [DIAGNOSTIC] Board OK - ${totalCheckers} checkers`, 'success', {
                     totalCheckers,
                     point5: board.points[5],
@@ -307,43 +351,9 @@ const GameRoom = () => {
                     point12: board.points[12],
                     point23: board.points[23]
                 });
-                boardFixedRef.current = true;
-                return;
-            }
-            
-            // Si le board est vide, forcer réinitialisation UNE SEULE FOIS
-            if (totalCheckers === 0 && !boardFixedRef.current) {
-                boardFixedRef.current = true; // Marquer comme fixé pour éviter la boucle
-                addLog(`❌ [GAME_ROOM] Board vide détecté - Réinitialisation FORCÉE`, 'error');
-                const fixedState = {
-                    ...gameState,
-                    board: INITIAL_BOARD
-                };
-                updateGame(fixedState);
             }
         }
-    }, [board]); // SEULEMENT board dans les dépendances
-    
-    // Vérifier que board.points existe et est valide
-    if (!board.points || !Array.isArray(board.points) || board.points.length !== 24) {
-        const addLog = useDebugStore.getState().addLog;
-        addLog(`❌ [GAME_ROOM] Board invalide - Réinitialisation avec INITIAL_BOARD`, 'error', { 
-            hasPoints: !!board.points, 
-            isArray: Array.isArray(board.points),
-            length: board.points?.length,
-            board: board
-        });
-        
-        // Forcer réinitialisation avec INITIAL_BOARD (synchronisé)
-        const fixedState = {
-            ...gameState,
-            board: INITIAL_BOARD
-        };
-        updateGame(fixedState);
-        addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
-        
-        // Ne pas retourner, laisser le re-render avec le nouveau board
-    }
+    }, [board, gameState, updateGame]);
     
     // Fix isMyTurn: use players from store
     const isMyTurn = (() => {
