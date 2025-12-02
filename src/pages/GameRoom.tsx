@@ -322,6 +322,28 @@ const GameRoom = () => {
         }
     }, [gameState?.board, gameState?.matchLength, gameState?.score, gameState?.cubeValue, playerColor, players, currentRoom?.id]);
 
+    // Diagnostic du board pour les jetons - useEffect AVANT les returns
+    useEffect(() => {
+        if (!gameState || !gameState.board || !gameState.board.points) return;
+        
+        const addLog = useDebugStore.getState().addLog;
+        const totalCheckersOnBoard = gameState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
+        const pointsWithCheckers = gameState.board.points.filter((p: any) => p?.count > 0).length;
+        
+        if (gameState.board && gameState.board.points) {
+            addLog(`🎯 [GAME_ROOM] Board pour rendu`, 'info', {
+                totalCheckers: totalCheckersOnBoard,
+                pointsWithCheckers,
+                samplePoints: {
+                    point0: gameState.board.points[0],
+                    point5: gameState.board.points[5],
+                    point11: gameState.board.points[11],
+                    point12: gameState.board.points[12],
+                    point23: gameState.board.points[23]
+                }
+            });
+        }
+    }, [gameState?.board?.points]);
 
     // Vérifier si on est en mode offline-bot (ne nécessite pas de connexion)
     const isOfflineMode = currentRoom?.id === 'offline-bot' || roomId === 'offline-bot';
@@ -434,28 +456,6 @@ const GameRoom = () => {
     }
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
-    
-    // Diagnostic du board pour les jetons
-    const addLog = useDebugStore.getState().addLog;
-    const totalCheckersOnBoard = board?.points?.reduce((sum: number, p: any) => sum + (p?.count || 0), 0) || 0;
-    const pointsWithCheckers = board?.points?.filter((p: any) => p?.count > 0).length || 0;
-    
-    // Log une seule fois au montage pour éviter le spam
-    useEffect(() => {
-        if (board && board.points) {
-            addLog(`🎯 [GAME_ROOM] Board pour rendu`, 'info', {
-                totalCheckers: totalCheckersOnBoard,
-                pointsWithCheckers,
-                samplePoints: {
-                    point0: board.points[0],
-                    point5: board.points[5],
-                    point11: board.points[11],
-                    point12: board.points[12],
-                    point23: board.points[23]
-                }
-            });
-        }
-    }, [board?.points]); // Seulement quand les points changent
     
     // Fix isMyTurn: use players from store
     const isMyTurn = (() => {
