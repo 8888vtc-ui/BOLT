@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Dices, Zap, Users, Award, TrendingUp, Globe } from 'lucide-react';
+import { Dices, Zap, Award, TrendingUp, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';

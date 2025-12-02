@@ -143,36 +143,71 @@ const Lobby = () => {
 
                                 <button
                                     onClick={async () => {
-                                        // Permettre le jeu même sans connexion (mode offline)
-                                        const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
-                                        
-                                        if (!user) {
-                                            // Mode offline pour les non-connectés
-                                            showInfo("Mode hors ligne activé");
-                                            navigate(`/game/offline-bot${queryParams}`);
-                                            return;
-                                        }
-                                        
                                         try {
-                                            const { data, error } = await supabase
-                                                .from('rooms')
-                                                .insert({
-                                                    name: `Dojo ${user.username}`,
-                                                    created_by: user.id,
-                                                    status: 'playing'
-                                                })
-                                                .select()
-                                                .single();
-
-                                            if (error) {
-                                                console.error("Erreur création salle (Supabase):", error);
-                                                console.log("Falling back to offline bot mode...");
+                                            // Fermer la modal d'abord
+                                            setShowBotSetup(false);
+                                            
+                                            // Construire les paramètres de requête
+                                            const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
+                                            
+                                            // Vérifier si l'utilisateur est connecté
+                                            if (!user || !user.id) {
+                                                // Mode offline pour les non-connectés
+                                                showInfo("Mode hors ligne activé - Jouez sans compte !");
                                                 navigate(`/game/offline-bot${queryParams}`);
                                                 return;
                                             }
-                                            if (data) navigate(`/game/${data.id}${queryParams}`);
-                                        } catch (err) {
-                                            console.error("Exception création salle:", err);
+                                            
+                                            // Vérifier si Supabase est configuré
+                                            const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+                                            
+                                            if (DEMO_MODE) {
+                                                // Mode démo : utiliser offline-bot
+                                                showInfo("Mode démo - Jouez contre le bot !");
+                                                navigate(`/game/offline-bot${queryParams}`);
+                                                return;
+                                            }
+                                            
+                                            // Essayer de créer la salle dans Supabase
+                                            try {
+                                                const roomName = `Dojo ${user.username || 'Joueur'}`;
+                                                
+                                                const { data, error } = await Promise.race([
+                                                    supabase
+                                                        .from('rooms')
+                                                        .insert({
+                                                            name: roomName,
+                                                            created_by: user.id,
+                                                            status: 'playing'
+                                                        })
+                                                        .select()
+                                                        .single(),
+                                                    new Promise((_, reject) => 
+                                                        setTimeout(() => reject(new Error('Timeout création salle')), 10000)
+                                                    )
+                                                ]) as any;
+
+                                                if (error) {
+                                                    console.error("Erreur création salle (Supabase):", error);
+                                                    showInfo("Mode hors ligne activé");
+                                                    navigate(`/game/offline-bot${queryParams}`);
+                                                    return;
+                                                }
+                                                
+                                                if (data && data.id) {
+                                                    navigate(`/game/${data.id}${queryParams}`);
+                                                } else {
+                                                    throw new Error('Aucune salle créée');
+                                                }
+                                            } catch (supabaseError: any) {
+                                                console.error("Exception création salle:", supabaseError);
+                                                showInfo("Mode hors ligne activé");
+                                                navigate(`/game/offline-bot${queryParams}`);
+                                            }
+                                        } catch (err: any) {
+                                            console.error("Erreur critique au démarrage:", err);
+                                            showError("Erreur au démarrage. Passage en mode hors ligne.");
+                                            const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
                                             navigate(`/game/offline-bot${queryParams}`);
                                         }
                                     }}
