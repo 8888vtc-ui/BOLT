@@ -73,10 +73,12 @@ const GameRoom = () => {
         winType: 'simple'
     });
 
-    // Parse Game Options from URL
+    // Parse Game Options from URL - avec protection contre les valeurs invalides
     const searchParams = new URLSearchParams(location.search);
-    const mode = searchParams.get('mode') as 'money' | 'match' | null;
-    const length = parseInt(searchParams.get('length') || '0');
+    const rawMode = searchParams.get('mode');
+    const mode = (rawMode === 'match' || rawMode === 'money') ? rawMode : 'money';
+    const rawLength = parseInt(searchParams.get('length') || '0');
+    const length = isNaN(rawLength) || rawLength < 0 ? 0 : rawLength;
 
     // Determine player color based on players array (must be before useEffect that uses it)
     const playerColor = useMemo(() => {
@@ -143,7 +145,7 @@ const GameRoom = () => {
         addLog(`⚠️ [GAME_ROOM] Room ${roomId} → Fallback offline-bot`, 'info');
         navigate(`/game/offline-bot${queryParams}`);
         
-    }, [roomId, currentRoom?.id, mode, length, location.search, joinRoom, navigate]); // Toutes les dépendances nécessaires
+    }, [roomId, mode, length, location.search, joinRoom, navigate]); // Retirer currentRoom?.id pour éviter boucle
 
     // Detect game end and calculate match score (avec protection contre boucle infinie)
     const gameEndProcessedRef = useRef<string | null>(null);
@@ -313,54 +315,37 @@ const GameRoom = () => {
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
     
-    // VALIDATION UNIFIÉE DU BOARD - Un seul useEffect pour tout gérer
-    const boardValidationRef = useRef({ fixed: false, validated: false });
+    // VALIDATION UNIFIÉE DU BOARD - Un seul useEffect simplifié
+    const boardValidationRef = useRef({ fixed: false });
     useEffect(() => {
         if (!board || !board.points) return;
+        if (boardValidationRef.current.fixed) return;
         
-        // Vérifier structure
         const isValidStructure = Array.isArray(board.points) && board.points.length === 24;
         const totalCheckers = board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
-        const isEmpty = totalCheckers === 0;
         
-        // Si déjà validé et OK, skip
-        if (boardValidationRef.current.validated && isValidStructure && !isEmpty) {
-            return;
-        }
-        
-        // Si problème détecté et pas encore fixé
-        if ((!isValidStructure || isEmpty) && !boardValidationRef.current.fixed) {
+        if (!isValidStructure || totalCheckers === 0) {
             boardValidationRef.current.fixed = true;
-            boardValidationRef.current.validated = true;
-            
             const addLog = useDebugStore.getState().addLog;
             addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', { 
                 isValidStructure, 
-                totalCheckers,
-                pointsLength: board.points?.length
+                totalCheckers
             });
             
+            // Utiliser une copie profonde de INITIAL_BOARD
+            const fixedBoard = JSON.parse(JSON.stringify(INITIAL_BOARD));
             const fixedState = {
                 ...gameState,
-                board: INITIAL_BOARD
+                board: fixedBoard
             };
             updateGame(fixedState);
             addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
-        } else if (isValidStructure && !isEmpty) {
-            boardValidationRef.current.validated = true;
-            // Log de succès seulement la première fois
-            if (!boardValidationRef.current.fixed) {
-                const addLog = useDebugStore.getState().addLog;
-                addLog(`🔍 [DIAGNOSTIC] Board OK - ${totalCheckers} checkers`, 'success', {
-                    totalCheckers,
-                    point5: board.points[5],
-                    point11: board.points[11],
-                    point12: board.points[12],
-                    point23: board.points[23]
-                });
-            }
+        } else {
+            boardValidationRef.current.fixed = true;
+            const addLog = useDebugStore.getState().addLog;
+            addLog(`🔍 [DIAGNOSTIC] Board OK - ${totalCheckers} checkers`, 'success');
         }
-    }, [board, gameState, updateGame]);
+    }, [board]); // SEULEMENT board dans les dépendances pour éviter boucle
     
     // Fix isMyTurn: use players from store
     const isMyTurn = (() => {

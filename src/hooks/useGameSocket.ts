@@ -15,7 +15,7 @@ interface GameOptions {
 }
 
 const createMockGameState = (userId?: string, options?: GameOptions): GameState => ({
-    board: INITIAL_BOARD,
+    board: JSON.parse(JSON.stringify(INITIAL_BOARD)), // COPIE PROFONDE pour éviter les mutations
     dice: [],
     turn: userId || 'guest-1', // Le tour est au joueur par défaut
     score: {},
@@ -23,7 +23,7 @@ const createMockGameState = (userId?: string, options?: GameOptions): GameState 
     cubeOwner: null, // Cube au centre au début
     doubleValue: 1,
     canDouble: true,
-    matchLength: options?.mode === 'match' ? options.matchLength : 0, // 0 = Money Game
+    matchLength: options?.mode === 'match' ? (options.matchLength || 3) : 0, // 0 = Money Game, défaut 3 pour match
     currentPlayer: 1,
     pendingDouble: null
 });
@@ -226,19 +226,17 @@ export const useGameSocket = () => {
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 const botState = createMockGameState(user?.id, options);
                 
-                // Vérifier que le board est valide AVANT les logs
+                // Vérifier que le board est valide AVANT les logs - utiliser copie profonde
                 if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
                     addLog(`❌ [JOIN_ROOM] Board invalide, utilisation INITIAL_BOARD`, 'error');
-                    const { INITIAL_BOARD } = await import('../lib/gameLogic');
-                    botState.board = INITIAL_BOARD;
+                    botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD)); // Copie profonde
                 }
                 
                 // Vérifier que le board a des jetons
                 const totalCheckers = botState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
                 if (totalCheckers === 0) {
                     addLog(`❌ [JOIN_ROOM] Board vide, utilisation INITIAL_BOARD`, 'error');
-                    const { INITIAL_BOARD } = await import('../lib/gameLogic');
-                    botState.board = INITIAL_BOARD;
+                    botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD)); // Copie profonde
                 }
                 
                 addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
