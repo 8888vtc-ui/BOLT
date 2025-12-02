@@ -154,6 +154,55 @@ const GameRoom = () => {
     // VALIDATION UNIFIÉE DU BOARD - Déclarer AVANT les returns (règle React hooks)
     const boardValidationRef = useRef({ fixed: false });
     
+    // Validation du board - useEffect AVANT les returns
+    useEffect(() => {
+        if (!gameState || !gameState.board || !gameState.board.points) return;
+        if (boardValidationRef.current.fixed) return;
+        
+        try {
+            const isValidStructure = Array.isArray(gameState.board.points) && gameState.board.points.length === 24;
+            const totalCheckers = gameState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
+            
+            if (!isValidStructure || totalCheckers === 0) {
+                boardValidationRef.current.fixed = true;
+                const addLog = useDebugStore.getState().addLog;
+                addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', { 
+                    isValidStructure, 
+                    totalCheckers
+                });
+                
+                try {
+                    const fixedBoard = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                    const currentGameState = useGameStore.getState().gameState;
+                    if (currentGameState) {
+                        const fixedState = {
+                            ...currentGameState,
+                            board: fixedBoard
+                        };
+                        updateGame(fixedState);
+                        addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
+                    }
+                } catch (copyError: any) {
+                    const currentGameState = useGameStore.getState().gameState;
+                    if (currentGameState) {
+                        const fixedBoard = {
+                            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+                            bar: { ...INITIAL_BOARD.bar },
+                            off: { ...INITIAL_BOARD.off }
+                        };
+                        const fixedState = {
+                            ...currentGameState,
+                            board: fixedBoard
+                        };
+                        updateGame(fixedState);
+                    }
+                }
+            }
+        } catch (error: any) {
+            // Ignorer les erreurs de validation
+        }
+    }, [gameState?.board, updateGame]);
+    
     useEffect(() => {
         if (!gameState || !gameState.board) return;
 
@@ -365,65 +414,6 @@ const GameRoom = () => {
     }
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
-    
-    // VALIDATION UNIFIÉE DU BOARD - Version simplifiée et sécurisée (useRef déjà déclaré plus haut)
-    useEffect(() => {
-        if (!board || !board.points) return;
-        if (boardValidationRef.current.fixed) return;
-        
-        try {
-            const isValidStructure = Array.isArray(board.points) && board.points.length === 24;
-            const totalCheckers = board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
-            
-            if (!isValidStructure || totalCheckers === 0) {
-                boardValidationRef.current.fixed = true;
-                const addLog = useDebugStore.getState().addLog;
-                addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', { 
-                    isValidStructure, 
-                    totalCheckers
-                });
-                
-                // Utiliser une copie profonde de INITIAL_BOARD avec protection
-                try {
-                    const fixedBoard = JSON.parse(JSON.stringify(INITIAL_BOARD));
-                    // Utiliser getState() pour obtenir le gameState actuel
-                    const currentGameState = useGameStore.getState().gameState;
-                    if (currentGameState) {
-                        const fixedState = {
-                            ...currentGameState,
-                            board: fixedBoard
-                        };
-                        updateGame(fixedState);
-                        addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
-                    }
-                } catch (copyError: any) {
-                    addLog(`❌ [GAME_ROOM] Erreur copie board: ${copyError.message}`, 'error');
-                    // Fallback : copie manuelle
-                    const currentGameState = useGameStore.getState().gameState;
-                    if (currentGameState) {
-                        const fixedBoard = {
-                            points: INITIAL_BOARD.points.map(p => ({ ...p })),
-                            bar: { ...INITIAL_BOARD.bar },
-                            off: { ...INITIAL_BOARD.off }
-                        };
-                        const fixedState = {
-                            ...currentGameState,
-                            board: fixedBoard
-                        };
-                        updateGame(fixedState);
-                    }
-                }
-            } else {
-                boardValidationRef.current.fixed = true;
-                const addLog = useDebugStore.getState().addLog;
-                addLog(`🔍 [DIAGNOSTIC] Board OK - ${totalCheckers} checkers`, 'success');
-            }
-        } catch (error: any) {
-            const addLog = useDebugStore.getState().addLog;
-            addLog(`❌ [GAME_ROOM] Erreur validation board: ${error.message}`, 'error', error);
-            boardValidationRef.current.fixed = true;
-        }
-    }, [board]); // SEULEMENT board pour éviter boucle
     
     // Fix isMyTurn: use players from store
     const isMyTurn = (() => {
