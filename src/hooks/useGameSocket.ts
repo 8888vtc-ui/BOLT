@@ -656,10 +656,18 @@ export const useGameSocket = () => {
             const currentDice = newState.dice || [];
 
             let dieUsed = -1;
-            if (playerColor === 1) { // Blanc (23 -> 0)
+            if (playerColor === 1) { 
+                // Blanc (23 -> 0) : se déplace vers le bas, donc from > to
                 if (from > to) dieUsed = from - to;
-            } else { // Noir (0 -> 23)
-                if (to > from) dieUsed = to - from;
+            } else { 
+                // Noir (0 -> 23) : se déplace vers le haut, donc to > from
+                // MAIS peut aussi se déplacer depuis le point 23 vers le bas (23->18)
+                // Dans ce cas, from > to, et on utilise from - to
+                if (to > from) {
+                    dieUsed = to - from; // Mouvement vers le haut (0→23)
+                } else if (from > to) {
+                    dieUsed = from - to; // Mouvement vers le bas depuis le point 23
+                }
             }
 
             const dieIndex = currentDice.indexOf(dieUsed);
