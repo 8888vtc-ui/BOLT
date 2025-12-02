@@ -14,41 +14,99 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        formatAndSetUser(session.user);
-      } else {
+    let isMounted = true;
+    const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    // Si mode démo, ne pas essayer Supabase
+    if (DEMO_MODE) {
+      console.log('Demo mode: Supabase not configured, skipping auth');
+      setLoading(false);
+      return;
+    }
+
+    // Timeout pour éviter le blocage infini
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn('Auth check timeout, setting loading to false');
         setLoading(false);
       }
-    });
+    }, 5000); // 5 secondes max
+
+    // 1. Get initial session avec gestion d'erreur
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (!isMounted) return;
+        
+        clearTimeout(timeoutId);
+        
+        if (error) {
+          console.error('Supabase auth error:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          formatAndSetUser(session.user);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        clearTimeout(timeoutId);
+        console.error('Supabase auth catch error:', error);
+        setLoading(false);
+      });
 
     // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        formatAndSetUser(session.user);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
+    let subscription: any = null;
+    try {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!isMounted) return;
+        
+        clearTimeout(timeoutId);
+        
+        if (session?.user) {
+          formatAndSetUser(session.user);
+        } else {
+          setUser(null);
+          setLoading(false);
+        }
+      });
+      subscription = data.subscription;
+    } catch (error) {
+      console.error('Failed to set up auth listener:', error);
+      clearTimeout(timeoutId);
+      setLoading(false);
+    }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
   }, []);
 
   const formatAndSetUser = async (authUser: any) => {
-    // Fetch additional profile data from 'profiles' table if needed
-    // For now, we use metadata from auth
-    const metadata = authUser.user_metadata || {};
+    try {
+      // Fetch additional profile data from 'profiles' table if needed
+      // For now, we use metadata from auth
+      const metadata = authUser.user_metadata || {};
 
-    setUser({
-      id: authUser.id,
-      username: metadata.username || metadata.full_name || authUser.email?.split('@')[0] || 'Joueur',
-      email: authUser.email,
-      avatar: metadata.avatar_url || metadata.picture,
-      role: authUser.is_anonymous ? 'guest' : 'user'
-    });
-    setLoading(false);
+      setUser({
+        id: authUser.id,
+        username: metadata.username || metadata.full_name || authUser.email?.split('@')[0] || 'Joueur',
+        email: authUser.email,
+        avatar: metadata.avatar_url || metadata.picture,
+        role: authUser.is_anonymous ? 'guest' : 'user'
+      });
+    } catch (error) {
+      console.error('Error formatting user:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loginWithGoogle = async () => {
@@ -63,22 +121,44 @@ export function useAuth() {
   };
 
   const loginAsGuest = async () => {
-    // Sign in anonymously
-    const { data, error } = await supabase.auth.signInAnonymously();
-
-    if (error) {
-      console.error('Guest login error:', error);
+    const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (DEMO_MODE) {
+      // Mode démo : créer un utilisateur local
+      const guestName = `Guest ${Math.floor(Math.random() * 1000)}`;
+      const guestId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`;
+      
+      setUser({
+        id: guestId,
+        username: guestName,
+        avatar,
+        role: 'guest'
+      });
+      setLoading(false);
       return;
     }
 
-    if (data?.user) {
-      // Update profile with random guest name
-      const guestName = `Guest ${Math.floor(Math.random() * 1000)}`;
-      const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.id}`;
+    // Sign in anonymously
+    try {
+      const { data, error } = await supabase.auth.signInAnonymously();
 
-      await supabase.auth.updateUser({
-        data: { username: guestName, avatar_url: avatar }
-      });
+      if (error) {
+        console.error('Guest login error:', error);
+        return;
+      }
+
+      if (data?.user) {
+        // Update profile with random guest name
+        const guestName = `Guest ${Math.floor(Math.random() * 1000)}`;
+        const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.id}`;
+
+        await supabase.auth.updateUser({
+          data: { username: guestName, avatar_url: avatar }
+        });
+      }
+    } catch (error) {
+      console.error('Guest login catch error:', error);
     }
   };
 
