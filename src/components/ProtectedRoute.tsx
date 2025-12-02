@@ -4,10 +4,16 @@ import { useAuth } from '../hooks/useAuth';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
+    allowGuest?: boolean; // Permet l'accès en mode guest
+    requireAuth?: boolean; // Force l'authentification (pour certaines routes)
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+    children, 
+    allowGuest = false,
+    requireAuth = false 
+}) => {
+    const { isAuthenticated, loading, user } = useAuth();
     const location = useLocation();
 
     if (loading) {
@@ -21,8 +27,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         );
     }
 
+    // Si requireAuth est true, forcer l'authentification
+    if (requireAuth && !isAuthenticated) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    // Si allowGuest est true, permettre l'accès même sans authentification
+    if (allowGuest) {
+        return <>{children}</>;
+    }
+
+    // Par défaut, nécessite une authentification
     if (!isAuthenticated) {
-        // Redirige vers /login en sauvegardant la page demandée
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 

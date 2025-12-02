@@ -85,32 +85,58 @@ const GameRoom = () => {
         return 1;
     }, [players, user?.id]);
 
-    // Rejoindre la room au montage
+    // Rejoindre la room au montage - Vérifier l'authentification d'abord
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
-        addLog(`🎮 [GAME_ROOM] useEffect montage - roomId: ${roomId}, isConnected: ${isConnected}, currentRoom: ${currentRoom?.id || 'null'}`, 'info', { roomId, isConnected, currentRoom: currentRoom?.id, mode, length });
+        addLog(`🎮 [GAME_ROOM] useEffect montage - roomId: ${roomId}, user: ${user?.id || 'null'}`, 'info', { roomId, userId: user?.id, mode, length });
+        
+        // Si pas d'utilisateur et pas offline-bot, rediriger vers login
+        if (!user && roomId !== 'offline-bot') {
+            addLog(`⚠️ [GAME_ROOM] Pas d'utilisateur, redirection vers login`, 'warning');
+            navigate(`/login?redirect=/game/${roomId}`);
+            return;
+        }
+
+        // Si pas de roomId, rediriger vers lobby
+        if (!roomId) {
+            addLog(`⚠️ [GAME_ROOM] Pas de roomId, redirection vers lobby`, 'warning');
+            navigate('/lobby');
+            return;
+        }
         
         const options = mode ? { mode, matchLength: length } : undefined;
         addLog(`🎮 [GAME_ROOM] Options: ${JSON.stringify(options)}`, 'info');
 
+        // Pour offline-bot, on peut joindre directement
         if (roomId === 'offline-bot') {
             addLog(`🎮 [GAME_ROOM] Lancement joinRoom pour offline-bot`, 'info');
             joinRoom('offline-bot', options).catch((err) => {
                 addLog(`❌ [GAME_ROOM] Erreur joinRoom offline-bot: ${err.message}`, 'error', err);
+                navigate('/lobby');
             });
-        } else if (roomId && isConnected && !currentRoom) {
+        } 
+        // Pour les autres rooms, vérifier la connexion
+        else if (roomId && isConnected && !currentRoom) {
             addLog(`🎮 [GAME_ROOM] Lancement joinRoom pour ${roomId}`, 'info');
             joinRoom(roomId, options).catch((err) => {
                 addLog(`❌ [GAME_ROOM] Erreur joinRoom ${roomId}: ${err.message}`, 'error', err);
+                // Fallback vers offline-bot en cas d'erreur
+                navigate('/game/offline-bot');
             });
-        } else {
+        } 
+        // Si pas connecté mais roomId valide, attendre la connexion
+        else if (roomId && !isConnected) {
+            addLog(`⏳ [GAME_ROOM] Attente de la connexion...`, 'info');
+            // Le useEffect se relancera quand isConnected changera
+        }
+        else {
             addLog(`⚠️ [GAME_ROOM] Conditions non remplies pour joinRoom`, 'info', {
                 hasRoomId: !!roomId,
                 isConnected,
                 hasCurrentRoom: !!currentRoom
             });
         }
-    }, [roomId, isConnected, currentRoom, joinRoom, user, mode, length]);
+    }, [roomId, isConnected, currentRoom, joinRoom, user, mode, length, navigate]);
 
     // Detect game end and calculate match score
     useEffect(() => {

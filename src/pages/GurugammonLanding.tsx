@@ -55,27 +55,16 @@ export default function GurugammonLanding() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
+            {/* Un seul bouton : Accéder au jeu (redirige vers login qui gère l'accès) */}
             <motion.button
               className="px-12 py-5 bg-gradient-to-r from-[#FFD700] to-[#FFC700] text-black text-xl font-black rounded-xl shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:shadow-[0_0_60px_rgba(255,215,0,0.6)] transition-shadow"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/lobby')}
+              onClick={() => navigate('/login?redirect=/lobby')}
             >
               <div className="flex items-center gap-3">
                 <Zap className="w-7 h-7" />
-                MULTIPLAYER LOBBY
-              </div>
-            </motion.button>
-
-            <motion.button
-              className="px-12 py-5 bg-black border-2 border-[#FFD700] text-[#FFD700] text-xl font-black rounded-xl hover:bg-[#FFD700]/10 transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/login')}
-            >
-              <div className="flex items-center gap-3">
-                <Users className="w-7 h-7" />
-                Login / Sign Up
+                COMMENCER À JOUER
               </div>
             </motion.button>
           </motion.div>

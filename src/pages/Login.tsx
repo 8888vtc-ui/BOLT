@@ -17,7 +17,12 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     const { error } = await loginWithGoogle();
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+    } else {
+      // Rediriger après connexion réussie
+      navigate(redirectTo);
+    }
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {

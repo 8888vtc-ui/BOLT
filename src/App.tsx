@@ -46,15 +46,27 @@ function App() {
           <Route path="/" element={<GurugammonLanding />} />
           <Route path="/login" element={<Login />} />
 
-          {/* Protected Routes with Navbar */}
+          {/* Routes avec Navbar - Lobby et GameRoom accessibles en guest */}
+          <Route element={<LayoutWithNavbar />}>
+            <Route path="/lobby" element={
+              <ProtectedRoute allowGuest={true}>
+                <Lobby />
+              </ProtectedRoute>
+            } />
+            <Route path="/game/:roomId" element={
+              <ProtectedRoute allowGuest={true}>
+                <GameRoom />
+              </ProtectedRoute>
+            } />
+          </Route>
+
+          {/* Routes protégées nécessitant authentification */}
           <Route element={
-            <ProtectedRoute>
+            <ProtectedRoute requireAuth={true}>
               <LayoutWithNavbar />
             </ProtectedRoute>
           }>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/lobby" element={<Lobby />} />
-            <Route path="/game/:roomId" element={<GameRoom />} />
             <Route path="/tournaments" element={<Tournaments />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
