@@ -219,7 +219,22 @@ export const useGameSocket = () => {
                 
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 const botState = createMockGameState(user?.id, options);
-                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { dice: botState.dice, turn: botState.turn });
+                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
+                    dice: botState.dice, 
+                    turn: botState.turn,
+                    hasBoard: !!botState.board,
+                    hasPoints: !!botState.board?.points,
+                    pointsLength: botState.board?.points?.length,
+                    pointsWithCheckers: botState.board?.points?.filter((p: any) => p.count > 0).length
+                });
+                
+                // Vérifier que le board est valide avant de l'envoyer
+                if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
+                    addLog(`❌ [JOIN_ROOM] Board invalide, utilisation INITIAL_BOARD`, 'error');
+                    const { INITIAL_BOARD } = await import('../lib/gameLogic');
+                    botState.board = INITIAL_BOARD;
+                }
+                
                 updateGame(botState);
                 addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ`, 'success');
                 return;
