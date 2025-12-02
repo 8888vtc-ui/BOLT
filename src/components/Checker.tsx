@@ -39,17 +39,17 @@ export default function Checker({ player, draggable, onDragStart, index = 0, sta
   return (
     <motion.div
       ref={draggable ? drag : null}
-      className="absolute cursor-pointer select-none"
+      className="absolute inset-0 cursor-pointer select-none"
       style={{
         width: '100%',
         height: '100%',
-        zIndex: index + 100,  // ✅ Z-index élevé
+        zIndex: index + 100,
         opacity: isDragging ? 0.3 : 1,
-        visibility: 'visible',  // ✅ FORCER
-        display: 'block',       // ✅ FORCER
-        // backgroundColor: player === 1 ? 'white' : 'black',  // ✅ DEBUG: couleur visible
-        // borderRadius: '50%',
-        // border: '2px solid gold'  // ✅ DEBUG: bordure visible
+        visibility: 'visible',
+        display: 'block',
+        position: 'absolute',
+        top: 0,
+        left: 0,
       }}
       animate={{
         scale: draggable ? [1, 1.05, 1] : 1,

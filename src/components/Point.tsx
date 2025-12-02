@@ -62,11 +62,15 @@ export default function Point({
     checkers.push(
       <div
         key={i}
-        className="relative w-[90%] aspect-square flex-shrink-0"
-        style={{ marginBottom: '-15%' }}
+        className="relative flex-shrink-0"
+        style={{ 
+          width: '36px',
+          height: '36px',
+          marginBottom: '-8px'
+        }}
         onClick={(e) => {
           if (isInteractive && onClick) {
-            e.stopPropagation(); // Empêcher la propagation si nécessaire
+            e.stopPropagation();
             onClick();
           }
         }}
