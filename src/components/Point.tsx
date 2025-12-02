@@ -66,10 +66,11 @@ export default function Point({
         style={{ 
           width: '90%',
           aspectRatio: '1 / 1',  // ✅ Responsive carré avec aspect-ratio moderne
-          // ✅ Overlap proportionnel : calc(90% * -0.22) = -19.8% de la largeur du parent
-          // Cela correspond à 22% de la hauteur du checker (car aspectRatio 1:1, height = width = 90%)
-          // Le ratio visuel d'overlap reste constant quelle que soit la taille de l'écran
-          marginBottom: i < displayCount - 1 ? 'calc(90% * -0.22)' : '0'
+          // ✅ Overlap proportionnel : transform utilise % de la hauteur du checker lui-même
+          // Les pourcentages dans transform sont calculés par rapport aux dimensions de l'élément transformé
+          // Cela garantit que l'overlap de 22% reste constant quelle que soit la taille de l'écran
+          // Seulement les checkers après le premier chevauchent (i > 0)
+          transform: i > 0 ? 'translateY(-22%)' : 'none'
         }}
         onClick={(e) => {
           if (isInteractive && onClick) {
