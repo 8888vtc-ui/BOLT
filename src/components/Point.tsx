@@ -64,9 +64,9 @@ export default function Point({
         key={i}
         className="relative flex-shrink-0"
         style={{ 
-          width: '36px',
-          height: '36px',
-          marginBottom: '-8px'
+          width: '90%',
+          aspectRatio: '1 / 1',  // ✅ Responsive carré avec aspect-ratio moderne
+          marginBottom: '-15%'   // ✅ Proportionnel au width
         }}
         onClick={(e) => {
           if (isInteractive && onClick) {
