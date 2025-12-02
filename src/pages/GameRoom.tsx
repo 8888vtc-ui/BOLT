@@ -287,30 +287,33 @@ const GameRoom = () => {
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
     
-    // DIAGNOSTIC - Vérifier la structure du board
+    // DIAGNOSTIC - Vérifier la structure du board (avec protection contre boucle infinie)
+    const boardFixedRef = useRef(false);
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
+        
+        // Éviter les appels multiples
+        if (boardFixedRef.current) return;
+        
         if (board && board.points) {
             const totalCheckers = board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
-            addLog(`🔍 [DIAGNOSTIC] Board structure:`, 'info', {
-                hasBoard: !!board,
-                hasPoints: !!board?.points,
-                pointsLength: board?.points?.length,
-                totalCheckers,
-                firstPoint: board?.points?.[0],
-                point5: board?.points?.[5], // Devrait avoir 5 checkers blancs
-                point11: board?.points?.[11], // Devrait avoir 5 checkers rouges
-                point12: board?.points?.[12], // Devrait avoir 5 checkers blancs
-                point23: board?.points?.[23], // Devrait avoir 2 checkers blancs
-                allPointsWithCheckers: board?.points?.map((p: any, i: number) => ({ 
-                    index: i, 
-                    player: p?.player, 
-                    count: p?.count 
-                })).filter((p: any) => p.count > 0)
-            });
             
-            // Si le board est vide, forcer réinitialisation
-            if (totalCheckers === 0) {
+            // Logs seulement la première fois
+            if (totalCheckers > 0) {
+                addLog(`🔍 [DIAGNOSTIC] Board OK - ${totalCheckers} checkers`, 'success', {
+                    totalCheckers,
+                    point5: board.points[5],
+                    point11: board.points[11],
+                    point12: board.points[12],
+                    point23: board.points[23]
+                });
+                boardFixedRef.current = true;
+                return;
+            }
+            
+            // Si le board est vide, forcer réinitialisation UNE SEULE FOIS
+            if (totalCheckers === 0 && !boardFixedRef.current) {
+                boardFixedRef.current = true; // Marquer comme fixé pour éviter la boucle
                 addLog(`❌ [GAME_ROOM] Board vide détecté - Réinitialisation FORCÉE`, 'error');
                 const fixedState = {
                     ...gameState,
@@ -319,7 +322,7 @@ const GameRoom = () => {
                 updateGame(fixedState);
             }
         }
-    }, [board, gameState, updateGame]);
+    }, [board]); // SEULEMENT board dans les dépendances
     
     // Vérifier que board.points existe et est valide
     if (!board.points || !Array.isArray(board.points) || board.points.length !== 24) {
