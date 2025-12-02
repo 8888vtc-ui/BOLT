@@ -4,20 +4,27 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw, Lightbulb, X } from 'lucide-react';
+import { ArrowLeft, WifiOff, Clock, User as UserIcon, LogOut, Flag, RotateCcw, Lightbulb, X, MessageCircle } from 'lucide-react';
 
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useGameStore } from '../stores/gameStore';
 import { useAuth } from '../hooks/useAuth';
+import { useDoublingCube } from '../hooks/useDoublingCube';
 import { analyzeMove, AIAnalysis } from '../lib/aiService';
 import { useDebugStore } from '../stores/debugStore';
+import { canOfferDouble, hasWon, checkWinType, PlayerColor, calculateMatchScore } from '../lib/gameLogic';
+import { useDevice } from '../hooks/useDevice';
+import { generateCoachVideo } from '../lib/heygenService';
+import { formatScriptForPersonality, Personality } from '../lib/coachPersonalities';
 
 import Point from '../components/Point';
 import Checker from '../components/Checker';
 import Dice from '../components/Dice';
-import DoublingCube from '../components/DoublingCube';
+import DoublingCube from '../components/game/DoublingCube';
 import ChatBox from '../components/game/ChatBox';
 import DebugOverlay from '../components/DebugOverlay';
+import WinModal from '../components/game/WinModal';
+import TestPanel from '../components/TestPanel';
 
 // Détection mobile pour Drag & Drop
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -38,19 +45,45 @@ const GameRoom = () => {
         canUndo
     } = useGameSocket();
 
-    const { currentRoom, gameState, players } = useGameStore();
+    const { currentRoom, gameState, players, messages } = useGameStore();
+    const { offerDouble, acceptDouble, rejectDouble } = useDoublingCube(currentRoom, user);
+    const { isDesktop, isMobile } = useDevice();
     const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     // AI Coach State
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [coachMode, setCoachMode] = useState<'text' | 'video'>('text');
+    const [personality, setPersonality] = useState<Personality>('strategist');
+    const [coachVideoUrl, setCoachVideoUrl] = useState<string | null>(null);
+    const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+
+    // Win Modal State
+    const [winModal, setWinModal] = useState<{
+        isOpen: boolean;
+        winner: 'player' | 'bot' | 'opponent';
+        winType: 'simple' | 'gammon' | 'backgammon';
+    }>({
+        isOpen: false,
+        winner: 'player',
+        winType: 'simple'
+    });
 
     // Parse Game Options from URL
     const searchParams = new URLSearchParams(location.search);
     const mode = searchParams.get('mode') as 'money' | 'match' | null;
     const length = parseInt(searchParams.get('length') || '0');
+
+    // Determine player color based on players array (must be before useEffect that uses it)
+    const playerColor = useMemo(() => {
+        if (!players || players.length === 0) return 1; // Default to player 1
+        if (players[0]?.id === user?.id) return 1; // Player 1 (White)
+        if (players[1]?.id === user?.id) return 2; // Player 2 (Red)
+        // If user is not in players array, default to player 1
+        return 1;
+    }, [players, user?.id]);
 
     // Rejoindre la room au montage
     useEffect(() => {
@@ -62,6 +95,87 @@ const GameRoom = () => {
             joinRoom(roomId, options);
         }
     }, [roomId, isConnected, currentRoom, joinRoom, user, mode, length]);
+
+    // Detect game end and calculate match score
+    useEffect(() => {
+        if (!gameState || !gameState.board) return;
+
+        const player1Won = hasWon(gameState.board, 1);
+        const player2Won = hasWon(gameState.board, 2);
+
+        if (player1Won || player2Won) {
+            const winner = player1Won ? 1 : 2;
+            const winType = checkWinType(gameState.board, winner as PlayerColor);
+            
+            // Determine winner player ID
+            const winnerPlayerId = winner === 1 
+                ? (players[0]?.id || 'player1')
+                : (players[1]?.id || 'player2');
+            
+            // Calculate match score if match game
+            if (gameState.matchLength && gameState.matchLength > 0 && players.length > 0) {
+                const newMatchScore = calculateMatchScore(
+                    winType,
+                    gameState.cubeValue,
+                    gameState.matchLength,
+                    gameState.score || {},
+                    winnerPlayerId,
+                    players
+                );
+                
+                if (newMatchScore) {
+                    // Update game state with new score
+                    const { updateGame } = useGameStore.getState();
+                    const updatedGameState = {
+                        ...gameState,
+                        score: newMatchScore
+                    };
+                    updateGame(updatedGameState);
+                    
+                    // Sauvegarder en DB si nécessaire
+                    if (currentRoom && currentRoom.id !== 'offline-bot') {
+                        import('../lib/supabase').then(({ supabase }) => {
+                            supabase.from('games').update({ board_state: updatedGameState }).eq('room_id', currentRoom.id).then(() => {
+                                const addLog = useDebugStore.getState().addLog;
+                                addLog('Score de match sauvegardé', 'success');
+                            }).catch((error) => {
+                                const addLog = useDebugStore.getState().addLog;
+                                addLog('Erreur sauvegarde score', 'error', error);
+                            });
+                        }).catch((error) => {
+                            const addLog = useDebugStore.getState().addLog;
+                            addLog('Erreur import supabase', 'error', error);
+                        });
+                    }
+                    
+                    // Check if match is complete
+                    const matchComplete = Object.values(newMatchScore).some(
+                        (points: number) => points >= gameState.matchLength!
+                    );
+                    
+                    if (matchComplete) {
+                        // Match is complete - show match win modal
+                        const playerWon = (playerColor === 1 && player1Won) || (playerColor === 2 && player2Won);
+                        setWinModal({
+                            isOpen: true,
+                            winner: playerWon ? 'player' : (players[1]?.id === 'bot' ? 'bot' : 'opponent'),
+                            winType: 'simple' // Match win is always simple
+                        });
+                        return;
+                    }
+                }
+            }
+            
+            // Determine if player won
+            const playerWon = (playerColor === 1 && player1Won) || (playerColor === 2 && player2Won);
+            
+            setWinModal({
+                isOpen: true,
+                winner: playerWon ? 'player' : (players[1]?.id === 'bot' ? 'bot' : 'opponent'),
+                winType
+            });
+        }
+    }, [gameState, playerColor, players]);
 
 
     // Check if game is loaded
@@ -98,9 +212,28 @@ const GameRoom = () => {
     }
 
     // --- Game Logic ---
-    const { board, dice, turn, score, cubeValue } = gameState;
-    const isMyTurn = turn === user?.id || (turn === 'guest-1' && user?.id === 'guest-1'); // Hack for demo
-    const playerColor = players[0]?.id === user?.id ? 1 : 2; // 1 = Blanc, 2 = Rouge
+    const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
+    
+    // Fix isMyTurn: use players from store
+    const isMyTurn = (() => {
+        if (!user) return false;
+        const myId = user.id;
+        // Check if current turn matches my ID
+        if (turn === myId) return true;
+        // Fallback for guest mode
+        if (turn === 'guest-1' && myId === 'guest-1') return true;
+        return false;
+    })();
+
+    // Calcul si le joueur peut doubler
+    const hasDiceRolled = dice && dice.length > 0;
+    const canDouble = canOfferDouble(
+        cubeValue,
+        cubeOwner,
+        user?.id || '',
+        hasDiceRolled,
+        gameState.matchLength || 0
+    );
 
     // Handlers
     const handleRollDice = () => {
@@ -118,6 +251,7 @@ const GameRoom = () => {
         if (isAnalyzing) return;
         setIsAnalyzing(true);
         setAiAnalysis(null);
+        setCoachVideoUrl(null);
         setShowAnalysis(true);
 
         const addLog = useDebugStore.getState().addLog;
@@ -127,10 +261,51 @@ const GameRoom = () => {
             const analysis = await analyzeMove(gameState, gameState.dice, playerColor);
             setAiAnalysis(analysis);
             addLog('Analyse reçue !', 'success');
+            
+            // If desktop and video mode, generate video
+            if (isDesktop && coachMode === 'video') {
+                setIsGeneratingVideo(true);
+                try {
+                    const script = formatScriptForPersonality(analysis, personality);
+                    const videoUrl = await generateCoachVideo(script, personality);
+                    if (videoUrl) {
+                        setCoachVideoUrl(videoUrl);
+                    } else {
+                        // Fallback to text if video generation fails
+                        setCoachMode('text');
+                    }
+                } catch (e) {
+                    console.error('Error generating video:', e);
+                    setCoachMode('text');
+                } finally {
+                    setIsGeneratingVideo(false);
+                }
+            }
         } catch (e) {
             addLog('Erreur analyse', 'error', e);
         }
         setIsAnalyzing(false);
+    };
+
+    // Handle coach mode change
+    const handleCoachModeChange = async (mode: 'text' | 'video') => {
+        setCoachMode(mode);
+        
+        // If switching to video and we have analysis, generate video
+        if (mode === 'video' && aiAnalysis && isDesktop && !coachVideoUrl) {
+            setIsGeneratingVideo(true);
+            try {
+                const script = formatScriptForPersonality(aiAnalysis, personality);
+                const videoUrl = await generateCoachVideo(script, personality);
+                if (videoUrl) {
+                    setCoachVideoUrl(videoUrl);
+                }
+            } catch (e) {
+                console.error('Error generating video:', e);
+            } finally {
+                setIsGeneratingVideo(false);
+            }
+        }
     };
 
     const onDragStart = (index: number) => {
@@ -208,6 +383,7 @@ const GameRoom = () => {
         <DndProvider backend={backend}>
             <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans relative">
                 <DebugOverlay />
+                <TestPanel />
 
                 {/* AI Coach Modal */}
                 <AnimatePresence>
@@ -233,29 +409,65 @@ const GameRoom = () => {
                                     <h3 className="text-xl font-bold text-white">L'avis du Coach</h3>
                                 </div>
 
-                                {/* Mode Toggle */}
-                                <div className="flex justify-center mb-6">
-                                    <div className="bg-black/40 p-1 rounded-full flex items-center border border-white/10">
-                                        <button
-                                            onClick={() => setCoachMode('text')}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${coachMode === 'text'
-                                                ? 'bg-[#FFD700] text-black shadow-lg'
-                                                : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            Texte
-                                        </button>
-                                        <button
-                                            onClick={() => setCoachMode('video')}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${coachMode === 'video'
-                                                ? 'bg-[#FFD700] text-black shadow-lg'
-                                                : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            Avatar Vidéo
-                                        </button>
-                                    </div>
-                                </div>
+                                {/* Mode Toggle - Desktop only */}
+                                {isDesktop && (
+                                    <>
+                                        <div className="flex justify-center mb-4">
+                                            <div className="bg-black/40 p-1 rounded-full flex items-center border border-white/10">
+                                                <button
+                                                    onClick={() => handleCoachModeChange('text')}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${coachMode === 'text'
+                                                        ? 'bg-[#FFD700] text-black shadow-lg'
+                                                        : 'text-gray-400 hover:text-white'
+                                                        }`}
+                                                >
+                                                    Text
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCoachModeChange('video')}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${coachMode === 'video'
+                                                        ? 'bg-[#FFD700] text-black shadow-lg'
+                                                        : 'text-gray-400 hover:text-white'
+                                                        }`}
+                                                >
+                                                    Video Avatar
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Personality Selection - Desktop only */}
+                                        {coachMode === 'video' && (
+                                            <div className="flex justify-center mb-4">
+                                                <div className="bg-black/40 p-1 rounded-full flex items-center border border-white/10">
+                                                    <button
+                                                        onClick={() => {
+                                                            setPersonality('strategist');
+                                                            setCoachVideoUrl(null); // Regenerate with new personality
+                                                        }}
+                                                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${personality === 'strategist'
+                                                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                                            : 'text-gray-400 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        Strategist
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setPersonality('humorist');
+                                                            setCoachVideoUrl(null); // Regenerate with new personality
+                                                        }}
+                                                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${personality === 'humorist'
+                                                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                                            : 'text-gray-400 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        Humorist
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
 
                                 {isAnalyzing ? (
                                     <div className="py-8 flex flex-col items-center gap-4">
@@ -263,7 +475,7 @@ const GameRoom = () => {
                                         <p className="text-gray-400 animate-pulse">Analyse de la position...</p>
                                     </div>
                                 ) : aiAnalysis ? (
-                                    coachMode === 'text' ? (
+                                    (coachMode === 'text' || !isDesktop) ? (
                                         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                                             {/* Meilleur Coup */}
                                             <div className="bg-black/30 p-4 rounded-xl border border-white/5">
@@ -306,22 +518,44 @@ const GameRoom = () => {
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                                            <div className="w-48 h-48 bg-black/50 rounded-full border-4 border-[#FFD700]/20 flex items-center justify-center overflow-hidden relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
-                                                {/* Placeholder Avatar */}
-                                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 z-10"></div>
-                                                <UserIcon className="w-24 h-24 text-gray-600" />
-                                                <div className="absolute bottom-4 z-20 px-4 text-center">
-                                                    <div className="text-[10px] text-[#FFD700] uppercase tracking-widest font-bold animate-pulse">
-                                                        En train de parler...
+                                            {isGeneratingVideo ? (
+                                                <>
+                                                    <div className="w-48 h-48 bg-black/50 rounded-full border-4 border-[#FFD700]/20 flex items-center justify-center overflow-hidden relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                                                        <div className="w-12 h-12 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
                                                     </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-white/5 p-4 rounded-xl border border-white/5 w-full text-center">
-                                                <p className="text-sm text-gray-300 italic">
-                                                    "{aiAnalysis.strategicAdvice?.speechScript || aiAnalysis.explanation.slice(0, 100) + '...'}"
-                                                </p>
-                                            </div>
+                                                    <p className="text-gray-400 animate-pulse">Generating video avatar...</p>
+                                                </>
+                                            ) : coachVideoUrl ? (
+                                                <>
+                                                    <div className="w-48 h-48 bg-black/50 rounded-full border-4 border-[#FFD700]/20 flex items-center justify-center overflow-hidden relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                                                        <video
+                                                            src={coachVideoUrl}
+                                                            autoPlay
+                                                            loop
+                                                            muted
+                                                            className="w-full h-full object-cover rounded-full"
+                                                        />
+                                                    </div>
+                                                    <div className="bg-white/5 p-4 rounded-xl border border-white/5 w-full text-center">
+                                                        <p className="text-sm text-gray-300 italic">
+                                                            "{formatScriptForPersonality(aiAnalysis, personality).slice(0, 100)}..."
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="w-48 h-48 bg-black/50 rounded-full border-4 border-[#FFD700]/20 flex items-center justify-center overflow-hidden relative shadow-[0_0_30px_rgba(255,215,0,0.1)]">
+                                                        <UserIcon className="w-24 h-24 text-gray-600" />
+                                                    </div>
+                                                    <p className="text-gray-400">Video generation failed. Showing text mode.</p>
+                                                    <button
+                                                        onClick={() => handleCoachModeChange('text')}
+                                                        className="px-4 py-2 bg-[#FFD700] text-black font-bold rounded-lg"
+                                                    >
+                                                        Switch to Text
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     )
                                 ) : (
@@ -334,46 +568,91 @@ const GameRoom = () => {
                     )}
                 </AnimatePresence>
 
+                {/* Win Modal */}
+                <WinModal
+                    isOpen={winModal.isOpen}
+                    winner={winModal.winner}
+                    winType={winModal.winType}
+                    onClose={() => setWinModal(prev => ({ ...prev, isOpen: false }))}
+                    onRematch={() => {
+                        setWinModal(prev => ({ ...prev, isOpen: false }));
+                        // Reset game and restart
+                        window.location.reload();
+                    }}
+                />
+
                 {/* Navbar du jeu */}
-                <div className="h-16 bg-[#111] border-b border-white/10 flex items-center justify-between px-6 z-20 shadow-lg">
-                    <div className="flex items-center gap-4">
+                <div className={`${isMobile ? 'h-14' : 'h-16'} bg-[#111] border-b border-white/10 flex items-center justify-between px-4 md:px-6 z-20 shadow-lg`}>
+                    <div className="flex items-center gap-2 md:gap-4">
                         <button onClick={handleLeave} className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
-                            <ArrowLeft className="w-6 h-6" />
+                            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
                         </button>
                         <div>
-                            <h1 className="text-lg font-bold text-white tracking-wide">{currentRoom.name}</h1>
+                            <h1 className="text-sm md:text-lg font-bold text-white tracking-wide truncate max-w-[150px] md:max-w-none">{currentRoom.name}</h1>
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                En ligne
+                                <span className="hidden md:inline">En ligne</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/5">
-                            <div className="flex flex-col items-end">
-                                <span className="text-xs text-gray-400">Score</span>
-                                <span className="text-sm font-bold text-[#FFD700]">{score.player1 || 0} - {score.player2 || 0}</span>
+                    <div className="flex items-center gap-2 md:gap-6">
+                        {!isMobile && (
+                            <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/5">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xs text-gray-400">
+                                        {gameState.matchLength && gameState.matchLength > 0 
+                                            ? `Match ${gameState.matchLength}` 
+                                            : 'Money Game'}
+                                    </span>
+                                    <span className="text-sm font-bold text-[#FFD700]">
+                                        {(() => {
+                                            if (!players || players.length === 0) return '0 - 0';
+                                            const player1Score = score[players[0]?.id || 'player1'] || 0;
+                                            const player2Score = score[players[1]?.id || 'player2'] || 0;
+                                            return `${player1Score} - ${player2Score}`;
+                                        })()}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <button
                             onClick={handleAskCoach}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 group"
+                            className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 group ${isMobile ? 'text-xs' : ''}`}
                         >
                             <Lightbulb className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                            <span className="text-sm font-bold">Coach AI</span>
-                            <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded font-bold ml-1">BETA</span>
+                            {!isMobile && (
+                                <>
+                                    <span className="text-sm font-bold">Coach AI</span>
+                                    <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded font-bold ml-1">BETA</span>
+                                </>
+                            )}
                         </button>
+
+                        {/* Mobile Chat Toggle */}
+                        {isMobile && (
+                            <button
+                                onClick={() => setIsChatOpen(!isChatOpen)}
+                                className="relative p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                            >
+                                <MessageCircle className="w-5 h-5 text-white" />
+                                {messages.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FFD700] text-black text-[10px] font-bold rounded-full flex items-center justify-center">
+                                        {messages.length}
+                                    </span>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Zone de jeu principale */}
-                <div className="flex-1 flex relative bg-[#1a1a1a]">
+                <div className={`flex-1 flex ${isMobile ? 'flex-col' : 'flex-row'} relative bg-[#1a1a1a]`}>
                     {/* Plateau de jeu */}
-                    <div className="flex-1 relative flex items-center justify-center p-4 md:p-8">
+                    <div className={`${isMobile ? 'flex-1' : 'flex-1'} relative flex items-center justify-center p-2 md:p-4 lg:p-8`}>
                         {/* Cadre du plateau */}
-                        <div className="relative w-full max-w-[1000px] aspect-[4/3] bg-[#0a3d1d] rounded-xl shadow-2xl border-[16px] border-[#3d2b1f] flex overflow-hidden">
+                        <div className={`relative w-full ${isMobile ? 'max-w-full aspect-square' : 'max-w-[1000px] aspect-[4/3]'} bg-[#0a3d1d] rounded-xl shadow-2xl ${isMobile ? 'border-[8px]' : 'border-[16px]'} border-[#3d2b1f] flex overflow-hidden`}>
 
                             {/* Texture bois du cadre */}
                             <div className="absolute inset-0 border-[16px] border-[#3d2b1f] pointer-events-none z-10 rounded-xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]"></div>
@@ -423,40 +702,109 @@ const GameRoom = () => {
                             <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20">
                                 <div className="flex gap-8 pointer-events-auto">
                                     <Dice dice={dice} onRoll={handleRollDice} canRoll={isMyTurn && dice.length === 0} />
-                                    <DoublingCube value={cubeValue} canDouble={isMyTurn && gameState.canDouble} onDouble={() => sendGameAction('double', {})} />
+                                    <div className="bg-black/60 backdrop-blur-sm p-4 rounded-xl border border-white/10">
+                                        <DoublingCube
+                                            cubeValue={cubeValue}
+                                            cubeOwner={cubeOwner}
+                                            currentPlayerId={user?.id || ''}
+                                            canDouble={canDouble && isMyTurn}
+                                            pendingDouble={pendingDouble}
+                                            onOfferDouble={offerDouble}
+                                            onAcceptDouble={acceptDouble}
+                                            onRejectDouble={rejectDouble}
+                                            opponentName={players[1]?.username || 'Adversaire'}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Sidebar Droite (Chat & Infos) */}
-                    <div className="w-80 bg-[#111] border-l border-white/10 flex flex-col">
-                        <div className="p-4 border-b border-white/10">
-                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Joueurs</h3>
-                            <div className="space-y-3">
-                                <div className={`flex items-center gap-3 p-3 rounded-lg ${turn === players[0]?.id ? 'bg-white/10 border border-[#FFD700]/30' : 'bg-black/20'}`}>
-                                    <div className="w-2 h-2 rounded-full bg-gray-200"></div>
-                                    <div className="flex-1">
-                                        <div className="text-sm font-bold text-white">{players[0]?.username || 'Joueur 1'}</div>
-                                        <div className="text-xs text-gray-500">Blanc</div>
+                    {/* Sidebar Droite (Chat & Infos) - Desktop */}
+                    {isDesktop && (
+                        <div className="w-80 bg-[#111] border-l border-white/10 flex flex-col">
+                            <div className="p-4 border-b border-white/10">
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Players</h3>
+                                <div className="space-y-3">
+                                    <div className={`flex items-center gap-3 p-3 rounded-lg ${turn === players[0]?.id ? 'bg-white/10 border border-[#FFD700]/30' : 'bg-black/20'}`}>
+                                        <div className="w-2 h-2 rounded-full bg-gray-200"></div>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-bold text-white">{players[0]?.username || 'Player 1'}</div>
+                                            <div className="text-xs text-gray-500">White</div>
+                                        </div>
+                                        {turn === players[0]?.id && <Clock className="w-4 h-4 text-[#FFD700] animate-pulse" />}
                                     </div>
-                                    {turn === players[0]?.id && <Clock className="w-4 h-4 text-[#FFD700] animate-pulse" />}
-                                </div>
-                                <div className={`flex items-center gap-3 p-3 rounded-lg ${turn === players[1]?.id ? 'bg-white/10 border border-[#FFD700]/30' : 'bg-black/20'}`}>
-                                    <div className="w-2 h-2 rounded-full bg-red-600"></div>
-                                    <div className="flex-1">
-                                        <div className="text-sm font-bold text-white">{players[1]?.username || 'Joueur 2'}</div>
-                                        <div className="text-xs text-gray-500">Rouge</div>
+                                    <div className={`flex items-center gap-3 p-3 rounded-lg ${turn === players[1]?.id ? 'bg-white/10 border border-[#FFD700]/30' : 'bg-black/20'}`}>
+                                        <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-bold text-white">{players[1]?.username || 'Player 2'}</div>
+                                            <div className="text-xs text-gray-500">Red</div>
+                                        </div>
+                                        {turn === players[1]?.id && <Clock className="w-4 h-4 text-[#FFD700] animate-pulse" />}
                                     </div>
-                                    {turn === players[1]?.id && <Clock className="w-4 h-4 text-[#FFD700] animate-pulse" />}
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="flex-1 overflow-hidden">
-                            <ChatBox />
+                            <div className="flex-1 overflow-hidden">
+                                <ChatBox />
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Mobile Chat Drawer */}
+                    {isMobile && (
+                        <AnimatePresence>
+                            {isChatOpen && (
+                                <>
+                                    {/* Overlay */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        onClick={() => setIsChatOpen(false)}
+                                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+                                    />
+                                    
+                                    {/* Drawer */}
+                                    <motion.div
+                                        initial={{ y: '100%' }}
+                                        animate={{ y: 0 }}
+                                        exit={{ y: '100%' }}
+                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                        className="fixed bottom-0 left-0 right-0 bg-[#111] border-t border-white/10 rounded-t-3xl z-50 max-h-[70vh] flex flex-col shadow-2xl"
+                                    >
+                                        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Players</h3>
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`flex items-center gap-2 ${turn === players[0]?.id ? 'text-[#FFD700]' : 'text-gray-400'}`}>
+                                                        <div className="w-2 h-2 rounded-full bg-gray-200"></div>
+                                                        <span className="text-xs font-bold">{players[0]?.username || 'Player 1'}</span>
+                                                        {turn === players[0]?.id && <Clock className="w-3 h-3 animate-pulse" />}
+                                                    </div>
+                                                    <div className={`flex items-center gap-2 ${turn === players[1]?.id ? 'text-[#FFD700]' : 'text-gray-400'}`}>
+                                                        <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                                                        <span className="text-xs font-bold">{players[1]?.username || 'Player 2'}</span>
+                                                        {turn === players[1]?.id && <Clock className="w-3 h-3 animate-pulse" />}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setIsChatOpen(false)}
+                                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                            >
+                                                <X className="w-5 h-5 text-gray-400" />
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex-1 overflow-hidden">
+                                            <ChatBox />
+                                        </div>
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
+                    )}
                 </div>
             </div>
         </DndProvider>

@@ -8,7 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "check-deploy": "bash scripts/check-deploy.sh || node scripts/check-deploy.js",
+    "test-deploy": "node scripts/test-deployment.js",
+    "check-netlify": "node scripts/check-netlify-status.js",
+    "predeploy": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@netlify/functions": "^5.1.0",
