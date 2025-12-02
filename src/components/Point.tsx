@@ -66,11 +66,12 @@ export default function Point({
         style={{ 
           width: '90%',
           aspectRatio: '1 / 1',  // ✅ Responsive carré avec aspect-ratio moderne
-          // ✅ Overlap proportionnel : transform utilise % de la hauteur du checker lui-même
-          // Les pourcentages dans transform sont calculés par rapport aux dimensions de l'élément transformé
-          // Cela garantit que l'overlap de 22% reste constant quelle que soit la taille de l'écran
-          // Seulement les checkers après le premier chevauchent (i > 0)
-          transform: i > 0 ? 'translateY(-22%)' : 'none'
+          // ✅ Cascade overlap : marginBottom crée un chevauchement en cascade
+          // Chaque checker chevauche le précédent de ~22% de sa hauteur
+          // Même si marginBottom est calculé par rapport à la largeur du parent,
+          // avec aspectRatio 1:1, -20% de la largeur du parent ≈ -22% de la hauteur du checker
+          // Cela crée un effet visuel de cascade correct
+          marginBottom: i < displayCount - 1 ? '-20%' : '0'
         }}
         onClick={(e) => {
           if (isInteractive && onClick) {
