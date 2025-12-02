@@ -186,19 +186,18 @@ export const analyzeMove = async (
                 // Si P2 joue, on inverse les coordonnées : 24 - x
                 // Sauf si c'est "bar" (25) ou "off" (0/25)
 
-                if (playerColor === 2) {
-                    // Gestion Bar/Off à adapter si besoin, ici on suppose 1-24 standard
-                    if (from >= 1 && from <= 24) from = 24 - from; // Ex: 24 devient 0, 1 devient 23
-                    else if (from === 25) from = -1; // Bar
+                // MAPPING CORRIGÉ (23 - x pour les deux joueurs)
+                // Engine White (0->23) vs Frontend P1 (23->0) => Inversion
+                // Engine Black (23->0) vs Frontend P2 (0->23) => Inversion
+                // Donc on applique 23 - x pour tout le monde (si API 0-23)
 
-                    if (to >= 1 && to <= 24) to = 24 - to;
-                    else if (to === 0 || to === 25) to = 24; // Off (ou 24 selon logique interne)
-                    // Note: Vérifier si interne utilise 24 ou >23 pour off
-                } else {
-                    // Pour P1, on convertit 1-24 en 0-23
-                    if (from >= 1 && from <= 24) from = from - 1;
-                    if (to >= 1 && to <= 24) to = to - 1;
-                }
+                // Gestion du Bar (25 ou -1 selon API)
+                if (from === 25 || from === -1) from = -1; // Bar interne
+                else if (from >= 0 && from <= 24) from = 23 - from;
+
+                // Gestion du Off (24, 25 ou 0 selon API)
+                if (to === 24 || to === 25 || to === -1) to = 24; // Off interne
+                else if (to >= 0 && to <= 23) to = 23 - to;
 
                 // Correction temporaire : Si l'API renvoie déjà 0-23, ce mapping peut casser.
                 // On va se fier aux logs pour ajuster. 

@@ -824,7 +824,7 @@ export const useGameSocket = () => {
         // Fix: If user is null (guest), myId is 'guest-1'
         const myId = user?.id || 'guest-1';
         const currentTurn = gameState.turn;
-        const isBotTurn = currentTurn !== myId && currentTurn !== undefined && currentTurn !== null;
+        const isBotTurn = currentTurn === 'bot';
 
         // Créer une clé unique pour cette analyse (turn + dice)
         const analysisKey = `${currentTurn}-${gameState.dice.join(',')}`;
