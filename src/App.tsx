@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import { GameToaster } from './components/common/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/common/Navbar';
+import BrowserConsole from './components/BrowserConsole';
 
 // Pages
 import GurugammonLanding from './pages/GurugammonLanding';
@@ -82,6 +83,9 @@ function App() {
 
         {/* Global Toaster */}
         <GameToaster />
+        
+        {/* Console JavaScript visible partout */}
+        <BrowserConsole />
       </div>
     </Router>
   );

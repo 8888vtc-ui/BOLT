@@ -25,6 +25,7 @@ import Dice from '../components/Dice';
 import DoublingCube from '../components/game/DoublingCube';
 import ChatBox from '../components/game/ChatBox';
 import DebugOverlay from '../components/DebugOverlay';
+import BrowserConsole from '../components/BrowserConsole';
 import WinModal from '../components/game/WinModal';
 import TestPanel from '../components/TestPanel';
 
@@ -544,6 +545,7 @@ const GameRoom = () => {
         <DndProvider backend={backend}>
             <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans relative">
                 <DebugOverlay />
+                <BrowserConsole />
                 <TestPanel />
 
                 {/* AI Coach Modal */}
