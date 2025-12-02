@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Point from './Point';
 import Checker from './Checker';
 import Dice from './Dice';
-import DoublingCube from './DoublingCube';
+import DoublingCube from './game/DoublingCube';
 import {
   BoardState,
   PlayerColor,

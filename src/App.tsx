@@ -13,6 +13,8 @@ import GameRoom from './pages/GameRoom';
 import Tournaments from './pages/Tournaments';
 import Leaderboard from './pages/Leaderboard';
 import StubPage from './pages/StubPage';
+import Profile from './pages/Profile';
+import ComingSoon from './pages/ComingSoon';
 
 function LayoutWithNavbar() {
   const location = useLocation();
@@ -59,7 +61,8 @@ function App() {
 
             {/* New Routes */}
             <Route path="/analyses" element={<StubPage />} />
-            <Route path="/profile" element={<StubPage />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/coming-soon" element={<ComingSoon />} />
             <Route path="/settings" element={<StubPage />} />
             <Route path="/support" element={<StubPage />} />
           </Route>

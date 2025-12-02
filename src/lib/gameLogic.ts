@@ -301,3 +301,194 @@ export function getSmartMove(
   return null;
 }
 
+/**
+ * Trouve un coup valide pour le bot (fallback heuristique)
+ * Cherche tous les coups possibles et en choisit un
+ */
+export function findAnyValidMove(
+  board: BoardState,
+  player: PlayerColor,
+  dice: number[]
+): { from: number; to: number; dieUsed: number } | null {
+  // 1. Vérifier si on a des pions sur la barre
+  const barCount = player === 1 ? board.bar.player1 : board.bar.player2;
+  if (barCount > 0) {
+    // Doit entrer depuis la barre
+    for (const die of dice) {
+      const entryPoint = player === 1 ? 24 - die : die - 1;
+      if (canMoveTo(board, player, entryPoint)) {
+        return { from: -1, to: entryPoint, dieUsed: die };
+      }
+    }
+    return null; // Pas de point d'entrée disponible
+  }
+
+  // 2. Chercher tous les coups possibles
+  const validMoves: { from: number; to: number; dieUsed: number }[] = [];
+
+  for (let from = 0; from < 24; from++) {
+    const point = board.points[from];
+    if (point.player === player && point.count > 0) {
+      for (const die of dice) {
+        const dest = player === 1 ? from - die : from + die;
+
+        // Bear-off
+        if ((player === 1 && dest < 0) || (player === 2 && dest >= 24)) {
+          if (canBearOff(board, player, from, die)) {
+            validMoves.push({ from, to: dest, dieUsed: die });
+          }
+        }
+        // Mouvement normal
+        else if (dest >= 0 && dest < 24 && canMoveTo(board, player, dest)) {
+          validMoves.push({ from, to: dest, dieUsed: die });
+        }
+      }
+    }
+  }
+
+  if (validMoves.length === 0) return null;
+
+  // 3. Choisir le meilleur coup (heuristique simple)
+  // Priorité : Bear-off > Avancer > Sécuriser
+  const bearOffMove = validMoves.find(m => (player === 1 && m.to < 0) || (player === 2 && m.to >= 24));
+  if (bearOffMove) return bearOffMove;
+
+  // Avancer le plus possible
+  const sortedMoves = validMoves.sort((a, b) => {
+    const distA = player === 1 ? a.from - a.to : a.to - a.from;
+    const distB = player === 1 ? b.from - b.to : b.to - b.from;
+    return distB - distA; // Plus grand déplacement en premier
+  });
+
+  return sortedMoves[0];
+}
+
+// ============================================
+// DOUBLING CUBE LOGIC
+// ============================================
+
+/**
+ * Vérifie si un joueur peut proposer de doubler
+ * @param cubeValue Valeur actuelle du cube
+ * @param cubeOwner ID du propriétaire du cube (null si au centre)
+ * @param playerId ID du joueur qui veut doubler
+ * @param hasDiceRolled Si les dés ont été lancés ce tour
+ * @param matchLength Longueur du match (0 = money game)
+ * @param score Score actuel des joueurs
+ * @param isCrawfordGame Si on est dans le Crawford game
+ * @returns true si le joueur peut proposer de doubler
+ */
+export function canOfferDouble(
+  cubeValue: number,
+  cubeOwner: string | null,
+  playerId: string,
+  hasDiceRolled: boolean,
+  matchLength: number = 0,
+  score?: { [key: string]: number },
+  isCrawfordGame: boolean = false
+): boolean {
+  // 1. Le cube ne peut pas dépasser 64
+  if (cubeValue >= 64) return false;
+
+  // 2. On ne peut pas doubler après avoir lancé les dés
+  if (hasDiceRolled) return false;
+
+  // 3. Crawford Rule: Pas de cube pendant le Crawford game
+  if (isCrawfordGame) return false;
+
+  // 4. Le joueur doit posséder le cube OU le cube doit être au centre
+  if (cubeOwner !== null && cubeOwner !== playerId) return false;
+
+  return true;
+}
+
+/**
+ * Accepte une proposition de double
+ * Le joueur qui accepte devient propriétaire du cube
+ * @param cubeValue Valeur actuelle du cube
+ * @param acceptingPlayerId ID du joueur qui accepte
+ * @returns Nouvel état du cube
+ */
+export function acceptDouble(
+  cubeValue: number,
+  acceptingPlayerId: string
+): { cubeValue: number; cubeOwner: string } {
+  return {
+    cubeValue: cubeValue * 2,
+    cubeOwner: acceptingPlayerId
+  };
+}
+
+/**
+ * Rejette une proposition de double (Drop/Pass)
+ * Le joueur qui rejette perd la partie
+ * @param cubeValue Valeur actuelle du cube
+ * @param rejectingPlayerId ID du joueur qui rejette
+ * @returns Points gagnés par l'adversaire
+ */
+export function rejectDouble(cubeValue: number): number {
+  // Le joueur qui propose gagne la valeur ACTUELLE du cube (avant doublement)
+  return cubeValue;
+}
+
+/**
+ * Beaver: Re-doubler immédiatement après avoir accepté (optionnel, money game only)
+ * Le joueur qui beaver garde le cube
+ * @param cubeValue Valeur après acceptation
+ * @param beaverPlayerId ID du joueur qui beaver
+ * @returns Nouvel état du cube
+ */
+export function beaver(
+  cubeValue: number,
+  beaverPlayerId: string
+): { cubeValue: number; cubeOwner: string } {
+  return {
+    cubeValue: cubeValue * 2,
+    cubeOwner: beaverPlayerId
+  };
+}
+
+/**
+ * Calcule les points gagnés en fin de partie selon le type de victoire et le cube
+ * @param winType Type de victoire (simple, gammon, backgammon)
+ * @param cubeValue Valeur du cube
+ * @returns Points gagnés
+ */
+export function calculatePoints(winType: WinType, cubeValue: number): number {
+  const multiplier = winType === 'simple' ? 1 : winType === 'gammon' ? 2 : 3;
+  return cubeValue * multiplier;
+}
+
+/**
+ * Calcule le score de match après une partie
+ * @param winType Type de victoire (simple, gammon, backgammon)
+ * @param cubeValue Valeur du cube
+ * @param matchLength Longueur du match (0 = money game, pas de calcul de match)
+ * @param currentScore Score actuel du match { player1: number, player2: number }
+ * @param winnerPlayerId ID du joueur gagnant
+ * @param players Array des joueurs [player1, player2]
+ * @returns Nouveau score du match ou null si money game
+ */
+export function calculateMatchScore(
+  winType: WinType,
+  cubeValue: number,
+  matchLength: number,
+  currentScore: { [playerId: string]: number },
+  winnerPlayerId: string,
+  players: Array<{ id: string }>
+): { [playerId: string]: number } | null {
+  // Money game: pas de calcul de match
+  if (matchLength === 0) {
+    return null;
+  }
+
+  // Calculer les points gagnés
+  const pointsWon = calculatePoints(winType, cubeValue);
+
+  // Créer nouveau score
+  const newScore = { ...currentScore };
+  newScore[winnerPlayerId] = (newScore[winnerPlayerId] || 0) + pointsWon;
+
+  return newScore;
+}
+

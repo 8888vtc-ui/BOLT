@@ -31,11 +31,16 @@ export interface GameState {
     dice: number[];
     turn: string; // ID du joueur
     score: { [playerId: string]: number };
-    cubeValue: number;
-    doubleValue?: number;
-    canDouble?: boolean;
-    matchLength?: number;
+    cubeValue: number; // Valeur actuelle du cube (1, 2, 4, 8, 16, 32, 64)
+    cubeOwner: string | null; // ID du joueur qui possède le cube (null = au centre, disponible pour les deux)
+    doubleValue?: number; // Deprecated, on utilise cubeValue
+    canDouble?: boolean; // Deprecated, on calcule dynamiquement
+    matchLength?: number; // 0 = Money Game, sinon nombre de points pour gagner le match
     currentPlayer?: number;
+    pendingDouble?: {
+        offeredBy: string; // ID du joueur qui propose
+        timestamp: number;
+    } | null; // Proposition de double en attente
 }
 
 export interface ChatMessage {
@@ -44,6 +49,7 @@ export interface ChatMessage {
     username: string;
     text: string;
     timestamp: number;
+    type?: 'chat' | 'system';
 }
 
 interface GameStore {

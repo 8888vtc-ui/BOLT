@@ -12,6 +12,10 @@
     "check-deploy": "bash scripts/check-deploy.sh || node scripts/check-deploy.js",
     "test-deploy": "node scripts/test-deployment.js",
     "check-netlify": "node scripts/check-netlify-status.js",
+    "test": "node --loader ts-node/esm src/test/run-comprehensive-tests.ts",
+    "test:comprehensive": "npm run test",
+    "test:game": "node src/test/runGameTests.ts",
+    "test:validation": "node src/test/validateGameModes.ts",
     "predeploy": "npm run typecheck && npm run build"
   },
   "dependencies": {

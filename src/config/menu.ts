@@ -1,4 +1,4 @@
-import { Home, Users, Trophy, BarChart3, PieChart, User, Settings, HelpCircle, LogOut } from 'lucide-react';
+import { Home, Users, Trophy, BarChart3, PieChart, User, Settings, HelpCircle, LogOut, Sparkles } from 'lucide-react';
 
 export interface MenuItem {
     id: string;
@@ -45,6 +45,13 @@ export const MAIN_MENU: MenuItem[] = [
         route: '/analyses',
         icon: PieChart,
         roles: ['user']
+    },
+    {
+        id: 'coming-soon',
+        label: 'Coming Soon',
+        route: '/coming-soon',
+        icon: Sparkles,
+        roles: ['user', 'guest']
     }
 ];
 

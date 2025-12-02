@@ -1,8 +1,15 @@
-import { BoardState, GameState, Move } from './gameLogic';
+import { GameState } from '../stores/gameStore';
 
-const BOT_API_URL = 'https://botgammon.netlify.app/.netlify/functions/analyze';
+// URL de l'API Bot - configurable via variable d'environnement
+const BOT_API_URL = import.meta.env.VITE_BOT_API_URL || 'https://botgammon.netlify.app/.netlify/functions/analyze';
 
-interface AIAnalysisResult {
+interface Move {
+    from: number;
+    to: number;
+    die?: number;
+}
+
+export interface AIAnalysis {
     bestMove: Move[];
     explanation: string;
     winProbability: number;
@@ -19,12 +26,12 @@ export const analyzeMove = async (
     gameState: GameState,
     dice: number[],
     playerColor?: number
-): Promise<AIAnalysisResult> => {
+): Promise<AIAnalysis> => {
     try {
         // 1. Determine Active Player
-        const activePlayer = playerColor || (gameState.turn === 'white' ? 1 : 2);
+        const activePlayer = playerColor || 1;
 
-        addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, turn: gameState.turn, activePlayer });
+        addLog('🤖 AI Service: Preparing analysis...', 'info', { dice, activePlayer });
 
         // 2. COORDINATE SYSTEM ALIGNMENT (Old Logic restored)
         // Frontend: P1 moves DOWN (23->0), P2 moves UP (0->23).
@@ -82,19 +89,61 @@ export const analyzeMove = async (
             }
         };
 
-        addLog('🤖 AI Service: Calling BotGammon API...', 'info', JSON.stringify(payload));
-
-        const response = await fetch(BOT_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
+        addLog('🤖 AI Service: Calling BotGammon API...', 'info', { 
+            url: BOT_API_URL,
+            dice: dice,
+            player: targetEnginePlayer 
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`BotGammon API Error: ${response.status} - ${errorText}`);
+        // Retry logic avec backoff exponentiel
+        let lastError: Error | null = null;
+        const maxRetries = 3;
+        let response: Response | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+                response = await fetch(BOT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    break; // Succès, sortir de la boucle
+                } else {
+                    const errorText = await response.text();
+                    lastError = new Error(`BotGammon API Error: ${response.status} - ${errorText}`);
+                    addLog(`🤖 AI Service: Attempt ${attempt}/${maxRetries} failed`, 'error', {
+                        status: response.status,
+                        error: errorText
+                    });
+                }
+            } catch (error: any) {
+                lastError = error instanceof Error ? error : new Error(String(error));
+                addLog(`🤖 AI Service: Attempt ${attempt}/${maxRetries} failed`, 'error', {
+                    error: lastError.message,
+                    isTimeout: error.name === 'AbortError'
+                });
+            }
+
+            // Attendre avant de réessayer (backoff exponentiel)
+            if (attempt < maxRetries) {
+                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s max
+                addLog(`🤖 AI Service: Retrying in ${delay}ms...`, 'info');
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+
+        if (!response || !response.ok) {
+            throw lastError || new Error('BotGammon API: All retry attempts failed');
         }
 
         const data = await response.json();
@@ -165,8 +214,8 @@ export const analyzeMove = async (
 };
 
 // Helper for logs
-import { useDebugStore } from '../store/debugStore';
-const addLog = (msg: string, type: 'info' | 'success' | 'error' | 'warning' = 'info', data?: any) => {
+import { useDebugStore } from '../stores/debugStore';
+const addLog = (msg: string, type: 'info' | 'success' | 'error' = 'info', data?: any) => {
     try {
         useDebugStore.getState().addLog(msg, type, data);
     } catch (e) {

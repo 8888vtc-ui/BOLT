@@ -1,27 +1,53 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Play, Trophy, TrendingUp, Target, Clock, Award } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useGameSocket } from '../hooks/useGameSocket';
 import TrophyCase from '../components/profile/TrophyCase';
+import { getUserStats, getRecentGames, type UserStats, type RecentGame } from '../lib/statsService';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { playVsBot } = useGameSocket();
+  
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [recentGames, setRecentGames] = useState<RecentGame[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const stats = [
-    { label: 'Parties jouées', value: '47', icon: Play, color: '#FFD700' },
-    { label: 'Victoires', value: '32', icon: Trophy, color: '#00FF00' },
-    { label: 'Taux de victoire', value: '68%', icon: TrendingUp, color: '#FF00FF' },
-    { label: 'Classement', value: '#142', icon: Award, color: '#00FFFF' },
-  ];
+  useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
-  const recentGames = [
-    { opponent: 'Magnus', result: 'Victoire', score: '7-3', date: 'Il y a 2h' },
-    { opponent: 'Kasparov', result: 'Défaite', score: '4-7', date: 'Il y a 5h' },
-    { opponent: 'Alice', result: 'Victoire', score: '7-1', date: 'Hier' },
-  ];
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [userStats, games] = await Promise.all([
+          getUserStats(user.id),
+          getRecentGames(user.id, 10)
+        ]);
+        setStats(userStats);
+        setRecentGames(games);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user?.id]);
+
+  // Stats formatées pour l'affichage
+  const displayStats = stats ? [
+    { label: 'Parties jouées', value: stats.gamesPlayed.toString(), icon: Play, color: '#FFD700' },
+    { label: 'Victoires', value: stats.wins.toString(), icon: Trophy, color: '#00FF00' },
+    { label: 'Taux de victoire', value: `${stats.winRate}%`, icon: TrendingUp, color: '#FF00FF' },
+    { label: 'Classement', value: stats.rank ? `#${stats.rank}` : 'N/A', icon: Award, color: '#00FFFF' },
+  ] : [];
 
   return (
     <div className="min-h-screen bg-[#050505] p-8">
@@ -40,23 +66,42 @@ export default function Dashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-[#111] rounded-2xl p-6 border border-white/10 hover:border-[#FFD700]/50 transition-all"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <stat.icon className="w-8 h-8" style={{ color: stat.color }} />
-                <div className="text-3xl font-black" style={{ color: stat.color }}>
-                  {stat.value}
+          {loading ? (
+            // Skeleton loading
+            Array.from({ length: 4 }).map((_, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="bg-[#111] rounded-2xl p-6 border border-white/10"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-8 h-8 bg-white/10 rounded animate-pulse" />
+                  <div className="w-16 h-8 bg-white/10 rounded animate-pulse" />
                 </div>
-              </div>
-              <div className="text-gray-400 text-sm font-medium">{stat.label}</div>
-            </motion.div>
-          ))}
+                <div className="w-24 h-4 bg-white/10 rounded animate-pulse" />
+              </motion.div>
+            ))
+          ) : (
+            displayStats.map((stat, index) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="bg-[#111] rounded-2xl p-6 border border-white/10 hover:border-[#FFD700]/50 transition-all"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <stat.icon className="w-8 h-8" style={{ color: stat.color }} />
+                  <div className="text-3xl font-black" style={{ color: stat.color }}>
+                    {stat.value}
+                  </div>
+                </div>
+                <div className="text-gray-400 text-sm font-medium">{stat.label}</div>
+              </motion.div>
+            ))
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -115,10 +160,10 @@ export default function Dashboard() {
             Mes Trophées
           </h2>
           <TrophyCase
-            tournamentsWon={12}
-            tournamentsPlayed={47}
-            tournamentPoints={3450}
-            bestFinish={1}
+            tournamentsWon={stats?.tournamentsWon || 0}
+            tournamentsPlayed={stats?.tournamentsPlayed || 0}
+            tournamentPoints={stats?.tournamentPoints || 0}
+            bestFinish={stats?.bestTournamentFinish || 0}
             badges={[]}
           />
         </motion.div>
@@ -135,36 +180,66 @@ export default function Dashboard() {
             Parties Récentes
           </h2>
 
-          <div className="space-y-4">
-            {recentGames.map((game, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-700 to-black flex items-center justify-center text-white font-bold">
-                    {game.opponent[0]}
+          {loading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 bg-white/5 rounded-xl"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-white/10 animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="w-32 h-4 bg-white/10 rounded animate-pulse" />
+                      <div className="w-24 h-3 bg-white/10 rounded animate-pulse" />
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-bold text-white">vs {game.opponent}</div>
-                    <div className="text-sm text-gray-400">{game.date}</div>
-                  </div>
+                  <div className="w-20 h-6 bg-white/10 rounded animate-pulse" />
                 </div>
+              ))}
+            </div>
+          ) : recentGames.length > 0 ? (
+            <div className="space-y-4">
+              {recentGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/game/${game.id}`)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-700 to-black flex items-center justify-center text-white font-bold">
+                      {game.opponent[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-bold text-white">vs {game.opponent}</div>
+                      <div className="text-sm text-gray-400">{game.date}</div>
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-6">
-                  <div className="text-lg font-mono font-bold text-gray-300">{game.score}</div>
-                  <div
-                    className={`px-4 py-2 rounded-lg font-bold ${game.result === 'Victoire'
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-red-500/20 text-red-400'
+                  <div className="flex items-center gap-6">
+                    <div className="text-lg font-mono font-bold text-gray-300">{game.score}</div>
+                    <div
+                      className={`px-4 py-2 rounded-lg font-bold ${
+                        game.result === 'win'
+                          ? 'bg-green-500/20 text-green-400'
+                          : game.result === 'loss'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-gray-500/20 text-gray-400'
                       }`}
-                  >
-                    {game.result}
+                    >
+                      {game.result === 'win' ? 'Victoire' : game.result === 'loss' ? 'Défaite' : 'Égalité'}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-400">
+              <Clock className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p className="text-lg">Aucune partie récente</p>
+              <p className="text-sm mt-2">Commencez à jouer pour voir vos statistiques !</p>
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

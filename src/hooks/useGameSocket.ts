@@ -1,10 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from './useAuth';
-import { useGameStore, Room, GameState } from '../stores/gameStore';
-import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor } from '../lib/gameLogic';
+import { useGameStore, Room, GameState, Player } from '../stores/gameStore';
+import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
-import { analyzeMove, AIAnalysis } from '../lib/aiService';
+import { analyzeMove } from '../lib/aiService';
 
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
@@ -20,10 +20,12 @@ const createMockGameState = (userId?: string, options?: GameOptions): GameState 
     turn: userId || 'guest-1', // Le tour est au joueur par défaut
     score: {},
     cubeValue: 1,
+    cubeOwner: null, // Cube au centre au début
     doubleValue: 1,
     canDouble: true,
     matchLength: options?.mode === 'match' ? options.matchLength : 0, // 0 = Money Game
-    currentPlayer: 1
+    currentPlayer: 1,
+    pendingDouble: null
 });
 
 const createMockRooms = (): Room[] => [];
@@ -36,6 +38,7 @@ export const useGameSocket = () => {
         setIsConnected,
         setRoomsList,
         setRoom,
+        setPlayers,
         updateGame,
         addMessage,
         resetGame,
@@ -92,6 +95,81 @@ export const useGameSocket = () => {
         }
     };
 
+    // --- Fetch Room Players Helper ---
+    const fetchRoomPlayers = async (roomId: string): Promise<Player[]> => {
+        const addLog = useDebugStore.getState().addLog;
+
+        if (roomId === 'offline-bot') {
+            // Solo mode: return player + bot
+            if (user) {
+                return [
+                    { id: user.id, username: user.username || 'Guest', avatar: user.avatar },
+                    { id: 'bot', username: 'Guru AI', avatar: undefined }
+                ];
+            }
+            return [
+                { id: 'guest-1', username: 'Guest', avatar: undefined },
+                { id: 'bot', username: 'Guru AI', avatar: undefined }
+            ];
+        }
+
+        try {
+            // Fetch participants from room_participants
+            const { data: participants, error: participantsError } = await supabase
+                .from('room_participants')
+                .select('user_id')
+                .eq('room_id', roomId);
+
+            if (participantsError) {
+                addLog('Error fetching participants', 'error', participantsError);
+                return [];
+            }
+
+            if (!participants || participants.length === 0) {
+                addLog('No participants found', 'info');
+                return [];
+            }
+
+            const userIds = participants.map(p => p.user_id);
+
+            // Try to fetch from profiles table first
+            const { data: profilesData, error: profilesError } = await supabase
+                .from('profiles')
+                .select('id, username, avatar_url')
+                .in('id', userIds);
+
+            if (profilesError) {
+                addLog('Error fetching profiles, trying auth.users', 'error', profilesError);
+            }
+
+            // If profiles found, use them
+            if (profilesData && profilesData.length > 0) {
+                const players: Player[] = profilesData.map(p => ({
+                    id: p.id,
+                    username: p.username || 'Unknown',
+                    avatar: p.avatar_url || undefined
+                }));
+                addLog(`Fetched ${players.length} players from profiles`, 'success');
+                return players;
+            }
+
+            // Fallback: try to get from auth.users metadata
+            // Note: We can't directly query auth.users, so we'll use what we have
+            // For now, return basic players with IDs
+            const players: Player[] = userIds.map(id => ({
+                id,
+                username: `Player ${id.slice(0, 8)}`,
+                avatar: undefined
+            }));
+            addLog(`Fetched ${players.length} players (fallback)`, 'info');
+            return players;
+
+        } catch (err) {
+            addLog('Exception fetching room players', 'error', err);
+            return [];
+        }
+    };
+
     // --- Join Room & Subscribe to Game State ---
     const joinRoom = useCallback(async (roomId: string, options?: GameOptions) => {
         const addLog = useDebugStore.getState().addLog;
@@ -113,12 +191,14 @@ export const useGameSocket = () => {
         try {
             if (roomId === 'offline-bot') {
                 addLog('Initializing Offline Bot Mode', 'info');
+                const soloPlayers = await fetchRoomPlayers('offline-bot');
                 setRoom({
                     id: 'offline-bot',
                     name: 'Entraînement Solo (Offline)',
                     status: 'playing',
-                    players: [{ id: user?.id || 'guest', username: user?.username || 'Guest', avatar_url: null }]
+                    players: []
                 });
+                setPlayers(soloPlayers);
                 updateGame(createMockGameState(user?.id, options));
                 return;
             }
@@ -126,6 +206,11 @@ export const useGameSocket = () => {
             if (user) {
                 await supabase.from('room_participants').upsert({ room_id: roomId, user_id: user.id }).select();
             }
+
+            // Fetch players before setting room
+            const roomPlayers = await fetchRoomPlayers(roomId);
+            setPlayers(roomPlayers);
+            addLog(`Fetched ${roomPlayers.length} players for room`, 'success');
 
             const { data: roomData, error: roomError } = await supabase.from('rooms').select('*').eq('id', roomId).single();
 
@@ -135,7 +220,7 @@ export const useGameSocket = () => {
                 setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
             } else if (roomData) {
                 addLog(`Room fetched: ${roomData.name}`, 'success');
-                setRoom(roomData);
+                setRoom({ ...roomData, players: [] }); // Players are set separately via setPlayers
             }
 
             if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -304,23 +389,68 @@ export const useGameSocket = () => {
             }
         }
 
-        // Switch turn if no dice left
-        if (newState.dice.length === 0 && action === 'move') {
-            // Simple turn switch logic for now
-            // In a real game, we need to check if moves are possible even with dice left
-            // But for MVP, let's switch when dice are empty
-            const currentPlayerId = newState.turn;
-            // If current is user, switch to 'bot' or other player
-            if (players && players.length > 1) {
-                newState.turn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
-                // Solo/Bot mode
-                const myId = user?.id || 'guest-1';
-                newState.turn = currentPlayerId === myId ? 'bot' : myId;
+        // Check for win condition before switching turn
+        if (action === 'move' && newState.board) {
+            const player1Won = hasWon(newState.board, 1);
+            const player2Won = hasWon(newState.board, 2);
+
+            if (player1Won || player2Won) {
+                const winner = player1Won ? 1 : 2;
+                const winType = checkWinType(newState.board, winner);
+                addLog(`Player ${winner} won! Type: ${winType}`, 'success');
+
+                // Calculate and update match score if match game
+                if (newState.matchLength && newState.matchLength > 0 && players && players.length > 0) {
+                    const winnerPlayerId = winner === 1
+                        ? (players[0]?.id || 'player1')
+                        : (players[1]?.id || 'player2');
+
+                    const newMatchScore = calculateMatchScore(
+                        winType,
+                        newState.cubeValue,
+                        newState.matchLength,
+                        newState.score || {},
+                        winnerPlayerId,
+                        players
+                    );
+
+                    if (newMatchScore) {
+                        newState.score = newMatchScore;
+                        addLog(`Match score updated: ${JSON.stringify(newMatchScore)}`, 'success');
+                    }
+                }
+
+                // Mark the game as ended
+                newState.dice = [];
+                // Don't switch turn, game is over
+            } else {
+                // Switch turn if no dice left
+                if (newState.dice.length === 0) {
+                    const currentPlayerId = newState.turn;
+                    const myId = user?.id || 'guest-1';
+
+                    // Determine current player color
+                    let currentPlayerColor = 1;
+                    if (players && players.length > 0) {
+                        if (currentPlayerId === players[0].id) currentPlayerColor = 1;
+                        else if (currentPlayerId === players[1]?.id) currentPlayerColor = 2;
+                        else if (currentPlayerId === 'bot') currentPlayerColor = 2;
+                    }
+
+                    // Switch to other player
+                    if (players && players.length > 1) {
+                        // Multiplayer: switch between players[0] and players[1]
+                        newState.turn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
+                    } else {
+                        // Solo/Bot mode: switch between user and bot
+                        newState.turn = currentPlayerId === myId ? 'bot' : myId;
+                    }
+                    addLog(`Turn switched to: ${newState.turn}`, 'info');
+                }
             }
         }
 
-        // TODO: DOUBLE CUBE CHECK - Implement logic here if needed
-        // if (action === 'double') { ... }
+        // Double Cube state is handled via newState properties (pendingDouble, cubeValue)
 
         if (newState.board) {
             addLog('Updating local game state...', 'info');
@@ -341,54 +471,264 @@ export const useGameSocket = () => {
 
     // --- Bot Logic ---
     const botIsThinking = useRef(false);
-    
+    const botTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     useEffect(() => {
-        if (!currentRoom || !gameState) return;
+        if (!currentRoom || !gameState) {
+            const addLog = useDebugStore.getState().addLog;
+            addLog('🤖 Bot: Skipping - no room or gameState', 'warning', { 
+                hasRoom: !!currentRoom, 
+                hasGameState: !!gameState 
+            });
+            return;
+        }
 
         // Check if it's a solo training game
         // We assume it's solo if the name starts with 'Entraînement' OR if there is only 1 player and we are playing
         // Also explicitly check for 'offline-bot' ID
-        const isSoloGame = currentRoom.id === 'offline-bot' || currentRoom.name.startsWith('Entraînement') || (currentRoom.players && currentRoom.players.length <= 1);
+        const isSoloGame = currentRoom.id === 'offline-bot' || 
+                          currentRoom.name?.startsWith('Entraînement') || 
+                          (players && players.length <= 1);
 
-        if (!isSoloGame) return;
+        if (!isSoloGame) {
+            const addLog = useDebugStore.getState().addLog;
+            addLog('🤖 Bot: Not a solo game, skipping', 'info', { 
+                roomId: currentRoom.id, 
+                roomName: currentRoom.name,
+                playersCount: players?.length || 0
+            });
+            return;
+        }
 
         // Check if it's Bot's turn
         // Bot is 'bot' or any ID that is not me
         // Fix: If user is null (guest), myId is 'guest-1'
         const myId = user?.id || 'guest-1';
-        const isBotTurn = gameState.turn !== myId;
+        const currentTurn = gameState.turn;
+        const isBotTurn = currentTurn !== myId && currentTurn !== undefined && currentTurn !== null;
+
+        // Logs détaillés pour diagnostiquer
+        const addLog = useDebugStore.getState().addLog;
+        addLog('🤖 Bot: Checking turn...', 'info', {
+            currentTurn,
+            myId,
+            isBotTurn,
+            botIsThinking: botIsThinking.current,
+            players: players?.map(p => ({ id: p.id, username: p.username }))
+        });
 
         if (isBotTurn && !botIsThinking.current) {
+            // Clear any existing timeout
+            if (botTimeoutRef.current) {
+                clearTimeout(botTimeoutRef.current);
+                botTimeoutRef.current = null;
+            }
+
+            // Safety timeout: débloquer le bot après 30 secondes
+            botTimeoutRef.current = setTimeout(() => {
+                addLog('🤖 Bot: TIMEOUT - Forcing unlock after 30s', 'error');
+                botIsThinking.current = false;
+                if (botTimeoutRef.current) {
+                    clearTimeout(botTimeoutRef.current);
+                    botTimeoutRef.current = null;
+                }
+            }, 30000);
             const performBotMove = async () => {
                 botIsThinking.current = true;
                 const addLog = useDebugStore.getState().addLog;
 
-                // 1. Roll Dice if needed
+                // 0. Check if Bot needs to respond to a double offer
+                if (gameState.pendingDouble && gameState.pendingDouble.offeredBy !== 'bot') {
+                    addLog('🤖 Bot: Évaluation de la proposition de double...', 'info');
+                    await new Promise(r => setTimeout(r, 1500));
+
+                    try {
+                        // Analyser la position pour décider
+                        const analysis = await analyzeMove(gameState, gameState.dice.length > 0 ? gameState.dice : [1, 1], 2);
+
+                        // Import dynamique pour éviter les dépendances circulaires
+                        const { shouldBotAcceptDouble } = await import('../lib/botDoublingLogic');
+
+                        const shouldAccept = shouldBotAcceptDouble(
+                            analysis.winProbability / 100, // Convertir en 0-1
+                            analysis.equity || 0,
+                            gameState.cubeValue,
+                            undefined,
+                            gameState.matchLength || 0
+                        );
+
+                        if (shouldAccept) {
+                            addLog(`🤖 Bot: J'accepte ! (${analysis.winProbability.toFixed(1)}% de chances)`, 'success');
+                            await new Promise(r => setTimeout(r, 800));
+
+                            // Accepter le double
+                            const botId = 'bot';
+                            const newState = {
+                                ...gameState,
+                                cubeValue: gameState.cubeValue * 2,
+                                cubeOwner: botId,
+                                pendingDouble: null
+                            };
+                            updateGame(newState);
+
+                            if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                                await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                            }
+                        } else {
+                            addLog(`🤖 Bot: J'abandonne. (${analysis.winProbability.toFixed(1)}% de chances, trop faible)`, 'error');
+                            await new Promise(r => setTimeout(r, 800));
+
+                            // Refuser = Abandonner, l'adversaire gagne
+                            const pointsWon = gameState.cubeValue;
+                            const newScore = { ...gameState.score };
+                            newScore[gameState.pendingDouble.offeredBy] = (newScore[gameState.pendingDouble.offeredBy] || 0) + pointsWon;
+
+                            const newState = {
+                                ...gameState,
+                                score: newScore,
+                                pendingDouble: null,
+                                dice: [],
+                                turn: gameState.pendingDouble.offeredBy
+                            };
+                            updateGame(newState);
+
+                            if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                                await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                            }
+                        }
+                    } catch (e) {
+                        addLog('🤖 Bot: Erreur évaluation double, j\'accepte par défaut', 'error', e);
+                        // Par défaut, accepter pour ne pas bloquer le jeu
+                        const botId = 'bot';
+                        const newState = {
+                            ...gameState,
+                            cubeValue: gameState.cubeValue * 2,
+                            cubeOwner: botId,
+                            pendingDouble: null
+                        };
+                        updateGame(newState);
+                    }
+
+                    botIsThinking.current = false;
+                    return;
+                }
+
+                // 1. Consider doubling BEFORE rolling dice (if dice not rolled yet)
+                if (gameState.dice.length === 0 && !gameState.pendingDouble) {
+                    // Check if bot can double
+                    const { canOfferDouble } = await import('../lib/gameLogic');
+                    const botId = 'bot';
+
+                    const canDouble = canOfferDouble(
+                        gameState.cubeValue,
+                        gameState.cubeOwner,
+                        botId,
+                        false, // Pas encore lancé les dés
+                        gameState.matchLength || 0
+                    );
+
+                    if (canDouble) {
+                        // Analyser la position pour décider
+                        try {
+                            const analysis = await analyzeMove(gameState, [1, 1], 2); // Dés fictifs pour l'analyse
+                            const { shouldBotDouble } = await import('../lib/botDoublingLogic');
+
+                            const shouldDouble = shouldBotDouble(
+                                analysis.winProbability / 100,
+                                analysis.equity || 0,
+                                gameState.cubeValue,
+                                undefined,
+                                gameState.matchLength || 0
+                            );
+
+                            if (shouldDouble) {
+                                addLog(`🤖 Bot: Je propose de doubler ! (${analysis.winProbability.toFixed(1)}% de chances)`, 'info');
+                                await new Promise(r => setTimeout(r, 1200));
+
+                                const newState = {
+                                    ...gameState,
+                                    pendingDouble: {
+                                        offeredBy: botId,
+                                        timestamp: Date.now()
+                                    }
+                                };
+                                updateGame(newState);
+
+                                if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                                    await supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                                }
+
+                                botIsThinking.current = false;
+                                return; // Attendre la réponse du joueur
+                            }
+                        } catch (e) {
+                            addLog('🤖 Bot: Erreur évaluation pour doubler', 'error', e);
+                            // Continuer normalement
+                        }
+                    }
+                }
+
+                // 2. Roll Dice if needed
                 if (gameState.dice.length === 0) {
                     addLog('🤖 Bot: Rolling dice...', 'info');
                     await new Promise(r => setTimeout(r, 1000));
                     sendGameAction('rollDice', {}, 2); // Force Player 2 (Black)
+                    // Clear timeout on success
+                    if (botTimeoutRef.current) {
+                        clearTimeout(botTimeoutRef.current);
+                        botTimeoutRef.current = null;
+                    }
                     botIsThinking.current = false;
                     return;
                 }
 
                 // 2. Analyze and Move
-                addLog('🤖 Bot: Thinking...', 'info');
-                // await new Promise(r => setTimeout(r, 1500));
+                addLog('🤖 Bot: Analyzing position...', 'info', { 
+                    dice: gameState.dice,
+                    diceCount: gameState.dice.length 
+                });
 
                 try {
-                    // We need to pass the board from the perspective of the bot (Player 2)
-                    const analysis = await analyzeMove(gameState, gameState.dice, 2);
+                    // Timeout pour l'API (10 secondes max)
+                    const analysisPromise = analyzeMove(gameState, gameState.dice, 2);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('API timeout after 10s')), 10000)
+                    );
+
+                    const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
 
                     if (analysis.bestMove && analysis.bestMove.length > 0) {
-                        // Play ALL moves in the sequence
-                        for (const move of analysis.bestMove) {
-                            addLog(`🤖 Bot: Moving ${move.from} -> ${move.to}`, 'info');
-                            await new Promise(r => setTimeout(r, 600));
+                        addLog(`🤖 Bot: Found ${analysis.bestMove.length} move(s)`, 'success', {
+                            moves: analysis.bestMove.map((m: any) => `${m.from}→${m.to}`)
+                        });
+
+                        // Play ALL moves in the sequence, en attendant la confirmation de chaque coup
+                        for (let i = 0; i < analysis.bestMove.length; i++) {
+                            const move = analysis.bestMove[i];
+                            addLog(`🤖 Bot: Playing move ${i + 1}/${analysis.bestMove.length}: ${move.from} -> ${move.to}`, 'info');
+                            
+                            // Attendre un peu avant chaque coup pour la visualisation
+                            await new Promise(r => setTimeout(r, 800));
+                            
+                            // Envoyer le coup
                             sendGameAction('move', { from: move.from, to: move.to }, 2);
+                            
+                            // Attendre que le state se mette à jour avant le prochain coup
+                            // On attend un peu plus pour les doubles
+                            const waitTime = analysis.bestMove.length > 2 ? 1200 : 1000;
+                            await new Promise(r => setTimeout(r, waitTime));
+                            
+                            // Vérifier que le coup a été appliqué (dice devrait diminuer)
+                            // Si on a encore des dés et qu'on n'est pas au dernier coup, continuer
+                            if (i < analysis.bestMove.length - 1) {
+                                // Attendre un peu plus pour la synchronisation
+                                await new Promise(r => setTimeout(r, 500));
+                            }
                         }
+                        
+                        addLog('🤖 Bot: All moves completed', 'success');
                     } else {
-                        addLog('🤖 Bot: No moves found or turn done.', 'info');
+                        addLog('🤖 Bot: No moves found or turn done.', 'warning');
                         // Force turn switch if no moves possible
                         await new Promise(r => setTimeout(r, 2000));
 
@@ -401,19 +741,60 @@ export const useGameSocket = () => {
                             supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
                         }
                     }
-                } catch (e) {
-                    addLog('🤖 Bot: Error', 'error', e);
-                    // Fallback: If bot crashes, switch turn after delay to avoid hanging
-                    await new Promise(r => setTimeout(r, 2000));
-                    const newState = { ...gameState, dice: [] }; // Clear dice to force turn switch
-                    updateGame(newState);
+                } catch (e: any) {
+                    addLog('🤖 Bot: API Error, using fallback', 'error', e);
+                    
+                    // FALLBACK: Utiliser une logique heuristique simple
+                    try {
+                        const { findAnyValidMove } = await import('../lib/gameLogic');
+                        const fallbackMove = findAnyValidMove(gameState.board, 2, gameState.dice);
+                        
+                        if (fallbackMove) {
+                            addLog(`🤖 Bot: Fallback move found: ${fallbackMove.from} -> ${fallbackMove.to} (dé: ${fallbackMove.dieUsed})`, 'warning');
+                            await new Promise(r => setTimeout(r, 1000));
+                            sendGameAction('move', { from: fallbackMove.from, to: fallbackMove.to }, 2);
+                        } else {
+                            addLog('🤖 Bot: No fallback move available, switching turn', 'error');
+                            // Switch turn if no moves possible
+                            await new Promise(r => setTimeout(r, 2000));
+                            const newState = { ...gameState, dice: [] };
+                            updateGame(newState);
+                            
+                            if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                                supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                            }
+                        }
+                    } catch (fallbackError) {
+                        addLog('🤖 Bot: Fallback also failed, switching turn', 'error', fallbackError);
+                        // Last resort: switch turn
+                        await new Promise(r => setTimeout(r, 2000));
+                        const newState = { ...gameState, dice: [] };
+                        updateGame(newState);
+                        
+                        if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                            supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                        }
+                    }
                 }
-                
+
+                // Clear timeout on success
+                if (botTimeoutRef.current) {
+                    clearTimeout(botTimeoutRef.current);
+                    botTimeoutRef.current = null;
+                }
                 botIsThinking.current = false;
             };
             performBotMove();
         }
-    }, [gameState, currentRoom, user, sendGameAction]);
+
+        // Cleanup function
+        return () => {
+            if (botTimeoutRef.current) {
+                clearTimeout(botTimeoutRef.current);
+                botTimeoutRef.current = null;
+            }
+        };
+    }, [gameState, currentRoom, user, sendGameAction, players, updateGame]);
 
     const handleCheckerClick = useCallback((index: number) => {
         if (!gameState || !user) return;
