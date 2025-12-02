@@ -87,12 +87,28 @@ const GameRoom = () => {
 
     // Rejoindre la room au montage
     useEffect(() => {
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`🎮 [GAME_ROOM] useEffect montage - roomId: ${roomId}, isConnected: ${isConnected}, currentRoom: ${currentRoom?.id || 'null'}`, 'info', { roomId, isConnected, currentRoom: currentRoom?.id, mode, length });
+        
         const options = mode ? { mode, matchLength: length } : undefined;
+        addLog(`🎮 [GAME_ROOM] Options: ${JSON.stringify(options)}`, 'info');
 
         if (roomId === 'offline-bot') {
-            joinRoom('offline-bot', options);
+            addLog(`🎮 [GAME_ROOM] Lancement joinRoom pour offline-bot`, 'info');
+            joinRoom('offline-bot', options).catch((err) => {
+                addLog(`❌ [GAME_ROOM] Erreur joinRoom offline-bot: ${err.message}`, 'error', err);
+            });
         } else if (roomId && isConnected && !currentRoom) {
-            joinRoom(roomId, options);
+            addLog(`🎮 [GAME_ROOM] Lancement joinRoom pour ${roomId}`, 'info');
+            joinRoom(roomId, options).catch((err) => {
+                addLog(`❌ [GAME_ROOM] Erreur joinRoom ${roomId}: ${err.message}`, 'error', err);
+            });
+        } else {
+            addLog(`⚠️ [GAME_ROOM] Conditions non remplies pour joinRoom`, 'info', {
+                hasRoomId: !!roomId,
+                isConnected,
+                hasCurrentRoom: !!currentRoom
+            });
         }
     }, [roomId, isConnected, currentRoom, joinRoom, user, mode, length]);
 

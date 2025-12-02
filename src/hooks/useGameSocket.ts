@@ -173,110 +173,213 @@ export const useGameSocket = () => {
     // --- Join Room & Subscribe to Game State ---
     const joinRoom = useCallback(async (roomId: string, options?: GameOptions) => {
         const addLog = useDebugStore.getState().addLog;
-        addLog(`Joining room: ${roomId}`, 'info', options);
+        addLog(`🚀 [JOIN_ROOM] Début - Room ID: ${roomId}`, 'info', { roomId, options, DEMO_MODE, user: user?.id });
 
         if (DEMO_MODE) {
-            addLog('Demo mode join', 'info');
+            addLog('✅ [JOIN_ROOM] Mode démo activé', 'info');
             const room = roomsList.find(r => r.id === roomId) || {
                 id: roomId,
                 name: 'Salle Demo',
                 status: 'playing',
                 players: []
             };
+            addLog(`✅ [JOIN_ROOM] Room définie (démo): ${room.name}`, 'success');
             setRoom(room as Room);
-            updateGame(createMockGameState(user?.id, options));
+            const mockState = createMockGameState(user?.id, options);
+            addLog(`✅ [JOIN_ROOM] État de jeu créé (démo)`, 'success', { dice: mockState.dice, turn: mockState.turn });
+            updateGame(mockState);
+            addLog(`✅ [JOIN_ROOM] Terminé (démo)`, 'success');
             return;
         }
 
         try {
             if (roomId === 'offline-bot') {
-                addLog('Initializing Offline Bot Mode', 'info');
+                addLog('🤖 [JOIN_ROOM] Initialisation mode bot offline', 'info');
+                addLog(`📋 [JOIN_ROOM] Récupération des joueurs...`, 'info');
                 const soloPlayers = await fetchRoomPlayers('offline-bot');
-                setRoom({
+                addLog(`✅ [JOIN_ROOM] Joueurs récupérés: ${soloPlayers.length}`, 'success', soloPlayers);
+                
+                const botRoom = {
                     id: 'offline-bot',
                     name: 'Entraînement Solo (Offline)',
-                    status: 'playing',
+                    status: 'playing' as const,
                     players: []
-                });
+                };
+                addLog(`✅ [JOIN_ROOM] Room définie (bot): ${botRoom.name}`, 'success');
+                setRoom(botRoom);
                 setPlayers(soloPlayers);
-                updateGame(createMockGameState(user?.id, options));
+                
+                const botState = createMockGameState(user?.id, options);
+                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { dice: botState.dice, turn: botState.turn });
+                updateGame(botState);
+                addLog(`✅ [JOIN_ROOM] Terminé (bot offline)`, 'success');
                 return;
             }
 
+            addLog(`📡 [JOIN_ROOM] Mode Supabase - User: ${user?.id || 'null'}`, 'info');
+
+            // Étape 1: Upsert participant
             if (user) {
-                await supabase.from('room_participants').upsert({ room_id: roomId, user_id: user.id }).select();
-            }
-
-            // Fetch players before setting room
-            const roomPlayers = await fetchRoomPlayers(roomId);
-            setPlayers(roomPlayers);
-            addLog(`Fetched ${roomPlayers.length} players for room`, 'success');
-
-            const { data: roomData, error: roomError } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-
-            if (roomError) {
-                addLog('Error fetching room', 'error', roomError);
-                // Fallback
-                setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
-            } else if (roomData) {
-                addLog(`Room fetched: ${roomData.name}`, 'success');
-                setRoom({ ...roomData, players: [] }); // Players are set separately via setPlayers
-            }
-
-            if (channelRef.current) supabase.removeChannel(channelRef.current);
-
-            const channel = supabase.channel(`room:${roomId}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `room_id=eq.${roomId}` }, (payload) => {
-                    const newGame = payload.new as any;
-                    if (newGame && newGame.board_state) {
-                        addLog('Game update received', 'info');
-                        updateGame(newGame.board_state);
-                    }
-                })
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, (payload) => {
-                    const msg = payload.new as any;
-                    addMessage({
-                        id: msg.id,
-                        userId: msg.user_id,
-                        username: 'Joueur',
-                        text: msg.content,
-                        timestamp: new Date(msg.created_at).getTime()
-                    });
-                })
-                .subscribe((status) => {
-                    addLog(`Subscription status: ${status}`, status === 'SUBSCRIBED' ? 'success' : 'info');
-                });
-
-            channelRef.current = channel;
-
-            // Récupération ou Création de l'état du jeu
-            const { data: gameData, error: gameError } = await supabase.from('games').select('*').eq('room_id', roomId).single();
-
-            if (gameData) {
-                addLog('Game state found', 'success');
-                updateGame(gameData.board_state);
-            } else {
-                addLog('No game found, creating new game...', 'info');
-                const initialState = createMockGameState(user?.id, options);
-                const { error: insertError } = await supabase.from('games').insert({
-                    room_id: roomId,
-                    board_state: initialState,
-                    white_player_id: user?.id
-                });
-
-                if (insertError) {
-                    addLog('Error creating game (retry)', 'error', insertError);
-                    const { data: retryGame } = await supabase.from('games').select('*').eq('room_id', roomId).single();
-                    if (retryGame) updateGame(retryGame.board_state);
-                    else updateGame(initialState);
-                } else {
-                    updateGame(initialState);
+                addLog(`📡 [JOIN_ROOM] Étape 1: Upsert participant...`, 'info');
+                try {
+                    const upsertResult = await Promise.race([
+                        supabase.from('room_participants').upsert({ room_id: roomId, user_id: user.id }).select(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout upsert participant')), 10000))
+                    ]) as any;
+                    addLog(`✅ [JOIN_ROOM] Participant upsert réussi`, 'success', upsertResult);
+                } catch (err: any) {
+                    addLog(`⚠️ [JOIN_ROOM] Erreur upsert participant (continuation): ${err.message}`, 'error', err);
                 }
+            } else {
+                addLog(`⚠️ [JOIN_ROOM] Pas d'utilisateur, skip upsert`, 'info');
             }
-        } catch (err) {
-            addLog('Critical error joining room', 'error', err);
+
+            // Étape 2: Fetch players
+            addLog(`📡 [JOIN_ROOM] Étape 2: Récupération des joueurs...`, 'info');
+            let roomPlayers: Player[] = [];
+            try {
+                roomPlayers = await Promise.race([
+                    fetchRoomPlayers(roomId),
+                    new Promise<Player[]>((_, reject) => setTimeout(() => reject(new Error('Timeout fetch players')), 10000))
+                ]);
+                addLog(`✅ [JOIN_ROOM] Joueurs récupérés: ${roomPlayers.length}`, 'success', roomPlayers);
+            } catch (err: any) {
+                addLog(`⚠️ [JOIN_ROOM] Erreur fetch players (fallback): ${err.message}`, 'error', err);
+                roomPlayers = user ? [{ id: user.id, username: user.username || 'Guest', avatar: user.avatar }] : [];
+            }
+            setPlayers(roomPlayers);
+
+            // Étape 3: Fetch room data
+            addLog(`📡 [JOIN_ROOM] Étape 3: Récupération des données de la room...`, 'info');
+            try {
+                const roomResult = await Promise.race([
+                    supabase.from('rooms').select('*').eq('id', roomId).single(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout fetch room')), 10000))
+                ]) as any;
+
+                const { data: roomData, error: roomError } = roomResult;
+
+                if (roomError) {
+                    addLog(`⚠️ [JOIN_ROOM] Erreur fetch room (fallback): ${roomError.message}`, 'error', roomError);
+                    setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
+                } else if (roomData) {
+                    addLog(`✅ [JOIN_ROOM] Room récupérée: ${roomData.name}`, 'success', roomData);
+                    setRoom({ ...roomData, players: [] });
+                }
+            } catch (err: any) {
+                addLog(`⚠️ [JOIN_ROOM] Erreur fetch room (catch): ${err.message}`, 'error', err);
+                setRoom({ id: roomId, name: 'Partie en cours', status: 'playing', players: [] });
+            }
+
+            // Étape 4: Setup channel
+            addLog(`📡 [JOIN_ROOM] Étape 4: Configuration du channel...`, 'info');
+            if (channelRef.current) {
+                addLog(`📡 [JOIN_ROOM] Suppression ancien channel...`, 'info');
+                supabase.removeChannel(channelRef.current);
+            }
+
+            try {
+                const channel = supabase.channel(`room:${roomId}`)
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `room_id=eq.${roomId}` }, (payload) => {
+                        const newGame = payload.new as any;
+                        if (newGame && newGame.board_state) {
+                            addLog('📥 [JOIN_ROOM] Mise à jour jeu reçue via channel', 'info');
+                            updateGame(newGame.board_state);
+                        }
+                    })
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, (payload) => {
+                        const msg = payload.new as any;
+                        addMessage({
+                            id: msg.id,
+                            userId: msg.user_id,
+                            username: 'Joueur',
+                            text: msg.content,
+                            timestamp: new Date(msg.created_at).getTime()
+                        });
+                    })
+                    .subscribe((status) => {
+                        addLog(`📡 [JOIN_ROOM] Statut subscription: ${status}`, status === 'SUBSCRIBED' ? 'success' : 'info');
+                    });
+
+                channelRef.current = channel;
+                addLog(`✅ [JOIN_ROOM] Channel configuré`, 'success');
+            } catch (err: any) {
+                addLog(`⚠️ [JOIN_ROOM] Erreur setup channel (continuation): ${err.message}`, 'error', err);
+            }
+
+            // Étape 5: Fetch or create game
+            addLog(`📡 [JOIN_ROOM] Étape 5: Récupération/création du jeu...`, 'info');
+            try {
+                const gameResult = await Promise.race([
+                    supabase.from('games').select('*').eq('room_id', roomId).single(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout fetch game')), 10000))
+                ]) as any;
+
+                const { data: gameData, error: gameError } = gameResult;
+
+                if (gameData) {
+                    addLog(`✅ [JOIN_ROOM] État de jeu trouvé`, 'success', { dice: gameData.board_state?.dice, turn: gameData.board_state?.turn });
+                    updateGame(gameData.board_state);
+                } else {
+                    addLog(`📝 [JOIN_ROOM] Aucun jeu trouvé, création...`, 'info');
+                    const initialState = createMockGameState(user?.id, options);
+                    addLog(`📝 [JOIN_ROOM] État initial créé`, 'info', { dice: initialState.dice, turn: initialState.turn });
+                    
+                    try {
+                        const insertResult = await Promise.race([
+                            supabase.from('games').insert({
+                                room_id: roomId,
+                                board_state: initialState,
+                                white_player_id: user?.id
+                            }),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout insert game')), 10000))
+                        ]) as any;
+
+                        const { error: insertError } = insertResult;
+
+                        if (insertError) {
+                            addLog(`⚠️ [JOIN_ROOM] Erreur création jeu (retry): ${insertError.message}`, 'error', insertError);
+                            try {
+                                const retryResult = await Promise.race([
+                                    supabase.from('games').select('*').eq('room_id', roomId).single(),
+                                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout retry game')), 5000))
+                                ]) as any;
+                                const { data: retryGame } = retryResult;
+                                if (retryGame) {
+                                    addLog(`✅ [JOIN_ROOM] Jeu récupéré après retry`, 'success');
+                                    updateGame(retryGame.board_state);
+                                } else {
+                                    addLog(`⚠️ [JOIN_ROOM] Fallback: utilisation état initial local`, 'info');
+                                    updateGame(initialState);
+                                }
+                            } catch (retryErr: any) {
+                                addLog(`⚠️ [JOIN_ROOM] Erreur retry (fallback local): ${retryErr.message}`, 'error', retryErr);
+                                updateGame(initialState);
+                            }
+                        } else {
+                            addLog(`✅ [JOIN_ROOM] Jeu créé avec succès`, 'success');
+                            updateGame(initialState);
+                        }
+                    } catch (insertErr: any) {
+                        addLog(`⚠️ [JOIN_ROOM] Erreur insert (fallback local): ${insertErr.message}`, 'error', insertErr);
+                        updateGame(initialState);
+                    }
+                }
+            } catch (err: any) {
+                addLog(`⚠️ [JOIN_ROOM] Erreur fetch/create game (fallback): ${err.message}`, 'error', err);
+                const fallbackState = createMockGameState(user?.id, options);
+                addLog(`⚠️ [JOIN_ROOM] Utilisation état fallback`, 'info');
+                updateGame(fallbackState);
+            }
+
+            addLog(`✅ [JOIN_ROOM] Terminé avec succès`, 'success');
+        } catch (err: any) {
+            addLog(`❌ [JOIN_ROOM] Erreur critique: ${err.message}`, 'error', err);
+            addLog(`❌ [JOIN_ROOM] Stack: ${err.stack}`, 'error');
             setRoom({ id: roomId, name: 'Erreur Connexion', status: 'playing', players: [] });
-            updateGame(createMockGameState(user?.id));
+            const errorState = createMockGameState(user?.id);
+            addLog(`⚠️ [JOIN_ROOM] Utilisation état d'erreur`, 'info');
+            updateGame(errorState);
         }
 
     }, [user, roomsList, setRoom, updateGame, addMessage]);
