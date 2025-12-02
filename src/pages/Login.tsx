@@ -1,12 +1,19 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Dices, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginWithGoogle, loginAsGuest } = useAuth();
   const [error, setError] = useState('');
+
+  // Récupérer la redirection depuis l'URL ou le state
+  const searchParams = new URLSearchParams(location.search);
+  const redirectTo = searchParams.get('redirect') || 
+                     (location.state as any)?.from?.pathname || 
+                     '/dashboard';
 
   const handleGoogleLogin = async () => {
     const { error } = await loginWithGoogle();
@@ -81,9 +88,9 @@ export default function Login() {
           </button>
 
           <button
-            onClick={() => {
-              loginAsGuest();
-              navigate('/lobby');
+            onClick={async () => {
+              await loginAsGuest();
+              navigate(redirectTo);
             }}
             className="w-full group relative overflow-hidden bg-[#1a1a1a] border-2 border-gray-700 hover:border-white text-gray-300 hover:text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 text-lg shadow-lg"
           >

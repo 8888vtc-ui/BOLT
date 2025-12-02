@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Trophy, Users, Clock, Calendar, Award, ChevronRight, Plus, Filter, Loader2, Play } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showError, showSuccess, showWarning, showInfo } from '../lib/notifications';
 import CreateTournamentModal, { TournamentConfig } from '../components/tournaments/CreateTournamentModal';
 import { useTournaments } from '../hooks/useTournaments';
 import { useAuth } from '../hooks/useAuth';
@@ -90,24 +91,24 @@ export default function Tournaments() {
       });
 
       setShowCreateModal(false);
-      alert(`Tournoi "${config.name}" créé avec succès !`);
+      showSuccess(`Tournoi "${config.name}" créé avec succès !`);
     } catch (err: any) {
-      alert(`Erreur lors de la création : ${err.message}`);
+      showError(`Erreur lors de la création : ${err.message}`);
     }
   };
 
   const handleRegister = async (tournamentId: string) => {
     if (!user) {
-      alert('Vous devez être connecté pour vous inscrire');
+      showWarning('Vous devez être connecté pour vous inscrire');
       return;
     }
 
     setRegistering(tournamentId);
     try {
       await registerForTournament(tournamentId);
-      alert('Inscription réussie !');
+      showSuccess('Inscription réussie !');
     } catch (err: any) {
-      alert(`Erreur : ${err.message}`);
+      showError(`Erreur : ${err.message}`);
     } finally {
       setRegistering(null);
     }
@@ -121,11 +122,11 @@ export default function Tournaments() {
       if (match && match.game_room_id) {
         navigate(`/game/${match.game_room_id}`);
       } else {
-        alert('Aucun match en cours trouvé pour ce tournoi.');
+        showInfo('Aucun match en cours trouvé pour ce tournoi.');
       }
     } catch (err: any) {
       console.error('Error joining match:', err);
-      alert('Erreur lors de la récupération du match.');
+      showError('Erreur lors de la récupération du match.');
     } finally {
       setJoiningMatch(null);
     }
@@ -254,12 +255,12 @@ export default function Tournaments() {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (confirm('Voulez-vous vraiment démarrer ce tournoi ? Les inscriptions seront closes.')) {
+                            if (window.confirm('Voulez-vous vraiment démarrer ce tournoi ? Les inscriptions seront closes.')) {
                               try {
                                 await startTournament(tournament.id);
-                                alert('Tournoi démarré avec succès !');
+                                showSuccess('Tournoi démarré avec succès !');
                               } catch (err: any) {
-                                alert('Erreur : ' + err.message);
+                                showError('Erreur : ' + err.message);
                               }
                             }
                           }}

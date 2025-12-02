@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useGameSocket } from '../hooks/useGameSocket';
 import TrophyCase from '../components/profile/TrophyCase';
 import { getUserStats, getRecentGames, type UserStats, type RecentGame } from '../lib/statsService';
+import { showError } from '../lib/notifications';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -122,8 +123,12 @@ export default function Dashboard() {
           <button
             onClick={async () => {
               const roomId = await playVsBot();
-              if (roomId) navigate(`/game/${roomId}`);
-              else alert("Erreur lors de la création de la salle d'entraînement.");
+              if (roomId) {
+                navigate(`/game/${roomId}`);
+              } else {
+                // Fallback vers le mode offline
+                navigate('/game/offline-bot?mode=match&length=5');
+              }
             }}
             className="bg-[#111] border-2 border-[#FFD700] text-[#FFD700] p-8 rounded-2xl font-black text-xl hover:bg-[#FFD700]/10 transition-all"
           >

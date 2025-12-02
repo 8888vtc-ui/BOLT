@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Trophy, Users, Calendar, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showWarning } from '../../lib/notifications';
 
 interface CreateTournamentModalProps {
     isOpen: boolean;
@@ -46,7 +47,7 @@ export default function CreateTournamentModal({ isOpen, onClose, onCreateTournam
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!config.name || !config.startDate) {
-            alert('Veuillez remplir tous les champs obligatoires');
+            showWarning('Veuillez remplir tous les champs obligatoires');
             return;
         }
         onCreateTournament(config);

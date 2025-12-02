@@ -1,4 +1,4 @@
-import { Home, Users, Trophy, BarChart3, PieChart, User, Settings, HelpCircle, LogOut, Sparkles } from 'lucide-react';
+import { Home, Swords, Trophy, BarChart3, User, Settings, HelpCircle, LogOut } from 'lucide-react';
 
 export interface MenuItem {
     id: string;
@@ -10,12 +10,13 @@ export interface MenuItem {
     action?: string; // For special actions like 'logout'
 }
 
+// Menu principal simplifié - 4 éléments max
 export const MAIN_MENU: MenuItem[] = [
     {
         id: 'play',
         label: 'JOUER',
         route: '/lobby',
-        icon: Users,
+        icon: Swords,
         roles: ['user', 'guest']
     },
     {
@@ -38,30 +39,17 @@ export const MAIN_MENU: MenuItem[] = [
         route: '/leaderboard',
         icon: BarChart3,
         roles: ['user', 'guest']
-    },
-    {
-        id: 'analyses',
-        label: 'Analyses',
-        route: '/analyses',
-        icon: PieChart,
-        roles: ['user']
-    },
-    {
-        id: 'coming-soon',
-        label: 'Coming Soon',
-        route: '/coming-soon',
-        icon: Sparkles,
-        roles: ['user', 'guest']
     }
 ];
 
+// Menu utilisateur (dropdown)
 export const USER_MENU: MenuItem[] = [
     {
         id: 'profile',
         label: 'Mon Profil',
         route: '/profile',
         icon: User,
-        roles: ['user']
+        roles: ['user', 'guest']
     },
     {
         id: 'settings',

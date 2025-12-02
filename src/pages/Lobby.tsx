@@ -4,6 +4,7 @@ import { Search, Trophy, Swords, Users } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useGameStore } from '../stores/gameStore';
 import { supabase } from '../lib/supabase';
+import { showError, showInfo } from '../lib/notifications';
 
 const Lobby = () => {
     const navigate = useNavigate();
@@ -142,10 +143,16 @@ const Lobby = () => {
 
                                 <button
                                     onClick={async () => {
+                                        // Permettre le jeu même sans connexion (mode offline)
+                                        const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
+                                        
                                         if (!user) {
-                                            alert("Vous devez être connecté pour jouer.");
+                                            // Mode offline pour les non-connectés
+                                            showInfo("Mode hors ligne activé");
+                                            navigate(`/game/offline-bot${queryParams}`);
                                             return;
                                         }
+                                        
                                         try {
                                             const { data, error } = await supabase
                                                 .from('rooms')
@@ -157,8 +164,6 @@ const Lobby = () => {
                                                 .select()
                                                 .single();
 
-                                            const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
-
                                             if (error) {
                                                 console.error("Erreur création salle (Supabase):", error);
                                                 console.log("Falling back to offline bot mode...");
@@ -168,7 +173,6 @@ const Lobby = () => {
                                             if (data) navigate(`/game/${data.id}${queryParams}`);
                                         } catch (err) {
                                             console.error("Exception création salle:", err);
-                                            const queryParams = `?mode=${gameMode}&length=${gameMode === 'match' ? matchLength : 0}`;
                                             navigate(`/game/offline-bot${queryParams}`);
                                         }
                                     }}
