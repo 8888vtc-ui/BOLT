@@ -340,14 +340,13 @@ export const useGameSocket = () => {
                     }
                 }
                 
-                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
-                    dice: botState.dice, 
-                    turn: botState.turn,
+                // Vérifier le board AVANT de l'envoyer au store
+                const boardCheck = {
                     hasBoard: !!botState.board,
                     hasPoints: !!botState.board?.points,
                     pointsLength: botState.board?.points?.length,
-                    totalCheckers,
-                    pointsWithCheckers: botState.board?.points?.filter((p: any) => p.count > 0).length,
+                    totalCheckers: botState.board?.points?.reduce((sum: number, p: any) => sum + (p?.count || 0), 0) || 0,
+                    pointsWithCheckers: botState.board?.points?.filter((p: any) => p?.count > 0).length || 0,
                     samplePoints: {
                         point0: botState.board?.points?.[0],
                         point5: botState.board?.points?.[5],
@@ -355,7 +354,29 @@ export const useGameSocket = () => {
                         point12: botState.board?.points?.[12],
                         point23: botState.board?.points?.[23]
                     }
+                };
+                
+                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
+                    dice: botState.dice, 
+                    turn: botState.turn,
+                    ...boardCheck
                 });
+                
+                // Si le board est vide ou invalide, FORCER l'utilisation de INITIAL_BOARD
+                if (!boardCheck.hasBoard || !boardCheck.hasPoints || boardCheck.pointsLength !== 24 || boardCheck.totalCheckers === 0) {
+                    addLog(`❌ [JOIN_ROOM] Board invalide détecté, FORCAGE INITIAL_BOARD`, 'error', boardCheck);
+                    try {
+                        botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                        addLog(`✅ [JOIN_ROOM] Board FORCÉ avec INITIAL_BOARD`, 'success');
+                    } catch (error) {
+                        botState.board = {
+                            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+                            bar: { ...INITIAL_BOARD.bar },
+                            off: { ...INITIAL_BOARD.off }
+                        };
+                        addLog(`✅ [JOIN_ROOM] Board FORCÉ avec INITIAL_BOARD (fallback)`, 'success');
+                    }
+                }
                 
                 // UPDATE GAME IMMÉDIATEMENT (synchrone) - CRITIQUE pour éviter écran noir
                 updateGame(botState);
