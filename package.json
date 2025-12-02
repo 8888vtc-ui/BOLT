@@ -16,6 +16,7 @@
     "test:comprehensive": "npm run test",
     "test:game": "node src/test/runGameTests.ts",
     "test:validation": "node src/test/validateGameModes.ts",
+    "test:bot-level": "node --loader ts-node/esm -e \"import { testBotLevel, evaluateBotLevel, printBotLevelResults } from './src/test/test-bot-level'; const tests = testBotLevel(); const eval = evaluateBotLevel(tests); printBotLevelResults(tests, eval);\"",
     "predeploy": "npm run typecheck && npm run build"
   },
   "dependencies": {
