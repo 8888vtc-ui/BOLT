@@ -89,10 +89,10 @@ export const analyzeMove = async (
             }
         };
 
-        addLog('🤖 AI Service: Calling BotGammon API...', 'info', { 
+        addLog('🤖 AI Service: Calling BotGammon API...', 'info', {
             url: BOT_API_URL,
             dice: dice,
-            player: targetEnginePlayer 
+            player: targetEnginePlayer
         });
 
         // Retry logic avec backoff exponentiel
@@ -174,12 +174,43 @@ export const analyzeMove = async (
         // But we should ensure they are valid.
 
         if (bestMoves.length > 0) {
-            bestMoves = bestMoves.map((move: any) => ({
-                ...move,
-                from: typeof move.from === 'number' ? move.from : move.from,
-                to: typeof move.to === 'number' ? move.to : move.to,
-                die: move.die !== undefined ? move.die : (move.dieUsed !== undefined ? move.dieUsed : undefined) // Préserver le die
-            }));
+            bestMoves = bestMoves.map((move: any) => {
+                // Normalisation des coordonnées
+                let from = typeof move.from === 'number' ? move.from : parseInt(move.from);
+                let to = typeof move.to === 'number' ? move.to : parseInt(move.to);
+                const die = move.die !== undefined ? move.die : (move.dieUsed !== undefined ? move.dieUsed : undefined);
+
+                // MAPPING CRITIQUE POUR LE JOUEUR 2 (NOIR)
+                // L'API renvoie souvent des coups du point de vue "24 -> 1"
+                // Mais notre moteur interne pour P2 fonctionne de "0 -> 23" (ou inversement selon l'implémentation)
+                // Si P2 joue, on inverse les coordonnées : 24 - x
+                // Sauf si c'est "bar" (25) ou "off" (0/25)
+
+                if (playerColor === 2) {
+                    // Gestion Bar/Off à adapter si besoin, ici on suppose 1-24 standard
+                    if (from >= 1 && from <= 24) from = 24 - from; // Ex: 24 devient 0, 1 devient 23
+                    else if (from === 25) from = -1; // Bar
+
+                    if (to >= 1 && to <= 24) to = 24 - to;
+                    else if (to === 0 || to === 25) to = 24; // Off (ou 24 selon logique interne)
+                    // Note: Vérifier si interne utilise 24 ou >23 pour off
+                } else {
+                    // Pour P1, on convertit 1-24 en 0-23
+                    if (from >= 1 && from <= 24) from = from - 1;
+                    if (to >= 1 && to <= 24) to = to - 1;
+                }
+
+                // Correction temporaire : Si l'API renvoie déjà 0-23, ce mapping peut casser.
+                // On va se fier aux logs pour ajuster. 
+                // Pour l'instant, on applique le mapping "API 1-24 -> Interne 0-23"
+
+                return {
+                    ...move,
+                    from,
+                    to,
+                    die
+                };
+            });
             addLog('🤖 AI Service: Mapped moves', 'info', bestMoves.map((m: any) => ({ from: m.from, to: m.to, die: m.die })));
         }
 

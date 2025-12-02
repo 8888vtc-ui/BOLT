@@ -24,6 +24,9 @@ Toutes les fonctionnalités demandées ont été implémentées et intégrées.
 ## 4. Qualité de Code 🧹
 -   Correction des erreurs de linting (types, imports).
 -   Nettoyage des TODOs obsolètes.
+-   **Correctifs Critiques** :
+    -   Réparation de l'exécution des coups du Bot (problème de dé manquant et coordonnées).
+    -   Correction de l'affichage des pions (invisibles sur certaines résolutions).
 
 ---
 

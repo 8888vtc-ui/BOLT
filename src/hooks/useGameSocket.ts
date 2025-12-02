@@ -38,7 +38,7 @@ const createMockGameState = (userId?: string, options?: GameOptions): GameState 
             off: { ...INITIAL_BOARD.off }
         };
     }
-    
+
     return {
         board: boardCopy,
         dice: [],
@@ -150,7 +150,7 @@ export const useGameSocket = () => {
             if (error) {
                 const addLog = useDebugStore.getState().addLog;
                 addLog(`⚠️ [SUPABASE] Erreur fetchRooms: ${error.message}`, 'warning', error);
-                
+
                 // Si erreur de permissions, retourner liste vide
                 if (error.code === '42501' || error.message?.includes('permission denied')) {
                     addLog(`⚠️ [SUPABASE] Permissions refusées - Liste vide`, 'warning');
@@ -260,7 +260,7 @@ export const useGameSocket = () => {
             addLog('✅ [JOIN_ROOM] Mode démo activé', 'info');
             // FORCER isConnected à true en mode démo
             setIsConnected(true);
-            
+
             const room = roomsList.find(r => r.id === roomId) || {
                 id: roomId,
                 name: 'Salle Demo',
@@ -279,21 +279,21 @@ export const useGameSocket = () => {
         try {
             if (roomId === 'offline-bot') {
                 addLog('🤖 [JOIN_ROOM] Initialisation mode bot offline', 'info');
-                
+
                 // FORCER isConnected à true pour mode offline-bot
                 setIsConnected(true);
-                
+
                 // Vérifier si on est déjà dans cette room ET que gameState existe
                 if (currentRoom && currentRoom.id === 'offline-bot' && gameState && gameState.board) {
                     addLog(`✅ [JOIN_ROOM] Déjà dans offline-bot avec gameState, skip`, 'info');
                     return;
                 }
-                
+
                 // VERSION ULTRA-RAPIDE - Pas d'appel API qui peut bloquer
                 addLog(`📋 [JOIN_ROOM] Création joueurs locaux...`, 'info');
-                const soloPlayers = user ? [{ id: user.id, username: user.username || 'Joueur', avatar: user.avatar }] : [{ id: 'guest', username: 'Invité', avatar: null }];
+                const soloPlayers = user ? [{ id: user.id, username: user.username || 'Joueur', avatar: user.avatar }] : [{ id: 'guest', username: 'Invité', avatar: undefined }];
                 addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', soloPlayers);
-                
+
                 const botRoom = {
                     id: 'offline-bot',
                     name: 'Entraînement Solo (Offline)',
@@ -301,14 +301,14 @@ export const useGameSocket = () => {
                     players: []
                 };
                 addLog(`✅ [JOIN_ROOM] Room définie (bot): ${botRoom.name}`, 'success');
-                
+
                 // SET ROOM ET PLAYERS IMMÉDIATEMENT (synchrone)
                 setRoom(botRoom);
                 setPlayers(soloPlayers);
-                
+
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 const botState = createMockGameState(user?.id, options);
-                
+
                 // Vérifier que le board est valide AVANT les logs - utiliser copie profonde sécurisée
                 if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
                     addLog(`❌ [JOIN_ROOM] Board invalide, utilisation INITIAL_BOARD`, 'error');
@@ -323,7 +323,7 @@ export const useGameSocket = () => {
                         };
                     }
                 }
-                
+
                 // Vérifier que le board a des jetons
                 const totalCheckers = botState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
                 if (totalCheckers === 0) {
@@ -339,7 +339,7 @@ export const useGameSocket = () => {
                         };
                     }
                 }
-                
+
                 // Vérifier le board AVANT de l'envoyer au store
                 const boardCheck = {
                     hasBoard: !!botState.board,
@@ -355,13 +355,13 @@ export const useGameSocket = () => {
                         point23: botState.board?.points?.[23]
                     }
                 };
-                
-                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
-                    dice: botState.dice, 
+
+                addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', {
+                    dice: botState.dice,
                     turn: botState.turn,
                     ...boardCheck
                 });
-                
+
                 // Si le board est vide ou invalide, FORCER l'utilisation de INITIAL_BOARD
                 if (!boardCheck.hasBoard || !boardCheck.hasPoints || boardCheck.pointsLength !== 24 || boardCheck.totalCheckers === 0) {
                     addLog(`❌ [JOIN_ROOM] Board invalide détecté, FORCAGE INITIAL_BOARD`, 'error', boardCheck);
@@ -377,7 +377,7 @@ export const useGameSocket = () => {
                         addLog(`✅ [JOIN_ROOM] Board FORCÉ avec INITIAL_BOARD (fallback)`, 'success');
                     }
                 }
-                
+
                 // UPDATE GAME IMMÉDIATEMENT (synchrone) - CRITIQUE pour éviter écran noir
                 updateGame(botState);
                 addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ - Room et GameState définis`, 'success', {
@@ -513,7 +513,7 @@ export const useGameSocket = () => {
                     addLog(`📝 [JOIN_ROOM] Aucun jeu trouvé, création...`, 'info');
                     const initialState = createMockGameState(user?.id, options);
                     addLog(`📝 [JOIN_ROOM] État initial créé`, 'info', { dice: initialState.dice, turn: initialState.turn });
-                    
+
                     try {
                         const insertResult = await Promise.race([
                             supabase.from('games').insert({
@@ -657,22 +657,22 @@ export const useGameSocket = () => {
 
             // Utiliser le die fourni par l'API si disponible, sinon le calculer
             let dieUsed = (die !== undefined && die !== null && die > 0) ? die : -1;
-            
-            addLog(`🔍 [MOVE] Calcul dieUsed`, 'info', { 
-                dieFromPayload: die, 
-                dieUsed, 
-                from, 
-                to, 
+
+            addLog(`🔍 [MOVE] Calcul dieUsed`, 'info', {
+                dieFromPayload: die,
+                dieUsed,
+                from,
+                to,
                 playerColor,
-                currentDice 
+                currentDice
             });
-            
+
             if (dieUsed === -1) {
                 // Calculer le die si non fourni
-                if (playerColor === 1) { 
+                if (playerColor === 1) {
                     // Blanc (23 -> 0) : se déplace vers le bas, donc from > to
                     if (from > to) dieUsed = from - to;
-                } else { 
+                } else {
                     // Noir (0 -> 23) : se déplace vers le haut, donc to > from
                     // MAIS peut aussi se déplacer depuis le point 23 vers le bas (23->18)
                     // Dans ce cas, from > to, et on utilise from - to
@@ -795,9 +795,9 @@ export const useGameSocket = () => {
     useEffect(() => {
         if (!currentRoom || !gameState) {
             const addLog = useDebugStore.getState().addLog;
-            addLog('🤖 Bot: Skipping - no room or gameState', 'warning', { 
-                hasRoom: !!currentRoom, 
-                hasGameState: !!gameState 
+            addLog('🤖 Bot: Skipping - no room or gameState', 'warning', {
+                hasRoom: !!currentRoom,
+                hasGameState: !!gameState
             });
             return;
         }
@@ -805,14 +805,14 @@ export const useGameSocket = () => {
         // Check if it's a solo training game
         // We assume it's solo if the name starts with 'Entraînement' OR if there is only 1 player and we are playing
         // Also explicitly check for 'offline-bot' ID
-        const isSoloGame = currentRoom.id === 'offline-bot' || 
-                          currentRoom.name?.startsWith('Entraînement') || 
-                          (players && players.length <= 1);
+        const isSoloGame = currentRoom.id === 'offline-bot' ||
+            currentRoom.name?.startsWith('Entraînement') ||
+            (players && players.length <= 1);
 
         if (!isSoloGame) {
             const addLog = useDebugStore.getState().addLog;
-            addLog('🤖 Bot: Not a solo game, skipping', 'info', { 
-                roomId: currentRoom.id, 
+            addLog('🤖 Bot: Not a solo game, skipping', 'info', {
+                roomId: currentRoom.id,
                 roomName: currentRoom.name,
                 playersCount: players?.length || 0
             });
@@ -1012,9 +1012,9 @@ export const useGameSocket = () => {
                 }
 
                 // 2. Analyze and Move
-                addLog('🤖 Bot: Analyzing position...', 'info', { 
+                addLog('🤖 Bot: Analyzing position...', 'info', {
                     dice: gameState.dice,
-                    diceCount: gameState.dice.length 
+                    diceCount: gameState.dice.length
                 });
 
                 try {
@@ -1033,22 +1033,23 @@ export const useGameSocket = () => {
                                 move: { from: move.from, to: move.to, die: move.die },
                                 availableDice: gameState.dice
                             });
-                            
+
                             // Attendre un peu avant chaque coup pour la visualisation
                             await new Promise(r => setTimeout(r, 800));
-                            
+
                             // Envoyer le coup avec le die fourni par l'API
-                            sendGameAction('move', { 
-                                from: move.from, 
-                                to: move.to, 
-                                die: move.die // Utiliser le die fourni par l'API
+                            // IMPORTANT: On passe 'die' explicitement dans le payload
+                            sendGameAction('move', {
+                                from: move.from,
+                                to: move.to,
+                                die: move.die
                             }, 2);
-                            
+
                             // Attendre que le state se mette à jour avant le prochain coup
                             // On attend un peu plus pour les doubles
                             const waitTime = analysis.bestMove.length > 2 ? 1200 : 1000;
                             await new Promise(r => setTimeout(r, waitTime));
-                            
+
                             // Vérifier que le coup a été appliqué (dice devrait diminuer)
                             // Si on a encore des dés et qu'on n'est pas au dernier coup, continuer
                             if (i < analysis.bestMove.length - 1) {
@@ -1056,7 +1057,7 @@ export const useGameSocket = () => {
                                 await new Promise(r => setTimeout(r, 500));
                             }
                         }
-                        
+
                         addLog('🤖 Bot: All moves completed', 'success');
                     } else {
                         addLog('🤖 Bot: No moves found or turn done.', 'warning');
@@ -1070,64 +1071,46 @@ export const useGameSocket = () => {
                         // Also update DB to ensure sync (SKIP for offline-bot)
                         if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
                             supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
-                            }
                         }
-                    } catch (e: any) {
-                        addLog('🤖 Bot: API Error, using fallback', 'error', e);
-                        
-                        // FALLBACK: Utiliser une logique heuristique améliorée
-                        try {
-                            const { findAnyValidMove, getAllValidMoves } = await import('../lib/gameLogic');
-                            
-                            // Essayer de trouver le meilleur coup parmi tous les coups valides
-                            const allMoves = getAllValidMoves ? getAllValidMoves(gameState.board, 2, gameState.dice) : null;
-                            
-                            let fallbackMove = null;
-                            
-                            if (allMoves && allMoves.length > 0) {
-                                // Préférer les coups qui avancent vers l'avant (bear-off)
-                                // Pour le joueur 2 (noir), on veut aller de 0 vers 23
-                                fallbackMove = allMoves.reduce((best: any, move: any) => {
-                                    if (!best) return move;
-                                    // Préférer les coups qui avancent le plus
-                                    const bestProgress = best.to - best.from;
-                                    const moveProgress = move.to - move.from;
-                                    if (moveProgress > bestProgress) return move;
-                                    // En cas d'égalité, préférer les coups qui créent des points
-                                    return best;
-                                }, null);
-                            } else {
-                                // Fallback simple si getAllValidMoves n'existe pas
-                                fallbackMove = findAnyValidMove(gameState.board, 2, gameState.dice);
-                            }
-                            
-                            if (fallbackMove) {
-                                addLog(`🤖 Bot: Fallback move found: ${fallbackMove.from} -> ${fallbackMove.to} (dé: ${fallbackMove.dieUsed || 'N/A'})`, 'warning');
-                                await new Promise(r => setTimeout(r, 1000));
-                                sendGameAction('move', { from: fallbackMove.from, to: fallbackMove.to }, 2);
-                            } else {
-                                addLog('🤖 Bot: No fallback move available, switching turn', 'error');
-                                // Switch turn if no moves possible
-                                await new Promise(r => setTimeout(r, 2000));
-                                const newState = { ...gameState, dice: [] };
-                                updateGame(newState);
-                                
-                                if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
-                                    supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
-                                }
-                            }
-                        } catch (fallbackError) {
-                            addLog('🤖 Bot: Fallback also failed, switching turn', 'error', fallbackError);
-                            // Last resort: switch turn
+                    }
+                } catch (e: any) {
+                    addLog('🤖 Bot: API Error, using fallback', 'error', e);
+
+                    // FALLBACK: Utiliser une logique heuristique améliorée
+                    // FALLBACK: Utiliser une logique heuristique améliorée
+                    try {
+                        const { findAnyValidMove } = await import('../lib/gameLogic');
+
+                        // Essayer de trouver un coup valide
+                        const validMove = findAnyValidMove(gameState.board, 2, gameState.dice);
+
+                        if (validMove) {
+                            addLog(`🤖 Bot: Fallback move found: ${validMove.from} -> ${validMove.to} (dé: ${validMove.dieUsed || 'N/A'})`, 'warning');
+                            await new Promise(r => setTimeout(r, 1000));
+                            sendGameAction('move', { from: validMove.from, to: validMove.to, die: validMove.dieUsed }, 2);
+                        } else {
+                            addLog('🤖 Bot: No fallback move available, switching turn', 'error');
+                            // Switch turn if no moves possible
                             await new Promise(r => setTimeout(r, 2000));
                             const newState = { ...gameState, dice: [] };
                             updateGame(newState);
-                            
+
                             if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
                                 supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
                             }
                         }
+                    } catch (fallbackError) {
+                        addLog('🤖 Bot: Fallback also failed, switching turn', 'error', fallbackError);
+                        // Last resort: switch turn
+                        await new Promise(r => setTimeout(r, 2000));
+                        const newState = { ...gameState, dice: [] };
+                        updateGame(newState);
+
+                        if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
+                            supabase.from('games').update({ board_state: newState }).eq('room_id', currentRoom.id);
+                        }
                     }
+                }
 
                 // Clear timeout on success
                 if (botTimeoutRef.current) {

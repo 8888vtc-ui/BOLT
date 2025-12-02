@@ -30,7 +30,7 @@ export default function Point({
   if (!point) {
     point = { player: null, count: 0 };
   }
-  
+
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: 'CHECKER',
@@ -99,10 +99,7 @@ export default function Point({
 
       {/* Conteneur des pions */}
       <div
-        className="relative z-10 flex flex-col items-center w-full h-full py-2"
-        style={{
-          justifyContent: isTop ? 'flex-start' : 'flex-end',
-        }}
+        className="relative z-10 flex flex-col items-center w-full h-full py-2 justify-start"
       >
         {/* Pas de reverse() ici car flex-col-reverse gère déjà l'ordre visuel pour le bas */}
         {checkers}
