@@ -14,19 +14,34 @@ interface GameOptions {
     matchLength: number;
 }
 
-const createMockGameState = (userId?: string, options?: GameOptions): GameState => ({
-    board: JSON.parse(JSON.stringify(INITIAL_BOARD)), // COPIE PROFONDE pour éviter les mutations
-    dice: [],
-    turn: userId || 'guest-1', // Le tour est au joueur par défaut
-    score: {},
-    cubeValue: 1,
-    cubeOwner: null, // Cube au centre au début
-    doubleValue: 1,
-    canDouble: true,
-    matchLength: options?.mode === 'match' ? (options.matchLength || 3) : 0, // 0 = Money Game, défaut 3 pour match
-    currentPlayer: 1,
-    pendingDouble: null
-});
+const createMockGameState = (userId?: string, options?: GameOptions): GameState => {
+    // Copie profonde sécurisée de INITIAL_BOARD
+    let boardCopy;
+    try {
+        boardCopy = JSON.parse(JSON.stringify(INITIAL_BOARD));
+    } catch (error) {
+        // Fallback : copie manuelle si JSON échoue
+        boardCopy = {
+            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+            bar: { ...INITIAL_BOARD.bar },
+            off: { ...INITIAL_BOARD.off }
+        };
+    }
+    
+    return {
+        board: boardCopy,
+        dice: [],
+        turn: userId || 'guest-1', // Le tour est au joueur par défaut
+        score: {},
+        cubeValue: 1,
+        cubeOwner: null, // Cube au centre au début
+        doubleValue: 1,
+        canDouble: true,
+        matchLength: options?.mode === 'match' ? (options.matchLength || 3) : 0, // 0 = Money Game, défaut 3 pour match
+        currentPlayer: 1,
+        pendingDouble: null
+    };
+};
 
 const createMockRooms = (): Room[] => [];
 
@@ -226,17 +241,35 @@ export const useGameSocket = () => {
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 const botState = createMockGameState(user?.id, options);
                 
-                // Vérifier que le board est valide AVANT les logs - utiliser copie profonde
+                // Vérifier que le board est valide AVANT les logs - utiliser copie profonde sécurisée
                 if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
                     addLog(`❌ [JOIN_ROOM] Board invalide, utilisation INITIAL_BOARD`, 'error');
-                    botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD)); // Copie profonde
+                    try {
+                        botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                    } catch (error) {
+                        // Fallback : copie manuelle
+                        botState.board = {
+                            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+                            bar: { ...INITIAL_BOARD.bar },
+                            off: { ...INITIAL_BOARD.off }
+                        };
+                    }
                 }
                 
                 // Vérifier que le board a des jetons
                 const totalCheckers = botState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
                 if (totalCheckers === 0) {
                     addLog(`❌ [JOIN_ROOM] Board vide, utilisation INITIAL_BOARD`, 'error');
-                    botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD)); // Copie profonde
+                    try {
+                        botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                    } catch (error) {
+                        // Fallback : copie manuelle
+                        botState.board = {
+                            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+                            bar: { ...INITIAL_BOARD.bar },
+                            off: { ...INITIAL_BOARD.off }
+                        };
+                    }
                 }
                 
                 addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { 
