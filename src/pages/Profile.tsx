@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, Save, Check, X, Edit2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { showToast } from '../components/common/Toast';
+import { showSuccess, showError } from '../lib/notifications';
 
 const Profile = () => {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const isSetupMode = searchParams.get('setup') === 'username';
     const { user, updateUsername } = useAuth();
     const [username, setUsername] = useState('');
     const [isEditing, setIsEditing] = useState(false);
@@ -14,8 +19,15 @@ const Profile = () => {
     useEffect(() => {
         if (user?.username) {
             setUsername(user.username);
+            // Si en mode setup et qu'un pseudo existe déjà, sortir du mode setup
+            if (isSetupMode && user.username && user.username !== 'Joueur') {
+                navigate('/lobby');
+            }
+        } else if (isSetupMode) {
+            // Mode setup : activer l'édition automatiquement
+            setIsEditing(true);
         }
-    }, [user]);
+    }, [user, isSetupMode, navigate]);
 
     const validateUsername = (value: string): string | null => {
         if (value.length < 3) {
@@ -49,15 +61,22 @@ const Profile = () => {
             const result = await updateUsername(username);
             if (result.error) {
                 setError(result.error);
-                showToast.error(result.error);
+                showError(result.error);
             } else {
                 setIsEditing(false);
-                showToast.success('Username updated successfully!');
+                showSuccess('Pseudo mis à jour avec succès !');
+                
+                // Si en mode setup, rediriger vers le lobby
+                if (isSetupMode) {
+                    setTimeout(() => {
+                        navigate('/lobby');
+                    }, 1000);
+                }
             }
         } catch (err: any) {
             const errorMsg = err.message || 'Failed to update username';
             setError(errorMsg);
-            showToast.error(errorMsg);
+            showError(errorMsg);
         } finally {
             setIsSaving(false);
         }
@@ -79,9 +98,11 @@ const Profile = () => {
                     className="mb-8"
                 >
                     <h1 className="text-4xl md:text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#FDB931]">
-                        Profile
+                        {isSetupMode ? 'Choisissez votre pseudo' : 'Profile'}
                     </h1>
-                    <p className="text-gray-400">Manage your account settings</p>
+                    <p className="text-gray-400">
+                        {isSetupMode ? 'Créez votre pseudo pour commencer à jouer' : 'Manage your account settings'}
+                    </p>
                 </motion.div>
 
                 {/* Profile Card */}
