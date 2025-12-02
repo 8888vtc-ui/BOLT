@@ -150,6 +150,10 @@ const GameRoom = () => {
 
     // Detect game end and calculate match score (avec protection contre boucle infinie)
     const gameEndProcessedRef = useRef<string | null>(null);
+    
+    // VALIDATION UNIFIÉE DU BOARD - Déclarer AVANT les returns (règle React hooks)
+    const boardValidationRef = useRef({ fixed: false });
+    
     useEffect(() => {
         if (!gameState || !gameState.board) return;
 
@@ -362,8 +366,7 @@ const GameRoom = () => {
     
     const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
     
-    // VALIDATION UNIFIÉE DU BOARD - Version simplifiée et sécurisée
-    const boardValidationRef = useRef({ fixed: false });
+    // VALIDATION UNIFIÉE DU BOARD - Version simplifiée et sécurisée (useRef déjà déclaré plus haut)
     useEffect(() => {
         if (!board || !board.points) return;
         if (boardValidationRef.current.fixed) return;
