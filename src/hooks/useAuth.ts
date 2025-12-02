@@ -91,15 +91,56 @@ export function useAuth() {
 
   const formatAndSetUser = async (authUser: any) => {
     try {
-      // Fetch additional profile data from 'profiles' table if needed
-      // For now, we use metadata from auth
       const metadata = authUser.user_metadata || {};
+      let username = metadata.username || metadata.full_name || authUser.email?.split('@')[0] || 'Joueur';
+      let avatar = metadata.avatar_url || metadata.picture;
+
+      // Vérifier si le profil existe dans la table profiles
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', authUser.id)
+          .single();
+
+        if (!profileError && profile) {
+          // Utiliser le pseudo du profil s'il existe
+          if (profile.username) {
+            username = profile.username;
+          }
+          if (profile.avatar_url) {
+            avatar = profile.avatar_url;
+          }
+        } else {
+          // Créer le profil s'il n'existe pas
+          const displayName = metadata.full_name || metadata.name || authUser.email?.split('@')[0] || `Joueur${Math.floor(Math.random() * 1000)}`;
+          
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: authUser.id,
+              username: displayName,
+              email: authUser.email,
+              avatar_url: avatar,
+              created_at: new Date().toISOString()
+            }, {
+              onConflict: 'id'
+            });
+
+          if (!insertError) {
+            username = displayName;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking/creating profile:', err);
+        // Continuer avec les métadonnées de base
+      }
 
       setUser({
         id: authUser.id,
-        username: metadata.username || metadata.full_name || authUser.email?.split('@')[0] || 'Joueur',
+        username: username,
         email: authUser.email,
-        avatar: metadata.avatar_url || metadata.picture,
+        avatar: avatar,
         role: authUser.is_anonymous ? 'guest' : 'user'
       });
     } catch (error) {
@@ -113,7 +154,11 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       }
     });
     if (error) console.error('Google login error:', error);

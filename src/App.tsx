@@ -7,6 +7,7 @@ import Navbar from './components/common/Navbar';
 // Pages
 import GurugammonLanding from './pages/GurugammonLanding';
 import Login from './pages/Login';
+import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
 import Lobby from './pages/Lobby';
 import GameRoom from './pages/GameRoom';
@@ -45,6 +46,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<GurugammonLanding />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Routes avec Navbar - Lobby et GameRoom accessibles en guest */}
           <Route element={<LayoutWithNavbar />}>

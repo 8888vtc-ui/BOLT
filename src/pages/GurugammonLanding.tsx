@@ -1,9 +1,19 @@
 import { motion } from 'framer-motion';
 import { Dices, Zap, Users, Award, TrendingUp, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function GurugammonLanding() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  // Redirection automatique si déjà connecté
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/lobby');
+    }
+  }, [user, loading, navigate]);
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
