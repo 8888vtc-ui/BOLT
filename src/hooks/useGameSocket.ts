@@ -195,6 +195,13 @@ export const useGameSocket = () => {
         try {
             if (roomId === 'offline-bot') {
                 addLog('🤖 [JOIN_ROOM] Initialisation mode bot offline', 'info');
+                
+                // Vérifier si on est déjà dans cette room
+                if (currentRoom && currentRoom.id === 'offline-bot') {
+                    addLog(`✅ [JOIN_ROOM] Déjà dans offline-bot, skip`, 'info');
+                    return;
+                }
+                
                 addLog(`📋 [JOIN_ROOM] Récupération des joueurs...`, 'info');
                 const soloPlayers = await fetchRoomPlayers('offline-bot');
                 addLog(`✅ [JOIN_ROOM] Joueurs récupérés: ${soloPlayers.length}`, 'success', soloPlayers);
@@ -382,7 +389,7 @@ export const useGameSocket = () => {
             updateGame(errorState);
         }
 
-    }, [user, roomsList, setRoom, updateGame, addMessage]);
+    }, [user, roomsList, setRoom, updateGame, addMessage, currentRoom]);
 
     const leaveRoom = useCallback(async () => {
         if (DEMO_MODE) { resetGame(); return; }

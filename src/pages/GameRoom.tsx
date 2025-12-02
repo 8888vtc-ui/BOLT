@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -86,13 +86,30 @@ const GameRoom = () => {
         return 1;
     }, [players, user?.id]);
 
+    // Flag pour éviter les appels multiples
+    const joiningRef = useRef(false);
+
     // Rejoindre la room au montage - Vérifier l'authentification d'abord
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
+        
+        // Éviter les appels multiples
+        if (joiningRef.current) {
+            addLog(`⚠️ [GAME_ROOM] Join déjà en cours, skip`, 'info');
+            return;
+        }
+        
+        // Si déjà dans la bonne room, ne pas rejoindre à nouveau
+        if (currentRoom && currentRoom.id === roomId) {
+            addLog(`✅ [GAME_ROOM] Déjà dans la room ${roomId}, skip`, 'info');
+            return;
+        }
+        
         addLog(`🎮 [GAME_ROOM] useEffect montage - roomId: ${roomId}, user: ${user?.id || 'null'}`, 'info', { roomId, userId: user?.id, mode, length });
         
         // Fonction async pour gérer le join
         const handleJoinRoom = async () => {
+            joiningRef.current = true;
             // Si pas d'utilisateur et pas offline-bot, rediriger vers login
             if (!user && roomId !== 'offline-bot') {
                 addLog(`⚠️ [GAME_ROOM] Pas d'utilisateur, redirection vers login`, 'warning');
@@ -166,10 +183,17 @@ const GameRoom = () => {
                     hasCurrentRoom: !!currentRoom
                 });
             }
+            
+            joiningRef.current = false;
         };
 
         handleJoinRoom();
-    }, [roomId, isConnected, currentRoom, joinRoom, user, mode, length, navigate, location.search]);
+        
+        // Cleanup
+        return () => {
+            joiningRef.current = false;
+        };
+    }, [roomId, isConnected, joinRoom, user, mode, length, navigate, location.search]); // Retirer currentRoom des dépendances pour éviter la boucle
 
     // Detect game end and calculate match score
     useEffect(() => {
