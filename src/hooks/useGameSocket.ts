@@ -290,7 +290,7 @@ export const useGameSocket = () => {
                 }
 
                 // VERSION ULTRA-RAPIDE - Pas d'appel API qui peut bloquer
-                addLog(`📋 [JOIN_ROOM] Création joueurs locaux...`, 'info');
+                addLog(`📋 [JOIN_ROOM] Création joueurs locaux...`, 'info', { user: user?.id, hasUser: !!user });
                 // CRITIQUE : Ajouter le bot comme deuxième joueur
                 const botId = 'bot';
                 const soloPlayers = user 
@@ -302,7 +302,12 @@ export const useGameSocket = () => {
                         { id: 'guest', username: 'Invité', avatar: undefined },
                         { id: botId, username: 'Bot IA', avatar: undefined }
                       ];
-                addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', soloPlayers);
+                addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', { 
+                    count: soloPlayers.length, 
+                    players: soloPlayers,
+                    botId,
+                    userExists: !!user
+                });
 
                 const botRoom = {
                     id: 'offline-bot',
