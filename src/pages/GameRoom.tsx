@@ -152,24 +152,36 @@ const GameRoom = () => {
     const gameEndProcessedRef = useRef<string | null>(null);
     
     // VALIDATION UNIFIÉE DU BOARD - Déclarer AVANT les returns (règle React hooks)
-    const boardValidationRef = useRef({ fixed: false });
+    const boardValidationRef = useRef({ fixed: false, lastBoardHash: '' });
     
     // Validation du board - useEffect AVANT les returns
     useEffect(() => {
         if (!gameState || !gameState.board || !gameState.board.points) return;
-        if (boardValidationRef.current.fixed) return;
         
         try {
             const isValidStructure = Array.isArray(gameState.board.points) && gameState.board.points.length === 24;
             const totalCheckers = gameState.board.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0);
             
-            if (!isValidStructure || totalCheckers === 0) {
-                boardValidationRef.current.fixed = true;
+            // Créer un hash du board pour détecter les changements
+            const boardHash = JSON.stringify(gameState.board.points);
+            
+            // Si le board a changé, réinitialiser le flag fixed
+            if (boardHash !== boardValidationRef.current.lastBoardHash) {
+                boardValidationRef.current.fixed = false;
+                boardValidationRef.current.lastBoardHash = boardHash;
+            }
+            
+            // Ne réinitialiser QUE si le board est vraiment invalide ET qu'on n'a pas déjà fixé ce board
+            if ((!isValidStructure || totalCheckers === 0) && !boardValidationRef.current.fixed) {
                 const addLog = useDebugStore.getState().addLog;
                 addLog(`❌ [GAME_ROOM] Board invalide/vide - Réinitialisation`, 'error', { 
                     isValidStructure, 
-                    totalCheckers
+                    totalCheckers,
+                    boardHash: boardHash.substring(0, 50)
                 });
+                
+                // Marquer comme fixé AVANT de réinitialiser pour éviter les boucles
+                boardValidationRef.current.fixed = true;
                 
                 try {
                     const fixedBoard = JSON.parse(JSON.stringify(INITIAL_BOARD));
@@ -180,7 +192,9 @@ const GameRoom = () => {
                             board: fixedBoard
                         };
                         updateGame(fixedState);
-                        addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success');
+                        addLog(`✅ [GAME_ROOM] Board réinitialisé avec INITIAL_BOARD`, 'success', {
+                            totalCheckersAfter: fixedBoard.points.reduce((sum: number, p: any) => sum + (p?.count || 0), 0)
+                        });
                     }
                 } catch (copyError: any) {
                     const currentGameState = useGameStore.getState().gameState;
@@ -196,6 +210,12 @@ const GameRoom = () => {
                         };
                         updateGame(fixedState);
                     }
+                }
+            } else if (isValidStructure && totalCheckers > 0) {
+                // Board valide - réinitialiser le flag fixed pour permettre les futures validations
+                // MAIS seulement si le board a vraiment changé (détecté par le hash)
+                if (boardHash !== boardValidationRef.current.lastBoardHash) {
+                    boardValidationRef.current.fixed = false;
                 }
             }
         } catch (error: any) {
@@ -544,13 +564,36 @@ const GameRoom = () => {
     const topPoints = [];
     const bottomPoints = [];
 
+    // Vérifier que le board est valide avant de le rendre
+    if (!board || !board.points || board.points.length !== 24) {
+        const addLog = useDebugStore.getState().addLog;
+        addLog(`❌ [GAME_ROOM] Board invalide lors du rendu`, 'error', {
+            hasBoard: !!board,
+            hasPoints: !!board?.points,
+            pointsLength: board?.points?.length
+        });
+        return (
+            <div className="h-screen bg-[#050505] text-white flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-red-500">Erreur: Board invalide</p>
+                </div>
+            </div>
+        );
+    }
+
     // Top row (points 12 à 23, de gauche à droite)
     for (let i = 12; i <= 23; i++) {
+        const point = board.points[i];
+        // S'assurer que le point existe et a une structure valide
+        const safePoint = point && typeof point === 'object' && 'count' in point
+            ? point
+            : { player: null, count: 0 };
+        
         topPoints.push(
             <Point
                 key={i}
                 index={i}
-                point={board.points[i] || { player: null, count: 0 }}
+                point={safePoint}
                 isTop={true}
                 isValidDestination={false}
                 onDrop={onDrop}
@@ -564,11 +607,17 @@ const GameRoom = () => {
 
     // Bottom row (points 11 à 0, de gauche à droite)
     for (let i = 11; i >= 0; i--) {
+        const point = board.points[i];
+        // S'assurer que le point existe et a une structure valide
+        const safePoint = point && typeof point === 'object' && 'count' in point
+            ? point
+            : { player: null, count: 0 };
+        
         bottomPoints.push(
             <Point
                 key={i}
                 index={i}
-                point={board.points[i] || { player: null, count: 0 }}
+                point={safePoint}
                 isTop={false}
                 isValidDestination={false}
                 onDrop={onDrop}
