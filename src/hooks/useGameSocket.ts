@@ -177,6 +177,9 @@ export const useGameSocket = () => {
 
         if (DEMO_MODE) {
             addLog('✅ [JOIN_ROOM] Mode démo activé', 'info');
+            // FORCER isConnected à true en mode démo
+            setIsConnected(true);
+            
             const room = roomsList.find(r => r.id === roomId) || {
                 id: roomId,
                 name: 'Salle Demo',
@@ -195,6 +198,9 @@ export const useGameSocket = () => {
         try {
             if (roomId === 'offline-bot') {
                 addLog('🤖 [JOIN_ROOM] Initialisation mode bot offline', 'info');
+                
+                // FORCER isConnected à true pour mode offline-bot
+                setIsConnected(true);
                 
                 // Vérifier si on est déjà dans cette room
                 if (currentRoom && currentRoom.id === 'offline-bot') {

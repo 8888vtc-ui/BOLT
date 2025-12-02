@@ -247,6 +247,10 @@ const GameRoom = () => {
     }, [gameState?.board, gameState?.matchLength, gameState?.score, gameState?.cubeValue, playerColor, players, currentRoom?.id]);
 
 
+    // Vérifier si on est en mode offline-bot (ne nécessite pas de connexion)
+    const isOfflineMode = currentRoom?.id === 'offline-bot' || roomId === 'offline-bot';
+    const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
     // Check if game is loaded
     if (!currentRoom || !gameState) {
         return (
@@ -256,22 +260,25 @@ const GameRoom = () => {
                 <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#B8860B]">
                     Chargement de la partie...
                 </h2>
-                <p className="text-gray-500 mt-2">Synchronisation avec le serveur</p>
+                <p className="text-gray-500 mt-2">
+                    {isOfflineMode || DEMO_MODE ? 'Initialisation du jeu local...' : 'Synchronisation avec le serveur'}
+                </p>
                 <p className="text-xs text-gray-700 mt-4 font-mono">
-                    {isConnected ? 'Connecté au socket' : 'Connexion socket en cours...'}
+                    {isOfflineMode || DEMO_MODE ? 'Mode hors ligne' : (isConnected ? 'Connecté au socket' : 'Connexion socket en cours...')}
                 </p>
             </div>
         );
     }
 
-    // Offline State
-    if (!isConnected) {
+    // Offline State - SEULEMENT si pas en mode offline-bot et pas en mode démo
+    if (!isConnected && !isOfflineMode && !DEMO_MODE) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center text-white">
                 <DebugOverlay />
                 <div className="text-center p-8 bg-[#111] rounded-2xl border border-red-500/20">
                     <WifiOff className="w-12 h-12 text-red-500 mx-auto mb-4" />
                     <h2 className="text-xl font-bold mb-2">Connexion perdue</h2>
+                    <p className="text-gray-500 mb-4">Tentative de reconnexion...</p>
                     <button onClick={() => navigate('/lobby')} className="text-[#FFD700] underline hover:text-white transition-colors">
                         Retour au Lobby
                     </button>
