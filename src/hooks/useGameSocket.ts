@@ -770,12 +770,25 @@ export const useGameSocket = () => {
                     // Switch to other player
                     if (players && players.length > 1) {
                         // Multiplayer: switch between players[0] and players[1]
-                        newState.turn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
+                        const newTurn = currentPlayerId === players[0].id ? players[1].id : players[0].id;
+                        newState.turn = newTurn;
+                        addLog(`🔄 [MOVE] Tour alterné: ${currentPlayerId} → ${newTurn}`, 'info', { 
+                            players: players.map(p => p.id),
+                            currentPlayerId,
+                            newTurn
+                        });
                     } else {
                         // Solo/Bot mode: switch between user and bot
-                        newState.turn = currentPlayerId === myId ? 'bot' : myId;
+                        const botId = 'bot';
+                        const newTurn = currentPlayerId === myId ? botId : myId;
+                        newState.turn = newTurn;
+                        addLog(`🔄 [MOVE] Tour alterné (fallback): ${currentPlayerId} → ${newTurn}`, 'warning', {
+                            myId,
+                            botId,
+                            currentPlayerId,
+                            newTurn
+                        });
                     }
-                    addLog(`Turn switched to: ${newState.turn}`, 'info');
                 }
             }
         }
