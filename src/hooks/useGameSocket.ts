@@ -629,7 +629,7 @@ export const useGameSocket = () => {
             newState.dice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
             addLog(`Dice rolled: ${newState.dice.join(', ')}`, 'success');
         } else if (action === 'move') {
-            const { from, to } = payload;
+            const { from, to, die } = payload; // Récupérer le die si fourni par l'API
 
             // Déterminer la couleur du joueur
             let playerColor = forcePlayerColor || 1;
@@ -655,18 +655,23 @@ export const useGameSocket = () => {
 
             const currentDice = newState.dice || [];
 
-            let dieUsed = -1;
-            if (playerColor === 1) { 
-                // Blanc (23 -> 0) : se déplace vers le bas, donc from > to
-                if (from > to) dieUsed = from - to;
-            } else { 
-                // Noir (0 -> 23) : se déplace vers le haut, donc to > from
-                // MAIS peut aussi se déplacer depuis le point 23 vers le bas (23->18)
-                // Dans ce cas, from > to, et on utilise from - to
-                if (to > from) {
-                    dieUsed = to - from; // Mouvement vers le haut (0→23)
-                } else if (from > to) {
-                    dieUsed = from - to; // Mouvement vers le bas depuis le point 23
+            // Utiliser le die fourni par l'API si disponible, sinon le calculer
+            let dieUsed = die !== undefined ? die : -1;
+            
+            if (dieUsed === -1) {
+                // Calculer le die si non fourni
+                if (playerColor === 1) { 
+                    // Blanc (23 -> 0) : se déplace vers le bas, donc from > to
+                    if (from > to) dieUsed = from - to;
+                } else { 
+                    // Noir (0 -> 23) : se déplace vers le haut, donc to > from
+                    // MAIS peut aussi se déplacer depuis le point 23 vers le bas (23->18)
+                    // Dans ce cas, from > to, et on utilise from - to
+                    if (to > from) {
+                        dieUsed = to - from; // Mouvement vers le haut (0→23)
+                    } else if (from > to) {
+                        dieUsed = from - to; // Mouvement vers le bas depuis le point 23
+                    }
                 }
             }
 
@@ -1019,8 +1024,12 @@ export const useGameSocket = () => {
                             // Attendre un peu avant chaque coup pour la visualisation
                             await new Promise(r => setTimeout(r, 800));
                             
-                            // Envoyer le coup
-                            sendGameAction('move', { from: move.from, to: move.to }, 2);
+                            // Envoyer le coup avec le die fourni par l'API
+                            sendGameAction('move', { 
+                                from: move.from, 
+                                to: move.to, 
+                                die: move.die // Utiliser le die fourni par l'API
+                            }, 2);
                             
                             // Attendre que le state se mette à jour avant le prochain coup
                             // On attend un peu plus pour les doubles
