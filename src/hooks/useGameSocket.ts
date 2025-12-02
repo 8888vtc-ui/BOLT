@@ -202,9 +202,10 @@ export const useGameSocket = () => {
                     return;
                 }
                 
-                addLog(`📋 [JOIN_ROOM] Récupération des joueurs...`, 'info');
-                const soloPlayers = await fetchRoomPlayers('offline-bot');
-                addLog(`✅ [JOIN_ROOM] Joueurs récupérés: ${soloPlayers.length}`, 'success', soloPlayers);
+                // VERSION ULTRA-RAPIDE - Pas d'appel API qui peut bloquer
+                addLog(`📋 [JOIN_ROOM] Création joueurs locaux...`, 'info');
+                const soloPlayers = user ? [{ id: user.id, username: user.username || 'Joueur', avatar: user.avatar }] : [{ id: 'guest', username: 'Invité', avatar: null }];
+                addLog(`✅ [JOIN_ROOM] Joueurs créés: ${soloPlayers.length}`, 'success', soloPlayers);
                 
                 const botRoom = {
                     id: 'offline-bot',
@@ -216,10 +217,11 @@ export const useGameSocket = () => {
                 setRoom(botRoom);
                 setPlayers(soloPlayers);
                 
+                // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 const botState = createMockGameState(user?.id, options);
                 addLog(`✅ [JOIN_ROOM] État de jeu créé (bot)`, 'success', { dice: botState.dice, turn: botState.turn });
                 updateGame(botState);
-                addLog(`✅ [JOIN_ROOM] Terminé (bot offline)`, 'success');
+                addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ`, 'success');
                 return;
             }
 

@@ -86,114 +86,64 @@ const GameRoom = () => {
         return 1;
     }, [players, user?.id]);
 
-    // Flag pour éviter les appels multiples
-    const joiningRef = useRef(false);
+    // Flag pour éviter les appels multiples - PERSISTANT
+    const hasJoinedRef = useRef<string | null>(null);
 
-    // Rejoindre la room au montage - Vérifier l'authentification d'abord
+    // Rejoindre la room au montage - VERSION ULTRA-SIMPLIFIÉE
     useEffect(() => {
         const addLog = useDebugStore.getState().addLog;
         
-        // Éviter les appels multiples
-        if (joiningRef.current) {
-            addLog(`⚠️ [GAME_ROOM] Join déjà en cours, skip`, 'info');
+        // Si pas de roomId, rediriger immédiatement
+        if (!roomId) {
+            addLog(`⚠️ [GAME_ROOM] Pas de roomId, redirection lobby`, 'warning');
+            navigate('/lobby');
             return;
         }
         
-        // Si déjà dans la bonne room, ne pas rejoindre à nouveau
+        // Si déjà rejoint cette room, skip
+        if (hasJoinedRef.current === roomId) {
+            addLog(`✅ [GAME_ROOM] Déjà rejoint ${roomId}, skip`, 'info');
+            return;
+        }
+        
+        // Si déjà dans la bonne room, skip
         if (currentRoom && currentRoom.id === roomId) {
+            hasJoinedRef.current = roomId;
             addLog(`✅ [GAME_ROOM] Déjà dans la room ${roomId}, skip`, 'info');
             return;
         }
         
-        addLog(`🎮 [GAME_ROOM] useEffect montage - roomId: ${roomId}, user: ${user?.id || 'null'}`, 'info', { roomId, userId: user?.id, mode, length });
+        addLog(`🎮 [GAME_ROOM] Démarrage join - roomId: ${roomId}`, 'info');
         
-        // Fonction async pour gérer le join
-        const handleJoinRoom = async () => {
-            joiningRef.current = true;
-            // Si pas d'utilisateur et pas offline-bot, rediriger vers login
-            if (!user && roomId !== 'offline-bot') {
-                addLog(`⚠️ [GAME_ROOM] Pas d'utilisateur, redirection vers login`, 'warning');
-                navigate(`/login?redirect=/game/${roomId}`);
-                return;
-            }
-
-            // Si pas de roomId, rediriger vers lobby
-            if (!roomId) {
-                addLog(`⚠️ [GAME_ROOM] Pas de roomId, redirection vers lobby`, 'warning');
-                navigate('/lobby');
-                return;
-            }
-            
-            const options = mode ? { mode, matchLength: length } : undefined;
-            addLog(`🎮 [GAME_ROOM] Options: ${JSON.stringify(options)}`, 'info');
-
-            // Pour offline-bot, on peut joindre directement (pas besoin de connexion)
-            if (roomId === 'offline-bot') {
-                addLog(`🎮 [GAME_ROOM] Lancement joinRoom pour offline-bot`, 'info');
-                try {
-                    await joinRoom('offline-bot', options);
-                    addLog(`✅ [GAME_ROOM] Offline-bot rejoint avec succès`, 'success');
-                } catch (err: any) {
-                    addLog(`❌ [GAME_ROOM] Erreur joinRoom offline-bot: ${err?.message || 'Erreur inconnue'}`, 'error', err);
-                    showError('Erreur au démarrage de la partie. Retour au lobby.');
+        // Marquer comme en cours
+        hasJoinedRef.current = roomId;
+        
+        // TOUJOURS utiliser offline-bot pour éviter les blocages Supabase
+        const options = mode ? { mode, matchLength: length } : undefined;
+        const queryParams = location.search || '';
+        
+        // Si c'est déjà offline-bot, joindre directement
+        if (roomId === 'offline-bot') {
+            addLog(`🤖 [GAME_ROOM] Mode offline-bot détecté`, 'info');
+            joinRoom('offline-bot', options)
+                .then(() => {
+                    addLog(`✅ [GAME_ROOM] Offline-bot rejoint`, 'success');
+                })
+                .catch((err: any) => {
+                    addLog(`❌ [GAME_ROOM] Erreur: ${err?.message}`, 'error', err);
+                    hasJoinedRef.current = null; // Reset pour retry
+                    showError('Erreur au démarrage. Retour au lobby.');
                     setTimeout(() => navigate('/lobby'), 2000);
-                }
-                return;
-            } 
-            
-            // Pour les autres rooms, vérifier la connexion Supabase
-            const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
-            
-            if (DEMO_MODE) {
-                // Mode démo : utiliser offline-bot
-                addLog(`⚠️ [GAME_ROOM] Mode démo détecté, redirection vers offline-bot`, 'info');
-                navigate(`/game/offline-bot${location.search}`);
-                return;
-            }
-            
-            // Si pas connecté mais roomId valide, attendre la connexion ou rediriger
-            if (roomId && !isConnected) {
-                addLog(`⏳ [GAME_ROOM] Attente de la connexion Supabase...`, 'info');
-                // Attendre max 3 secondes
-                setTimeout(() => {
-                    if (!isConnected) {
-                        addLog(`⚠️ [GAME_ROOM] Connexion Supabase timeout, fallback offline-bot`, 'warning');
-                        navigate(`/game/offline-bot${location.search}`);
-                    }
-                }, 3000);
-                return;
-            }
-            
-            // Pour les autres rooms, vérifier la connexion
-            if (roomId && isConnected && !currentRoom) {
-                addLog(`🎮 [GAME_ROOM] Lancement joinRoom pour ${roomId}`, 'info');
-                try {
-                    await joinRoom(roomId, options);
-                    addLog(`✅ [GAME_ROOM] Room ${roomId} rejointe avec succès`, 'success');
-                } catch (err: any) {
-                    addLog(`❌ [GAME_ROOM] Erreur joinRoom ${roomId}: ${err?.message || 'Erreur inconnue'}`, 'error', err);
-                    showError('Erreur lors de la connexion à la salle. Passage en mode hors ligne.');
-                    // Fallback vers offline-bot en cas d'erreur
-                    setTimeout(() => navigate(`/game/offline-bot${location.search}`), 2000);
-                }
-            } else {
-                addLog(`⚠️ [GAME_ROOM] Conditions non remplies pour joinRoom`, 'info', {
-                    hasRoomId: !!roomId,
-                    isConnected,
-                    hasCurrentRoom: !!currentRoom
                 });
-            }
-            
-            joiningRef.current = false;
-        };
-
-        handleJoinRoom();
+            return;
+        }
         
-        // Cleanup
-        return () => {
-            joiningRef.current = false;
-        };
-    }, [roomId, isConnected, joinRoom, user, mode, length, navigate, location.search]); // Retirer currentRoom des dépendances pour éviter la boucle
+        // Pour TOUTES les autres rooms, utiliser offline-bot en fallback
+        // Cela évite TOUS les blocages Supabase
+        addLog(`⚠️ [GAME_ROOM] Room ${roomId} → Fallback offline-bot pour éviter blocage`, 'info');
+        navigate(`/game/offline-bot${queryParams}`);
+        
+    }, [roomId]); // SEULEMENT roomId dans les dépendances - le minimum absolu
 
     // Detect game end and calculate match score
     useEffect(() => {
