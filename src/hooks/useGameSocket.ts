@@ -648,6 +648,28 @@ export const useGameSocket = () => {
             const dice2 = Math.floor(Math.random() * 6) + 1;
             newState.dice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
             addLog(`Dice rolled: ${newState.dice.join(', ')}`, 'success');
+            
+            // Calculate valid moves after rolling dice
+            try {
+                const { getValidMoves } = require('../lib/gameLogic');
+                const currentPlayerColor = newState.currentPlayer || 1;
+                const diceValues = newState.dice.length === 4 
+                    ? [newState.dice[0], newState.dice[1]] 
+                    : newState.dice;
+                
+                const validMovesMap = getValidMoves(newState.board, currentPlayerColor, diceValues);
+                const validMoves: any[] = [];
+                validMovesMap.forEach((destinations, fromIndex) => {
+                    destinations.forEach((toIndex) => {
+                        validMoves.push({ from: fromIndex, to: toIndex });
+                    });
+                });
+                newState.validMoves = validMoves;
+                addLog(`Calculated ${validMoves.length} valid moves`, 'info');
+            } catch (error) {
+                console.warn('[useGameSocket] Error calculating validMoves:', error);
+                newState.validMoves = [];
+            }
         } else if (action === 'move') {
             const { from, to, die } = payload; // Récupérer le die si fourni par l'API
 
