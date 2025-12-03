@@ -92,10 +92,15 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                 
                 const isSelected = checker.pip === selectedPip;
 
+                // Extract pip index for data-point attribute
+                const pipIndex = typeof checker.pip === 'number' ? checker.pip : 
+                                 checker.pip === 'bar' ? 'bar' : 
+                                 checker.pip === 'borne' ? 'borne' : 'unknown';
+                
                 return (
                     <Checker
                         key={checker.id}
-                        id={checker.id}
+                        id={`${checker.color}-${pipIndex}-${checker.z || 0}`}
                         color={checker.color}
                         cx={x}
                         cy={y}

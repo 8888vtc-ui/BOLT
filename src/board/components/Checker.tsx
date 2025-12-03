@@ -138,6 +138,10 @@ const Checker = memo<CheckerProps>(({
 
     return (
         <g
+            data-testid={`piece-${color}-${id}`}
+            data-point={typeof id === 'string' && id.includes('-') ? id.split('-')[0] : undefined}
+            data-selected={isSelected ? 'true' : 'false'}
+            data-playable={isPlayable ? 'true' : 'false'}
             style={{
                 cursor: isPlayable ? (isDraggingNow ? 'grabbing' : 'grab') : 'pointer', // Always pointer for debugging
                 pointerEvents: 'all', // Force pointer events

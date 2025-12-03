@@ -141,7 +141,7 @@ const BoardWrap = memo<BoardProps>(({
             )}
 
             {/* Board Container */}
-            <div className="gg-board-container">
+            <div className="gg-board-container" data-testid="board">
                 <BoardSVG
                     state={state}
                     selectedPip={selectedPip}
@@ -158,6 +158,7 @@ const BoardWrap = memo<BoardProps>(({
                 {canRoll && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                         <button
+                            data-testid="roll-dice"
                             onClick={onRollDice}
                             className="pointer-events-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-lg rounded-full shadow-2xl transform transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
                             aria-label="Roll the dice"

@@ -33,6 +33,9 @@ const Triangle = memo<TriangleProps>(({
 
     return (
         <g 
+            data-testid={`point-${pip}`}
+            data-point={pip}
+            data-valid={isHighlighted ? 'true' : 'false'}
             onClick={(e) => {
                 console.error('[Triangle] ✅✅✅ CLICK ON POINT ✅✅✅', { pip });
                 e.stopPropagation();
