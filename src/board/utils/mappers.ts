@@ -514,7 +514,8 @@ export const mapGameStateToBoardState = (
 // Reverse mapper: Convert BoardState move back to legacy format
 export const mapMoveToLegacy = (
     from: PipIndex | 'bar',
-    to: PipIndex | 'borne'
+    to: PipIndex | 'borne',
+    playerColor?: number // Paramètre optionnel pour compatibilité (non utilisé)
 ): { from: number; to: number } => {
     const legacyFrom = from === 'bar' ? -1 : (from as number) - 1;
     const legacyTo = to === 'borne' ? -1 : (to as number) - 1;

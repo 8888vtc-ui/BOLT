@@ -364,30 +364,30 @@ const GameRoom = () => {
     // isMyTurn calculation (safe even when gameState is null)
     const isMyTurn = useMemo(() => {
         if (!gameState) return false;
-        
+
         // Check if we're in demo/offline mode
         const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
-        const isOfflineOrDemo = DEMO_MODE || 
-                                currentRoom?.id === 'offline-bot' || 
-                                currentRoom?.id?.toLowerCase().includes('demo') ||
-                                currentRoom?.name?.toLowerCase().includes('demo') ||
-                                !user; // No user = demo mode
-        
+        const isOfflineOrDemo = DEMO_MODE ||
+            currentRoom?.id === 'offline-bot' ||
+            currentRoom?.id?.toLowerCase().includes('demo') ||
+            currentRoom?.name?.toLowerCase().includes('demo') ||
+            !user; // No user = demo mode
+
         // In demo/offline mode, the human player is always the one who should be able to play
         if (isOfflineOrDemo) {
             const myId = players && players.length > 0 ? players[0].id : 'guest';
             const currentTurn = turn;
-            
+
             // In demo mode, if turn is 'guest' or undefined, it's the human's turn
             // The human is NOT the bot, so turn !== 'bot' means it's human's turn
-            const isHumanTurn = currentTurn !== 'bot' && 
-                   (currentTurn === myId || 
-                    currentTurn === 'guest' || 
+            const isHumanTurn = currentTurn !== 'bot' &&
+                (currentTurn === myId ||
+                    currentTurn === 'guest' ||
                     currentTurn === 'guest-1' ||
                     currentTurn === undefined ||
                     currentTurn === null ||
                     (players && players.length > 0 && currentTurn === players[0].id));
-            
+
             console.error('[GameRoom] isMyTurn calculation (demo/offline):', {
                 DEMO_MODE,
                 isOfflineOrDemo,
@@ -399,10 +399,10 @@ const GameRoom = () => {
                 hasUser: !!user,
                 playersLength: players?.length || 0
             });
-            
+
             return isHumanTurn;
         }
-        
+
         // Normal online mode: check against user ID
         if (!user) {
             console.error('[GameRoom] isMyTurn: No user in online mode, returning false');
@@ -412,12 +412,12 @@ const GameRoom = () => {
         if (turn === myId) return true;
         if (turn === 'guest-1' && myId === 'guest-1') return true;
         if (turn === 'guest' && !user.id) return true;
-        
+
         // Fallback: check if turn matches first player
         if (players && players.length > 0 && turn === players[0].id) {
             return players[0].id === myId;
         }
-        
+
         return false;
     }, [user, gameState, turn, currentRoom?.id, currentRoom?.name, players]);
 
@@ -480,93 +480,43 @@ const GameRoom = () => {
     }), [players, score, gameState?.matchLength]);
 
     // Handle moves from the new board component
-    const handleBoardMove = useCallback((from: number | 'bar', to: number | 'borne') => {
+    const handleBoardMove = useCallback((from: PipIndex | 'bar', to: PipIndex | 'borne') => {
         const addLog = useDebugStore.getState().addLog;
-        const currentTurn = gameState?.turn;
-        const myId = user?.id || players?.[0]?.id || 'guest';
-        
-        // === VALIDATION STRICTE DU TOUR ===
-        // 1. Vérifier que ce n'est PAS le tour du bot
-        const isBotTurn = currentTurn === 'bot' || currentTurn === players?.[1]?.id;
-        
-        // 2. Vérifier que c'est VRAIMENT mon tour
-        const isDefinitelyMyTurn = !isBotTurn && (
-            currentTurn === myId ||
-            currentTurn === 'guest' ||
-            currentTurn === 'guest-1' ||
-            currentTurn === players?.[0]?.id ||
-            currentTurn === undefined ||
-            currentTurn === null
-        );
-        
-        console.error('[GameRoom] 🔒 handleBoardMove - TURN VALIDATION 🔒', { 
-            from, 
-            to, 
-            currentTurn,
-            myId,
-            isBotTurn,
-            isDefinitelyMyTurn,
-            isMyTurn,
-            playerColor,
-            playersIds: players?.map(p => p.id),
-            timestamp: new Date().toISOString()
-        });
-        
-        addLog(`[handleBoardMove] Validation tour: currentTurn=${currentTurn}, myId=${myId}, isBotTurn=${isBotTurn}`, 'info');
-        
-        // === BLOCAGE SI TOUR DU BOT ===
-        if (isBotTurn) {
-            console.error('[GameRoom] ❌❌❌ BLOCAGE: C\'est le tour du BOT, move ignoré ❌❌❌', { 
-                currentTurn,
-                botId: players?.[1]?.id || 'bot',
-                myId
-            });
-            addLog(`[handleBoardMove] BLOCAGE: Tour du bot (${currentTurn}), move ignoré`, 'warning');
-            return;
-        }
-        
-        // === BLOCAGE SI PAS MON TOUR (double vérification) ===
-        if (!isMyTurn && !isDefinitelyMyTurn) {
-            console.error('[GameRoom] ❌ Not my turn (double check), ignoring move', { 
+
+        // 1. Strict Turn Validation
+        if (!isMyTurn) {
+            console.error('[GameRoom] ⛔ Abort sendMove: not my turn', {
+                currentTurn: turn,
+                myId: user?.id || 'guest',
                 isMyTurn,
-                isDefinitelyMyTurn,
-                currentTurn,
-                myId
+                playerColor
             });
-            addLog(`[handleBoardMove] BLOCAGE: Pas mon tour (isMyTurn=${isMyTurn}, currentTurn=${currentTurn})`, 'warning');
+            addLog('⛔ Action bloquée: Ce n\'est pas votre tour', 'warning');
             return;
         }
-        
-        const isPlayer1 = playerColor === 1;
-        let fromIdx: number;
-        let toIdx: number;
-        
-        if (from === 'bar') {
-            fromIdx = isPlayer1 ? 24 : -1;
-        } else {
-            fromIdx = from - 1;
-        }
-        
-        if (to === 'borne') {
-            toIdx = isPlayer1 ? -1 : 24;
-        } else {
-            toIdx = to - 1;
-        }
-        
-        console.error('[GameRoom] ✅✅✅ ENVOI MOVE AUTORISÉ ✅✅✅', { 
-            fromIdx, 
-            toIdx, 
-            originalFrom: from, 
-            originalTo: to,
-            currentTurn,
-            myId,
-            mapped: `${fromIdx} -> ${toIdx}`
+
+        // Map to legacy format
+        const legacyMove = mapMoveToLegacy(from, to, playerColor);
+
+        console.log('[GameRoom] 🎲 EXECUTING MOVE', {
+            from,
+            to,
+            legacyMove,
+            isMyTurn,
+            playerColor
         });
-        
-        addLog(`[handleBoardMove] Envoi move: ${fromIdx} -> ${toIdx}, turn=${currentTurn}`, 'success');
-        
-        sendGameAction('move', { from: fromIdx, to: toIdx });
-    }, [isMyTurn, playerColor, sendGameAction, gameState?.turn, user?.id, players]);
+
+        // Send move to server
+        sendGameAction('board:move', {
+            ...legacyMove,
+            playerId: user?.id || (playerColor === 1 ? 'player1' : 'player2')
+        });
+
+    }, [isMyTurn, turn, user?.id, playerColor, sendGameAction]);
+
+
+
+
 
     // Determine if current player can double now
     const canDoubleNow = useMemo(() => {
@@ -582,9 +532,9 @@ const GameRoom = () => {
         const addLog = useDebugStore.getState().addLog;
         const diceArray = gameState?.dice || [];
         const canRoll = isMyTurn && diceArray.length === 0;
-        
-        addLog('Tentative de lancer les dés', 'info', { 
-            isMyTurn, 
+
+        addLog('Tentative de lancer les dés', 'info', {
+            isMyTurn,
             diceLength: diceArray.length,
             turn: gameState?.turn,
             myId: user?.id || players[0]?.id,
@@ -594,7 +544,7 @@ const GameRoom = () => {
         if (canRoll) {
             sendGameAction('rollDice', {});
         } else {
-            addLog('Action refusée', 'warning', { 
+            addLog('Action refusée', 'warning', {
                 reason: !isMyTurn ? 'Pas votre tour' : 'Dés déjà lancés',
                 isMyTurn,
                 diceLength: diceArray.length,

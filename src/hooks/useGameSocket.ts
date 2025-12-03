@@ -722,6 +722,39 @@ export const useGameSocket = () => {
                 addLog('Invalid move or no matching die', 'error', { from, to, dieUsed, dice: currentDice, playerColor });
                 return;
             }
+        } else if (action === 'board:move') {
+            const { from, to, playerId } = payload;
+            
+            // Validation stricte du tour AVANT traitement
+            const myId = user?.id || (players && players.length > 0 ? players[0].id : 'guest');
+            const currentTurn = gameState.turn;
+            
+            const isPlayerTurn = currentTurn === myId || 
+                                currentTurn === 'guest' || 
+                                currentTurn === 'guest-1' ||
+                                (players && players.length > 0 && currentTurn === players[0].id);
+            
+            if (!isPlayerTurn) {
+                addLog('⛔ [board:move] Not my turn, ignoring move', 'warning', {
+                    isMyTurn: false,
+                    currentTurn,
+                    myId,
+                    playerId,
+                    gameStateTurn: gameState.turn
+                });
+                return; // Ne pas traiter le move
+            }
+            
+            // Déterminer playerColor
+            let playerColor = 1;
+            if (players && players.length > 0) {
+                if (players[0]?.id === myId || players[0]?.id === playerId) playerColor = 1;
+                else if (players[1]?.id === myId || players[1]?.id === playerId) playerColor = 2;
+            }
+            
+            // Les coordonnées sont déjà en format legacy (from/to sont des nombres)
+            // Appeler récursivement avec l'action 'move' standard
+            return sendGameAction('move', { from, to }, playerColor);
         }
 
         // Check for win condition before switching turn
