@@ -365,19 +365,49 @@ const GameRoom = () => {
     const isMyTurn = useMemo(() => {
         if (!gameState) return false;
         
-        // In offline-bot mode, player is always players[0]
-        if (currentRoom?.id === 'offline-bot' && players && players.length > 0) {
-            const myId = players[0].id;
+        // Check if we're in demo/offline mode
+        const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
+        const isOfflineOrDemo = DEMO_MODE || 
+                                currentRoom?.id === 'offline-bot' || 
+                                currentRoom?.id?.toLowerCase().includes('demo') ||
+                                currentRoom?.name?.toLowerCase().includes('demo') ||
+                                !user; // No user = demo mode
+        
+        // In demo/offline mode, the human player is always the one who should be able to play
+        if (isOfflineOrDemo) {
+            const myId = players && players.length > 0 ? players[0].id : 'guest';
             const currentTurn = turn;
-            // Check if it's the first player's turn
-            return currentTurn === myId || 
-                   currentTurn === 'guest' || 
-                   currentTurn === 'guest-1' ||
-                   (currentTurn === players[0].id);
+            
+            // In demo mode, if turn is 'guest' or undefined, it's the human's turn
+            // The human is NOT the bot, so turn !== 'bot' means it's human's turn
+            const isHumanTurn = currentTurn !== 'bot' && 
+                   (currentTurn === myId || 
+                    currentTurn === 'guest' || 
+                    currentTurn === 'guest-1' ||
+                    currentTurn === undefined ||
+                    currentTurn === null ||
+                    (players && players.length > 0 && currentTurn === players[0].id));
+            
+            console.error('[GameRoom] isMyTurn calculation (demo/offline):', {
+                DEMO_MODE,
+                isOfflineOrDemo,
+                myId,
+                currentTurn,
+                isHumanTurn,
+                roomId: currentRoom?.id,
+                roomName: currentRoom?.name,
+                hasUser: !!user,
+                playersLength: players?.length || 0
+            });
+            
+            return isHumanTurn;
         }
         
-        // Normal mode: check against user ID
-        if (!user) return false;
+        // Normal online mode: check against user ID
+        if (!user) {
+            console.error('[GameRoom] isMyTurn: No user in online mode, returning false');
+            return false;
+        }
         const myId = user.id;
         if (turn === myId) return true;
         if (turn === 'guest-1' && myId === 'guest-1') return true;
@@ -389,7 +419,7 @@ const GameRoom = () => {
         }
         
         return false;
-    }, [user, gameState, turn, currentRoom?.id, players]);
+    }, [user, gameState, turn, currentRoom?.id, currentRoom?.name, players]);
 
     // canDouble calculation
     const hasDiceRolled = dice && dice.length > 0;

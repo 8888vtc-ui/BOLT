@@ -263,34 +263,34 @@ export const mapGameStateToBoardState = (
         players: players.map(p => ({ id: p.id, color: p.color }))
     });
     
-    // Get dice values - handle various formats
-    let diceValues: number[] = [];
+    // Get dice values for move calculation - handle various formats
+    let diceForMoves: number[] = [];
     if (gameState.dice) {
         if (Array.isArray(gameState.dice)) {
             // If array has 4 elements (double), extract unique values
             if (gameState.dice.length === 4) {
-                diceValues = [gameState.dice[0], gameState.dice[1]];
+                diceForMoves = [gameState.dice[0], gameState.dice[1]];
             } else if (gameState.dice.length >= 2) {
-                diceValues = [gameState.dice[0], gameState.dice[1]];
+                diceForMoves = [gameState.dice[0], gameState.dice[1]];
             } else if (gameState.dice.length > 0) {
-                diceValues = gameState.dice;
+                diceForMoves = gameState.dice;
             }
         }
     }
     
     console.warn('[mappers] DICE EXTRACTION:', {
         originalDice: gameState.dice,
-        extractedDice: diceValues,
-        diceLength: diceValues.length
+        extractedDice: diceForMoves,
+        diceLength: diceForMoves.length
     });
     
     // Get points array safely
     const pointsArray = getPointsArray(gameState.board);
     
-    const debugMsg = `[mappers] Calculating legal moves: dice=${diceValues.length}, points=${pointsArray.length}, turn=${turn}`;
+    const debugMsg = `[mappers] Calculating legal moves: dice=${diceForMoves.length}, points=${pointsArray.length}, turn=${turn}`;
     console.log(debugMsg, {
-        diceValues,
-        diceLength: diceValues.length,
+        diceForMoves,
+        diceLength: diceForMoves.length,
         pointsLength: pointsArray.length,
         turn,
         currentPlayerColor: turn === 'light' ? 1 : 2,
@@ -305,22 +305,22 @@ export const mapGameStateToBoardState = (
     // Only calculate moves if we have dice and a valid board
     // FORCE LOGS TO BE VISIBLE
     const conditionCheck = {
-        diceValuesLength: diceValues.length,
+        diceValuesLength: diceForMoves.length,
         pointsArrayLength: pointsArray.length,
-        hasDice: diceValues.length > 0,
+        hasDice: diceForMoves.length > 0,
         hasValidBoard: pointsArray.length === 24,
-        willCalculate: diceValues.length > 0 && pointsArray.length === 24,
-        diceValues: diceValues,
+        willCalculate: diceForMoves.length > 0 && pointsArray.length === 24,
+        diceForMoves: diceForMoves,
         pointsArraySample: pointsArray.slice(0, 3)
     };
     console.error('[mappers] ⚠️⚠️⚠️ CHECKING CONDITIONS ⚠️⚠️⚠️', conditionCheck);
     if (debugStore) {
         try {
-            debugStore.getState().addLog(`[mappers] Conditions: dice=${diceValues.length}, points=${pointsArray.length}`, 'error');
+            debugStore.getState().addLog(`[mappers] Conditions: dice=${diceForMoves.length}, points=${pointsArray.length}`, 'error');
         } catch (e) {}
     }
     
-    if (diceValues.length > 0 && pointsArray.length === 24) {
+    if (diceForMoves.length > 0 && pointsArray.length === 24) {
         try {
             // Convert to BoardState format for getValidMoves
             // CRITICAL: Map player IDs to colors (1 or 2)
@@ -380,10 +380,10 @@ export const mapGameStateToBoardState = (
                     off: boardStateForLogic.off
                 },
                 currentPlayerColor,
-                diceValues
+                diceForMoves
             });
             
-            const validMovesMap = getValidMoves(boardStateForLogic, currentPlayerColor, diceValues);
+            const validMovesMap = getValidMoves(boardStateForLogic, currentPlayerColor, diceForMoves);
             
             console.error('[mappers] ⚠️⚠️⚠️ getValidMoves RESULT ⚠️⚠️⚠️', {
                 mapSize: validMovesMap.size,
@@ -443,9 +443,9 @@ export const mapGameStateToBoardState = (
             }
         }
         } else {
-        const errorMsg = `[mappers] ❌ CANNOT CALCULATE LEGAL MOVES: dice=${diceValues.length}, points=${pointsArray.length}`;
+        const errorMsg = `[mappers] ❌ CANNOT CALCULATE LEGAL MOVES: dice=${diceForMoves.length}, points=${pointsArray.length}`;
         console.error(errorMsg, {
-            diceLength: diceValues.length,
+            diceLength: diceForMoves.length,
             pointsLength: pointsArray.length,
             hasBoard: !!gameState.board,
             boardType: typeof gameState.board,
