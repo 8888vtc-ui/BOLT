@@ -63,12 +63,16 @@ const Checker = memo<CheckerProps>(({
     const colors = color === 'light' ? lightColors : darkColors;
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
-        console.log('[Checker] PointerDown:', { isPlayable, id, color });
-        if (!isPlayable) {
-            console.log('[Checker] Not playable, ignoring pointerDown');
-            return;
-        }
-
+        // ALWAYS LOG - CRITICAL FOR DEBUG
+        console.error('[Checker] 🔥🔥🔥 POINTER DOWN 🔥🔥🔥', { 
+            isPlayable, 
+            id, 
+            color,
+            pip: id.split('-')[1],
+            timestamp: new Date().toISOString()
+        });
+        
+        // FORCE CAPTURE EVEN IF NOT PLAYABLE (for debug)
         e.preventDefault();
         e.stopPropagation();
         if (e.target instanceof SVGElement) {
@@ -77,8 +81,11 @@ const Checker = memo<CheckerProps>(({
         isDragging.current = true;
         startPos.current = { x: e.clientX, y: e.clientY };
         setDragOffset({ x: 0, y: 0 });
-        onDragStart(id);
-        console.log('[Checker] PointerDown captured, isDragging set to true');
+        
+        if (isPlayable) {
+            onDragStart(id);
+        }
+        console.error('[Checker] PointerDown captured, isDragging=true, isPlayable=' + isPlayable);
     }, [isPlayable, id, color, onDragStart]);
 
     const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -93,31 +100,37 @@ const Checker = memo<CheckerProps>(({
         const wasDragging = isDragging.current;
         isDragging.current = false;
         
+        console.error('[Checker] 🔥🔥🔥 POINTER UP 🔥🔥🔥', { 
+            wasDragging, 
+            isPlayable, 
+            id, 
+            color,
+            timestamp: new Date().toISOString()
+        });
+        
         if (e.target instanceof SVGElement) {
             (e.target as SVGElement).releasePointerCapture(e.pointerId);
         }
 
-        if (wasDragging) {
         const dx = e.clientX - startPos.current.x;
         const dy = e.clientY - startPos.current.y;
+        const isClick = Math.abs(dx) < 5 && Math.abs(dy) < 5;
 
-        // If minimal movement, treat as click
-        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-                console.error('[Checker] ✅✅✅ CLICK DETECTED ✅✅✅', { isPlayable, id, color });
-                if (isPlayable) {
+        console.error('[Checker] ✅✅✅ CLICK ANALYSIS ✅✅✅', { 
+            dx, 
+            dy, 
+            isClick, 
+            isPlayable,
+            willCallOnClick: isClick
+        });
+
+        // ALWAYS call onClick on click (for debugging) - parent will check validity
+        if (isClick) {
+            console.error('[Checker] 🎯🎯🎯 CALLING onClick() 🎯🎯🎯', { id, color, isPlayable });
             onClick();
-        } else {
-                    console.error('[Checker] ❌ Not playable, but click detected');
-                }
-            } else {
-                // Drop - will be resolved by hit test in parent
-                onDragEnd(null);
-            }
-        } else {
-            // If pointerDown was never captured, treat as click anyway
-            console.error('[Checker] ✅✅✅ POINTER UP WITHOUT DRAG - TREATING AS CLICK ✅✅✅', { isPlayable, id, color });
-            // ALWAYS call onClick, even if not playable (for debugging)
-            onClick();
+        } else if (wasDragging) {
+            // Drop - will be resolved by hit test in parent
+            onDragEnd(null);
         }
         
         setDragOffset({ x: 0, y: 0 });

@@ -23,6 +23,19 @@ const BoardWrap = memo<BoardProps>(({
         setSelectedPip(null);
     }, [state.turn]);
 
+    // LOG STATE AT EVERY RENDER - CRITICAL FOR DEBUG
+    useEffect(() => {
+        console.error('[BoardWrap] 🚨🚨🚨 STATE UPDATE 🚨🚨🚨', {
+            legalMovesCount: state.legalMoves.length,
+            checkersCount: state.checkers.length,
+            turn: state.turn,
+            diceValues: state.dice.values,
+            diceUsed: state.dice.used,
+            firstLegalMoves: state.legalMoves.slice(0, 5),
+            onMoveAvailable: typeof onMove === 'function'
+        });
+    }, [state.legalMoves, state.checkers.length, state.turn, state.dice.values, onMove]);
+
     // Announce moves for screen readers
     const announceMove = useCallback((from: PipIndex | 'bar', to: PipIndex | 'borne') => {
         const fromStr = from === 'bar' ? 'bar' : `point ${from}`;
@@ -31,7 +44,14 @@ const BoardWrap = memo<BoardProps>(({
     }, []);
 
     const handlePipClick = useCallback((pip: PipIndex | 'bar' | 'borne') => {
-        console.log('[BoardWrap] handlePipClick:', { pip, selectedPip, legalMovesCount: state.legalMoves.length, turn: state.turn });
+        console.error('[BoardWrap] 🔥🔥🔥 handlePipClick CALLED 🔥🔥🔥', { 
+            pip, 
+            selectedPip, 
+            legalMovesCount: state.legalMoves.length, 
+            turn: state.turn,
+            allLegalMoves: state.legalMoves.slice(0, 10),
+            timestamp: new Date().toISOString()
+        });
         
         // If clicking on borne (home), try to bear off
         if (pip === 'borne') {
@@ -40,7 +60,7 @@ const BoardWrap = memo<BoardProps>(({
                 const canBearOff = state.legalMoves.some(
                     m => m.from === selectedPip && m.to === 'borne'
                 );
-                console.log('[BoardWrap] Bear off attempt:', { selectedPip, canBearOff });
+                console.error('[BoardWrap] Bear off attempt:', { selectedPip, canBearOff });
                 if (canBearOff && onMove) {
                     onMove(selectedPip, 'borne');
                     announceMove(selectedPip, 'borne');
@@ -57,7 +77,7 @@ const BoardWrap = memo<BoardProps>(({
             );
             const hasLegalMoves = state.legalMoves.some(m => m.from === pip);
             
-            console.log('[BoardWrap] Selection attempt:', { pip, hasPlayableChecker, hasLegalMoves, legalMoves: state.legalMoves.filter(m => m.from === pip) });
+            console.error('[BoardWrap] Selection attempt:', { pip, hasPlayableChecker, hasLegalMoves, legalMoves: state.legalMoves.filter(m => m.from === pip) });
             
             if (hasPlayableChecker && hasLegalMoves) {
                 setSelectedPip(pip);
