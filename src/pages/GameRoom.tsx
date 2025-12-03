@@ -351,6 +351,111 @@ const GameRoom = () => {
     const isOfflineMode = currentRoom?.id === 'offline-bot' || roomId === 'offline-bot';
     const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+    // === HOOKS QUI DOIVENT ÊTRE AVANT LES RETURNS CONDITIONNELS ===
+    // Extract game state values safely (with defaults for when gameState is null)
+    const board = gameState?.board;
+    const dice = gameState?.dice || [];
+    const turn = gameState?.turn || '';
+    const score = gameState?.score;
+    const cubeValue = gameState?.cubeValue || 1;
+    const cubeOwner = gameState?.cubeOwner;
+    const pendingDouble = gameState?.pendingDouble;
+
+    // isMyTurn calculation (safe even when gameState is null)
+    const isMyTurn = useMemo(() => {
+        if (!user || !gameState) return false;
+        const myId = user.id;
+        if (turn === myId) return true;
+        if (turn === 'guest-1' && myId === 'guest-1') return true;
+        if (turn === 'guest' && !user.id) return true;
+        return false;
+    }, [user, gameState, turn]);
+
+    // canDouble calculation
+    const hasDiceRolled = dice && dice.length > 0;
+    const canDoubleCalc = useMemo(() => {
+        if (!gameState) return false;
+        return canOfferDouble(
+            cubeValue,
+            cubeOwner,
+            user?.id || '',
+            hasDiceRolled,
+            gameState.matchLength || 0
+        );
+    }, [gameState, cubeValue, cubeOwner, user?.id, hasDiceRolled]);
+
+    // Map state for new board - MUST BE BEFORE CONDITIONAL RETURNS
+    const boardState = useMemo(() => {
+        if (!gameState) return null;
+        const mappedPlayers = players.map((p, i) => ({
+            id: p.id,
+            color: i === 0 ? 1 : 2
+        }));
+        return mapGameStateToBoardState(gameState as any, user?.id || 'guest', mappedPlayers);
+    }, [gameState, user?.id, players]);
+
+    const matchState = useMemo(() => ({
+        players: [
+            {
+                handle: players[0]?.username || 'Player 1',
+                rating: 1500,
+                connected: true,
+                color: 'light' as const,
+                countryCode: 'US'
+            },
+            {
+                handle: players[1]?.username || 'Player 2',
+                rating: 1500,
+                connected: true,
+                color: 'dark' as const,
+                countryCode: 'AI'
+            }
+        ] as [Player, Player],
+        score: [
+            score && players[0] ? (score[players[0].id] || 0) : 0,
+            score && players[1] ? (score[players[1].id] || 0) : 0
+        ] as [number, number],
+        limitPoints: gameState?.matchLength || 0,
+        timers: [
+            { msRemaining: 0, running: false },
+            { msRemaining: 0, running: false }
+        ] as [TimerState, TimerState]
+    }), [players, score, gameState?.matchLength]);
+
+    // Handle moves from the new board component
+    const handleBoardMove = useCallback((from: number | 'bar', to: number | 'borne') => {
+        if (!isMyTurn) {
+            console.warn('[GameRoom] Not my turn, ignoring move');
+            return;
+        }
+        const isPlayer1 = playerColor === 1;
+        let fromIdx: number;
+        let toIdx: number;
+        if (from === 'bar') {
+            fromIdx = isPlayer1 ? 24 : -1;
+        } else {
+            fromIdx = from - 1;
+        }
+        if (to === 'borne') {
+            toIdx = isPlayer1 ? -1 : 24;
+        } else {
+            toIdx = to - 1;
+        }
+        console.log(`[GameRoom] Move: ${from} -> ${to} (mapped: ${fromIdx} -> ${toIdx})`);
+        sendGameAction('move', { from: fromIdx, to: toIdx });
+    }, [isMyTurn, playerColor, sendGameAction]);
+
+    // Determine if current player can double now
+    const canDoubleNow = useMemo(() => {
+        if (!isMyTurn) return false;
+        if (pendingDouble) return false;
+        if (!canDoubleCalc) return false;
+        if (dice && dice.length > 0) return false;
+        return true;
+    }, [isMyTurn, pendingDouble, canDoubleCalc, dice]);
+
+    // === END OF HOOKS THAT MUST BE BEFORE CONDITIONAL RETURNS ===
+
     // Check if game is loaded - FORCER l'initialisation si manquant
     if (!currentRoom || !gameState) {
         const addLog = useDebugStore.getState().addLog;
@@ -457,28 +562,9 @@ const GameRoom = () => {
         );
     }
 
-    const { board, dice, turn, score, cubeValue, cubeOwner, pendingDouble } = gameState;
-
-    // Fix isMyTurn: use players from store
-    const isMyTurn = (() => {
-        if (!user) return false;
-        const myId = user.id;
-        // Check if current turn matches my ID
-        if (turn === myId) return true;
-        // Fallback for guest mode
-        if (turn === 'guest-1' && myId === 'guest-1') return true;
-        return false;
-    })();
-
-    // Calcul si le joueur peut doubler
-    const hasDiceRolled = dice && dice.length > 0;
-    const canDouble = canOfferDouble(
-        cubeValue,
-        cubeOwner,
-        user?.id || '',
-        hasDiceRolled,
-        gameState.matchLength || 0
-    );
+    // Variables déjà extraites au début du composant (avant les returns conditionnels)
+    // board, dice, turn, score, cubeValue, cubeOwner, pendingDouble sont déjà définis
+    // isMyTurn, canDoubleCalc, boardState, matchState, handleBoardMove, canDoubleNow sont déjà définis
 
     // Handlers
     const handleRollDice = () => {
@@ -582,95 +668,7 @@ const GameRoom = () => {
         }
     };
 
-    // Map state for new board
-    const boardState = useMemo(() => {
-        if (!gameState) return null;
-        // Ensure players have color
-        const mappedPlayers = players.map((p, i) => ({
-            id: p.id,
-            color: i === 0 ? 1 : 2 // Default P1=1 (Light), P2=2 (Dark)
-        }));
-        return mapGameStateToBoardState(gameState as any, user?.id || 'guest', mappedPlayers);
-    }, [gameState, user?.id, players]);
-
-    const matchState = useMemo(() => ({
-        players: [
-            {
-                handle: players[0]?.username || 'Player 1',
-                rating: 1500,
-                connected: true,
-                color: 'light' as const,
-                countryCode: 'US'
-            },
-            {
-                handle: players[1]?.username || 'Player 2',
-                rating: 1500,
-                connected: true,
-                color: 'dark' as const,
-                countryCode: 'AI'
-            }
-        ] as [Player, Player],
-        score: [
-            score && players[0] ? (score[players[0].id] || 0) : 0,
-            score && players[1] ? (score[players[1].id] || 0) : 0
-        ] as [number, number],
-        limitPoints: gameState?.matchLength || 0,
-        timers: [
-            { msRemaining: 0, running: false },
-            { msRemaining: 0, running: false }
-        ] as [TimerState, TimerState]
-    }), [players, score, gameState?.matchLength]);
-
-    /**
-     * Handle moves from the new board component
-     * Maps from GuruGammon format (1-24, 'bar', 'borne') to legacy format (0-23)
-     */
-    const handleBoardMove = useCallback((from: number | 'bar', to: number | 'borne') => {
-        if (!isMyTurn) {
-            console.warn('[GameRoom] Not my turn, ignoring move');
-            return;
-        }
-
-        // Determine player color (Player 1 = Light moves 24->1, Player 2 = Dark moves 1->24)
-        const isPlayer1 = playerColor === 1;
-
-        // Convert from GuruGammon format to legacy format
-        let fromIdx: number;
-        let toIdx: number;
-
-        // Handle 'from' - bar or pip 1-24
-        if (from === 'bar') {
-            // Bar entry point depends on player
-            fromIdx = isPlayer1 ? 24 : -1;
-        } else {
-            // Convert pip 1-24 to index 0-23
-            fromIdx = from - 1;
-        }
-
-        // Handle 'to' - borne or pip 1-24
-        if (to === 'borne') {
-            // Bear-off point depends on player
-            toIdx = isPlayer1 ? -1 : 24;
-        } else {
-            // Convert pip 1-24 to index 0-23
-            toIdx = to - 1;
-        }
-
-        console.log(`[GameRoom] Move: ${from} -> ${to} (mapped: ${fromIdx} -> ${toIdx})`);
-        
-        // Send the move action
-        sendGameAction('move', { from: fromIdx, to: toIdx });
-    }, [isMyTurn, playerColor, sendGameAction]);
-
-    // Determine if current player can double
-    const canDoubleNow = useMemo(() => {
-        if (!isMyTurn) return false;
-        if (pendingDouble) return false;
-        if (!canDouble) return false;
-        // Can only double at start of turn before rolling
-        if (dice && dice.length > 0) return false;
-        return true;
-    }, [isMyTurn, pendingDouble, canDouble, dice]);
+    // boardState, matchState, handleBoardMove, canDoubleNow sont définis au début du composant
 
     return (
         <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans relative">
