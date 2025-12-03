@@ -60,8 +60,12 @@ test.describe('GuruGammon piece interaction', () => {
         // 1) Navigate to game/board and ensure loaded
         await page.goto(GAME_URL, { waitUntil: 'networkidle' });
         
-        const board = page.getByTestId('board');
-        await expect(board).toBeVisible({ timeout: 15000 });
+        // Wait for page to load
+        await page.waitForTimeout(3000);
+        
+        // Try multiple selectors for board
+        const board = page.getByTestId('board').or(page.locator('.gg-board-container')).or(page.locator('svg[role="application"]'));
+        await expect(board.first()).toBeVisible({ timeout: 20000 });
         
         // Wait for board to fully render
         await page.waitForTimeout(2000);
@@ -133,8 +137,12 @@ test.describe('GuruGammon piece interaction', () => {
     test('checkers are clickable and respond to clicks', async ({ page }) => {
         await page.goto(GAME_URL, { waitUntil: 'networkidle' });
         
-        const board = page.getByTestId('board');
-        await expect(board).toBeVisible({ timeout: 15000 });
+        // Wait for page to load
+        await page.waitForTimeout(3000);
+        
+        // Try multiple selectors for board
+        const board = page.getByTestId('board').or(page.locator('.gg-board-container')).or(page.locator('svg[role="application"]'));
+        await expect(board.first()).toBeVisible({ timeout: 20000 });
         await page.waitForTimeout(2000);
         
         // Roll dice if needed

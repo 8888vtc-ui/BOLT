@@ -1,0 +1,352 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - img [ref=e8]
+          - generic [ref=e11]: SYSTEM LOGS
+          - generic [ref=e12]: (11)
+        - generic [ref=e13]:
+          - button "Exporter les logs" [ref=e14] [cursor=pointer]:
+            - img [ref=e15]
+          - button "Effacer les logs" [ref=e19] [cursor=pointer]:
+            - img [ref=e20]
+          - button "Masquer" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - img [ref=e32]
+          - textbox "Rechercher..." [ref=e35]
+        - generic [ref=e36]:
+          - button "Tous (11)" [ref=e37] [cursor=pointer]
+          - button "Info (6)" [ref=e38] [cursor=pointer]
+          - button "OK (4)" [ref=e39] [cursor=pointer]
+          - button "⚠ (1)" [ref=e40] [cursor=pointer]
+          - button "❌ (0)" [ref=e41] [cursor=pointer]
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]: "[07:38:37]"
+            - generic [ref=e46]: 🎯 [GAME_ROOM] Board pour rendu
+          - generic [ref=e47]: "{ \"totalCheckers\": 30, \"pointsWithCheckers\": 8, \"samplePoints\": { \"point0\": { \"player\": 2, \"count\": 2 }, \"point5\": { \"player\": 1, \"count\": 5 }, \"point11\": { \"player\": 2, \"count\": 5 }, \"point12\": { \"player\": 1, \"count\": 5 }, \"point23\": { \"player\": 1, \"count\": 2 } } }"
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - generic [ref=e50]: "[07:38:37]"
+            - generic [ref=e51]: "🤖 Bot: Checking turn..."
+          - generic [ref=e52]: "{ \"currentTurn\": \"guest\", \"myId\": \"guest\", \"isBotTurn\": false, \"botIsThinking\": false, \"analysisInProgress\": null, \"analysisKey\": \"guest-no-dice\", \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ] }"
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]: "[07:38:36]"
+            - generic [ref=e56]: "🤖 Bot: Checking turn..."
+          - generic [ref=e57]: "{ \"currentTurn\": \"guest\", \"myId\": \"guest\", \"isBotTurn\": false, \"botIsThinking\": false, \"analysisInProgress\": null, \"analysisKey\": \"guest-no-dice\", \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ] }"
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - generic [ref=e60]: "[07:38:32]"
+            - generic [ref=e61]: ✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ - Room et GameState définis
+          - generic [ref=e62]: "{ \"roomSet\": true, \"gameStateSet\": true, \"hasBoard\": true }"
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]: "[07:38:32]"
+            - generic [ref=e66]: ✅ [JOIN_ROOM] État de jeu créé (bot)
+          - generic [ref=e67]: "{ \"dice\": [], \"turn\": \"guest\", \"hasBoard\": true, \"hasPoints\": true, \"pointsLength\": 24, \"totalCheckers\": 30, \"pointsWithCheckers\": 8, \"samplePoints\": { \"point0\": { \"player\": 2, \"count\": 2 }, \"point5\": { \"player\": 1, \"count\": 5 }, \"point11\": { \"player\": 2, \"count\": 5 }, \"point12\": { \"player\": 1, \"count\": 5 }, \"point23\": { \"player\": 1, \"count\": 2 } } }"
+        - generic [ref=e69]:
+          - generic [ref=e70]: "[07:38:32]"
+          - generic [ref=e71]: "✅ [JOIN_ROOM] Room définie (bot): Entraînement Solo (Offline)"
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: "[07:38:32]"
+            - generic [ref=e75]: "✅ [JOIN_ROOM] Joueurs créés: 2"
+          - generic [ref=e76]: "{ \"count\": 2, \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ], \"botId\": \"bot\", \"userExists\": false }"
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]: "[07:38:32]"
+            - generic [ref=e80]: 📋 [JOIN_ROOM] Création joueurs locaux...
+          - generic [ref=e81]: "{ \"hasUser\": false }"
+        - generic [ref=e83]:
+          - generic [ref=e84]: "[07:38:32]"
+          - generic [ref=e85]: 🤖 [JOIN_ROOM] Initialisation mode bot offline
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - generic [ref=e88]: "[07:38:32]"
+            - generic [ref=e89]: "🚀 [JOIN_ROOM] Début - Room ID: offline-bot"
+          - generic [ref=e90]: "{ \"roomId\": \"offline-bot\", \"options\": { \"mode\": \"money\", \"matchLength\": 0 }, \"DEMO_MODE\": false }"
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - generic [ref=e93]: "[07:38:32]"
+            - generic [ref=e94]: ⚠️ [GAME_ROOM] Room ou gameState manquant en mode offline-bot - Initialisation forcée
+          - generic [ref=e95]: "{ \"hasRoom\": false, \"hasGameState\": false, \"roomId\": \"offline-bot\" }"
+    - generic [ref=e96]:
+      - generic [ref=e97]:
+        - generic [ref=e98]:
+          - img [ref=e99]
+          - generic [ref=e102]: CONSOLE JAVASCRIPT
+          - generic [ref=e103]: (4 logs)
+        - generic [ref=e104]:
+          - button "Réduire" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+          - button "Effacer les logs" [ref=e108] [cursor=pointer]:
+            - img [ref=e109]
+          - button "Masquer" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+      - generic [ref=e119]:
+        - button "ALL" [ref=e120] [cursor=pointer]
+        - button "LOG (3)" [ref=e121] [cursor=pointer]
+        - button "INFO (0)" [ref=e122] [cursor=pointer]
+        - button "WARN (1)" [ref=e123] [cursor=pointer]
+        - button "ERROR (0)" [ref=e124] [cursor=pointer]
+      - generic [ref=e125]:
+        - generic [ref=e126]:
+          - generic [ref=e127]:
+            - generic [ref=e128]: "[07:38:36,164]"
+            - generic [ref=e129]: log
+          - generic [ref=e130]: "[07:38:36] 🤖 Bot: Checking turn... { \"currentTurn\": \"guest\", \"myId\": \"guest\", \"isBotTurn\": false, \"botIsThinking\": false, \"analysisInProgress\": null, \"analysisKey\": \"guest-no-dice\", \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ] }"
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: "[07:38:37,892]"
+            - generic [ref=e134]: log
+          - generic [ref=e135]: "[07:38:37] 🤖 Bot: Checking turn... { \"currentTurn\": \"guest\", \"myId\": \"guest\", \"isBotTurn\": false, \"botIsThinking\": false, \"analysisInProgress\": null, \"analysisKey\": \"guest-no-dice\", \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ] }"
+        - generic [ref=e136]:
+          - generic [ref=e137]:
+            - generic [ref=e138]: "[07:38:37,903]"
+            - generic [ref=e139]: log
+          - generic [ref=e140]: "[07:38:37] 🎯 [GAME_ROOM] Board pour rendu { \"totalCheckers\": 30, \"pointsWithCheckers\": 8, \"samplePoints\": { \"point0\": { \"player\": 2, \"count\": 2 }, \"point5\": { \"player\": 1, \"count\": 5 }, \"point11\": { \"player\": 2, \"count\": 5 }, \"point12\": { \"player\": 1, \"count\": 5 }, \"point23\": { \"player\": 1, \"count\": 2 } } }"
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - generic [ref=e143]: "[07:38:43,175]"
+            - generic [ref=e144]: warn
+          - generic [ref=e145]: Auth check timeout, setting loading to false
+    - generic [ref=e146]:
+      - generic [ref=e147]:
+        - generic [ref=e148]:
+          - img [ref=e149]
+          - generic [ref=e151]: PANEL DE TESTS
+        - button "Lancer Tests" [ref=e152] [cursor=pointer]:
+          - img [ref=e153]
+          - generic [ref=e155]: Lancer Tests
+      - generic [ref=e157]:
+        - button "Jeu" [ref=e158] [cursor=pointer]:
+          - img [ref=e159]
+          - text: Jeu
+        - button "Modes" [ref=e165] [cursor=pointer]:
+          - img [ref=e166]
+          - text: Modes
+      - paragraph [ref=e171]: Cliquez sur "Lancer Tests" pour exécuter la suite de tests
+    - generic [ref=e172]:
+      - generic [ref=e173]:
+        - button [ref=e174] [cursor=pointer]:
+          - img [ref=e175]
+        - generic [ref=e178]:
+          - heading "Entraînement Solo (Offline)" [level=1] [ref=e179]
+          - generic [ref=e182]: En ligne
+      - generic [ref=e183]:
+        - generic [ref=e185]:
+          - generic [ref=e186]: Money Game
+          - generic [ref=e187]: 0 - 0
+        - button "Coach AI BETA" [ref=e188] [cursor=pointer]:
+          - img [ref=e189]
+          - generic [ref=e193]: Coach AI
+          - generic [ref=e194]: BETA
+    - generic [ref=e195]:
+      - region "Backgammon game board" [ref=e197]:
+        - status [ref=e198]
+        - region "Match information" [ref=e199]:
+          - generic [ref=e200]:
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - generic [ref=e204]: Invité
+                - generic [ref=e205]: US
+              - generic [ref=e207]: "Rating: 1500"
+            - generic [ref=e208]: 00:00
+          - generic [ref=e209]:
+            - generic [ref=e210]:
+              - generic [ref=e211]: 0 - 0
+              - generic [ref=e212]: Match to 0
+            - generic [ref=e213]:
+              - generic [ref=e214]: "1"
+              - generic [ref=e215]: Center
+          - generic [ref=e216]:
+            - generic [ref=e217]: 00:00
+            - generic [ref=e218]:
+              - generic [ref=e219]:
+                - generic [ref=e221]: AI
+                - generic [ref=e222]: Bot IA
+              - generic [ref=e223]: "Rating: 1500"
+        - generic [ref=e225]:
+          - application "Backgammon board - GuruGammon" [ref=e226]:
+            - button "dark Home Zone - bear off area" [ref=e230] [cursor=pointer]:
+              - generic [ref=e249]: DARK HOME
+            - button "light Home Zone - bear off area" [ref=e250] [cursor=pointer]:
+              - generic [ref=e269]: LIGHT HOME
+            - button "Bar - captured checkers area" [ref=e270] [cursor=pointer]: BAR
+            - button "Point 1" [ref=e279] [cursor=pointer]: "1"
+            - button "Point 2" [ref=e282] [cursor=pointer]: "2"
+            - button "Point 3" [ref=e285] [cursor=pointer]: "3"
+            - button "Point 4" [ref=e288] [cursor=pointer]: "4"
+            - button "Point 5" [ref=e291] [cursor=pointer]: "5"
+            - button "Point 6" [ref=e294] [cursor=pointer]: "6"
+            - button "Point 7" [ref=e297] [cursor=pointer]: "7"
+            - button "Point 8" [ref=e300] [cursor=pointer]: "8"
+            - button "Point 9" [ref=e303] [cursor=pointer]: "9"
+            - button "Point 10" [ref=e306] [cursor=pointer]: "10"
+            - button "Point 11" [ref=e309] [cursor=pointer]: "11"
+            - button "Point 12" [ref=e312] [cursor=pointer]: "12"
+            - button "Point 13" [ref=e315] [cursor=pointer]: "13"
+            - button "Point 14" [ref=e318] [cursor=pointer]: "14"
+            - button "Point 15" [ref=e321] [cursor=pointer]: "15"
+            - button "Point 16" [ref=e324] [cursor=pointer]: "16"
+            - button "Point 17" [ref=e327] [cursor=pointer]: "17"
+            - button "Point 18" [ref=e330] [cursor=pointer]: "18"
+            - button "Point 19" [ref=e333] [cursor=pointer]: "19"
+            - button "Point 20" [ref=e336] [cursor=pointer]: "20"
+            - button "Point 21" [ref=e339] [cursor=pointer]: "21"
+            - button "Point 22" [ref=e342] [cursor=pointer]: "22"
+            - button "Point 23" [ref=e345] [cursor=pointer]: "23"
+            - button "Point 24" [ref=e348] [cursor=pointer]: "24"
+            - generic "Checkers layer" [ref=e351]:
+              - button "dark checker" [ref=e352]
+              - button "light checker" [ref=e362]
+              - button "light checker" [ref=e372]
+              - button "dark checker" [ref=e382]
+              - button "light checker" [ref=e392]
+              - button "dark checker" [ref=e402]
+              - button "dark checker" [ref=e412]
+              - button "light checker" [ref=e422]
+              - button "dark checker" [ref=e432]
+              - button "light checker" [ref=e442]
+              - button "light checker" [ref=e452]
+              - button "dark checker" [ref=e462]
+              - button "light checker" [ref=e472]
+              - button "dark checker" [ref=e482]
+              - button "dark checker" [ref=e492]
+              - button "light checker" [ref=e502]
+              - button "light checker" [ref=e512]
+              - button "light checker" [ref=e522]
+              - button "dark checker" [ref=e532]
+              - button "light checker" [ref=e542]
+              - button "dark checker" [ref=e552]
+              - button "dark checker" [ref=e562]
+              - button "light checker" [ref=e572]
+              - button "dark checker" [ref=e582]
+              - button "light checker" [ref=e592]
+              - button "dark checker" [ref=e602]
+              - button "light checker" [ref=e612]
+              - button "dark checker" [ref=e622]
+              - button "light checker" [ref=e632]
+              - button "dark checker" [ref=e642]
+            - button "Roll dice" [ref=e652] [cursor=pointer]: ROLL DICE
+            - button "Doubling cube showing 1" [ref=e654] [cursor=pointer]: "11"
+            - text: GURUGAMMON
+          - button "Roll the dice" [ref=e660] [cursor=pointer]: 🎲 ROLL DICE
+          - generic [ref=e663]: Light's turn
+        - generic [ref=e664]: Click to select • Click destination to move • Tab for keyboard navigation
+      - generic [ref=e665]:
+        - generic [ref=e666]:
+          - heading "Players" [level=3] [ref=e667]
+          - generic [ref=e668]:
+            - generic [ref=e669]:
+              - generic [ref=e671]:
+                - generic [ref=e672]: Invité
+                - generic [ref=e673]: White
+              - img [ref=e674]
+            - generic [ref=e679]:
+              - generic [ref=e680]: Bot IA
+              - generic [ref=e681]: Red
+        - generic [ref=e683]:
+          - generic [ref=e685]:
+            - heading "Chat" [level=3] [ref=e686]
+            - generic [ref=e687]:
+              - img [ref=e688]
+              - generic [ref=e695]: AI Coach
+          - generic [ref=e698]:
+            - textbox "Ask the AI Coach anything..." [ref=e699]
+            - button [disabled] [ref=e700]:
+              - img [ref=e701]
+  - generic [ref=e704]:
+    - generic [ref=e705]:
+      - generic [ref=e706]:
+        - img [ref=e707]
+        - generic [ref=e710]: CONSOLE JAVASCRIPT
+        - generic [ref=e711]: (13 logs)
+      - generic [ref=e712]:
+        - button "Réduire" [ref=e713] [cursor=pointer]:
+          - img [ref=e714]
+        - button "Effacer les logs" [ref=e716] [cursor=pointer]:
+          - img [ref=e717]
+        - button "Masquer" [ref=e723] [cursor=pointer]:
+          - img [ref=e724]
+    - generic [ref=e727]:
+      - button "ALL" [ref=e728] [cursor=pointer]
+      - button "LOG (11)" [ref=e729] [cursor=pointer]
+      - button "INFO (0)" [ref=e730] [cursor=pointer]
+      - button "WARN (2)" [ref=e731] [cursor=pointer]
+      - button "ERROR (0)" [ref=e732] [cursor=pointer]
+    - generic [ref=e733]:
+      - generic [ref=e734]:
+        - generic [ref=e735]:
+          - generic [ref=e736]: "[07:38:32,807]"
+          - generic [ref=e737]: warn
+        - generic [ref=e738]: "[07:38:32] ⚠️ [GAME_ROOM] Room ou gameState manquant en mode offline-bot - Initialisation forcée { \"hasRoom\": false, \"hasGameState\": false, \"roomId\": \"offline-bot\" }"
+      - generic [ref=e739]:
+        - generic [ref=e740]:
+          - generic [ref=e741]: "[07:38:32,838]"
+          - generic [ref=e742]: log
+        - generic [ref=e743]: "[07:38:32] 🚀 [JOIN_ROOM] Début - Room ID: offline-bot { \"roomId\": \"offline-bot\", \"options\": { \"mode\": \"money\", \"matchLength\": 0 }, \"DEMO_MODE\": false }"
+      - generic [ref=e744]:
+        - generic [ref=e745]:
+          - generic [ref=e746]: "[07:38:32,849]"
+          - generic [ref=e747]: log
+        - generic [ref=e748]: "[07:38:32] 🤖 [JOIN_ROOM] Initialisation mode bot offline"
+      - generic [ref=e749]:
+        - generic [ref=e750]:
+          - generic [ref=e751]: "[07:38:32,855]"
+          - generic [ref=e752]: log
+        - generic [ref=e753]: "[07:38:32] 📋 [JOIN_ROOM] Création joueurs locaux... { \"hasUser\": false }"
+      - generic [ref=e754]:
+        - generic [ref=e755]:
+          - generic [ref=e756]: "[07:38:32,865]"
+          - generic [ref=e757]: log
+        - generic [ref=e758]: "🎮 [JOIN_ROOM] Joueurs créés: 2 [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ]"
+      - generic [ref=e759]:
+        - generic [ref=e760]:
+          - generic [ref=e761]: "[07:38:32,873]"
+          - generic [ref=e762]: log
+        - generic [ref=e763]: "[07:38:32] ✅ [JOIN_ROOM] Joueurs créés: 2 { \"count\": 2, \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ], \"botId\": \"bot\", \"userExists\": false }"
+      - generic [ref=e764]:
+        - generic [ref=e765]:
+          - generic [ref=e766]: "[07:38:32,875]"
+          - generic [ref=e767]: log
+        - generic [ref=e768]: "[07:38:32] ✅ [JOIN_ROOM] Room définie (bot): Entraînement Solo (Offline)"
+      - generic [ref=e769]:
+        - generic [ref=e770]:
+          - generic [ref=e771]: "[07:38:32,884]"
+          - generic [ref=e772]: log
+        - generic [ref=e773]: "[07:38:32] ✅ [JOIN_ROOM] État de jeu créé (bot) { \"dice\": [], \"turn\": \"guest\", \"hasBoard\": true, \"hasPoints\": true, \"pointsLength\": 24, \"totalCheckers\": 30, \"pointsWithCheckers\": 8, \"samplePoints\": { \"point0\": { \"player\": 2, \"count\": 2 }, \"point5\": { \"player\": 1, \"count\": 5 }, \"point11\": { \"player\": 2, \"count\": 5 }, \"point12\": { \"player\": 1, \"count\": 5 }, \"point23\": { \"player\": 1, \"count\": 2 } } }"
+      - generic [ref=e774]:
+        - generic [ref=e775]:
+          - generic [ref=e776]: "[07:38:32,887]"
+          - generic [ref=e777]: log
+        - generic [ref=e778]: "[07:38:32] ✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ - Room et GameState définis { \"roomSet\": true, \"gameStateSet\": true, \"hasBoard\": true }"
+      - generic [ref=e779]:
+        - generic [ref=e780]:
+          - generic [ref=e781]: "[07:38:36,155]"
+          - generic [ref=e782]: log
+        - generic [ref=e783]: "[07:38:36] 🤖 Bot: Checking turn... { \"currentTurn\": \"guest\", \"myId\": \"guest\", \"isBotTurn\": false, \"botIsThinking\": false, \"analysisInProgress\": null, \"analysisKey\": \"guest-no-dice\", \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ] }"
+      - generic [ref=e784]:
+        - generic [ref=e785]:
+          - generic [ref=e786]: "[07:38:37,889]"
+          - generic [ref=e787]: log
+        - generic [ref=e788]: "[07:38:37] 🤖 Bot: Checking turn... { \"currentTurn\": \"guest\", \"myId\": \"guest\", \"isBotTurn\": false, \"botIsThinking\": false, \"analysisInProgress\": null, \"analysisKey\": \"guest-no-dice\", \"players\": [ { \"id\": \"guest\", \"username\": \"Invité\" }, { \"id\": \"bot\", \"username\": \"Bot IA\" } ] }"
+      - generic [ref=e789]:
+        - generic [ref=e790]:
+          - generic [ref=e791]: "[07:38:37,902]"
+          - generic [ref=e792]: log
+        - generic [ref=e793]: "[07:38:37] 🎯 [GAME_ROOM] Board pour rendu { \"totalCheckers\": 30, \"pointsWithCheckers\": 8, \"samplePoints\": { \"point0\": { \"player\": 2, \"count\": 2 }, \"point5\": { \"player\": 1, \"count\": 5 }, \"point11\": { \"player\": 2, \"count\": 5 }, \"point12\": { \"player\": 1, \"count\": 5 }, \"point23\": { \"player\": 1, \"count\": 2 } } }"
+      - generic [ref=e794]:
+        - generic [ref=e795]:
+          - generic [ref=e796]: "[07:38:43,139]"
+          - generic [ref=e797]: warn
+        - generic [ref=e798]: Auth check timeout, setting loading to false
+```
