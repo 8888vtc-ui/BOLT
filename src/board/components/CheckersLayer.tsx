@@ -45,7 +45,10 @@ const CheckersLayer = memo<CheckersLayerProps>(({
     }, [checkers]);
 
     return (
-        <g aria-label="Checkers layer">
+        <g 
+            aria-label="Checkers layer"
+            style={{ pointerEvents: 'all' }}
+        >
             {sortedCheckers.map((checker) => {
                 const { x, y } = getPipCoordinates(checker.pip, checker.z || 0);
                 
@@ -99,7 +102,7 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                         radius={CHECKER_RADIUS}
                         isPlayable={canPlay}
                         isSelected={isSelected}
-                        zIndex={10 + (checker.z || 0)}
+                        zIndex={20 + (checker.z || 0)} // Higher than triangles
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
                         onClick={() => canPlay && onCheckerClick(checker.pip)}
