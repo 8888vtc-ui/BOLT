@@ -70,8 +70,19 @@ export const mapGameStateToBoardState = (
             return p.color === 1 ? 'light' : 'dark';
         }
 
+        // CRITICAL: Map specific player IDs
+        const playerIdStr = String(playerId);
+        if (playerIdStr === 'guest' || playerIdStr === myId) {
+            // Guest or current user is always light (player 1)
+            return 'light';
+        }
+        if (playerIdStr === 'bot') {
+            // Bot is always dark (player 2)
+            return 'dark';
+        }
+        
         // Fallback: Check if it's the current user
-        if (String(playerId) === myId) return 'light';
+        if (playerIdStr === myId) return 'light';
         
         // Default to dark for opponent/bot
         return 'dark';
@@ -218,27 +229,38 @@ export const mapGameStateToBoardState = (
     
     // Determine current player color (1 or 2)
     // CRITICAL: Map turn to player color correctly
-    // If turn is a player ID, find which player it is
-    let currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
+    let currentPlayerColor: PlayerColor;
     
     // If gameState.turn is a player ID, map it correctly
     if (typeof gameState.turn === 'string') {
-        const turnPlayer = players.find(p => p.id === gameState.turn);
-        if (turnPlayer) {
-            currentPlayerColor = turnPlayer.color as PlayerColor;
-        } else if (gameState.turn === myId) {
-            // Current user is player 0 (light/1)
-            currentPlayerColor = 1;
+        const turnStr = gameState.turn;
+        
+        // Map specific player IDs
+        if (turnStr === 'guest' || turnStr === myId) {
+            currentPlayerColor = 1; // Light
+        } else if (turnStr === 'bot') {
+            currentPlayerColor = 2; // Dark
         } else {
-            // Opponent is player 1 (dark/2)
-            currentPlayerColor = 2;
+            // Look up in players array
+            const turnPlayer = players.find(p => p.id === turnStr);
+            if (turnPlayer) {
+                currentPlayerColor = turnPlayer.color as PlayerColor;
+            } else {
+                // Fallback: if it's myId, it's player 1
+                currentPlayerColor = turnStr === myId ? 1 : 2;
+            }
         }
+    } else {
+        // If turn is already mapped to 'light' or 'dark'
+        currentPlayerColor = turn === 'light' ? 1 : 2;
     }
     
     console.error('[mappers] ⚠️⚠️⚠️ CURRENT PLAYER COLOR ⚠️⚠️⚠️', {
         currentPlayerColor,
         turn,
-        gameStateTurn: gameState.turn
+        gameStateTurn: gameState.turn,
+        myId,
+        players: players.map(p => ({ id: p.id, color: p.color }))
     });
     
     // Get dice values - handle various formats
