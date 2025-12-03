@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState, Player } from '../stores/gameStore';
-import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore } from '../lib/gameLogic';
+import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore, getValidMoves } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
 import { analyzeMove } from '../lib/aiService';
@@ -651,7 +651,6 @@ export const useGameSocket = () => {
             
             // Calculate valid moves after rolling dice
             try {
-                const { getValidMoves } = require('../lib/gameLogic');
                 const currentPlayerColor = newState.currentPlayer || 1;
                 const diceValues = newState.dice.length === 4 
                     ? [newState.dice[0], newState.dice[1]] 
@@ -665,9 +664,11 @@ export const useGameSocket = () => {
                     });
                 });
                 newState.validMoves = validMoves;
-                addLog(`Calculated ${validMoves.length} valid moves`, 'info');
+                addLog(`✅ Calculated ${validMoves.length} valid moves`, 'success');
+                console.log('[useGameSocket] Valid moves calculated:', validMoves.length, validMoves.slice(0, 5));
             } catch (error) {
-                console.warn('[useGameSocket] Error calculating validMoves:', error);
+                console.error('[useGameSocket] Error calculating validMoves:', error);
+                addLog(`❌ Error calculating validMoves: ${error}`, 'error');
                 newState.validMoves = [];
             }
         } else if (action === 'move') {
