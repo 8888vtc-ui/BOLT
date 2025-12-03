@@ -1,6 +1,14 @@
 import { BoardState, CheckerState, Color, CubeState, DiceState, LegalMove, PipIndex } from '../types';
 import { getValidMoves, PlayerColor, Point } from '../../lib/gameLogic';
 
+// Import debug store for visible logging
+let debugStore: any = null;
+try {
+    debugStore = require('../../stores/useDebugStore').useDebugStore;
+} catch (e) {
+    // Fallback if debug store not available
+}
+
 // Define the shape of the existing GameState (approximate)
 interface LegacyGameState {
     board: {
@@ -198,7 +206,8 @@ export const mapGameStateToBoardState = (
     // Get points array safely
     const pointsArray = getPointsArray(gameState.board);
     
-    console.log('[mappers] Calculating legal moves:', {
+    const debugMsg = `[mappers] Calculating legal moves: dice=${diceValues.length}, points=${pointsArray.length}, turn=${turn}`;
+    console.log(debugMsg, {
         diceValues,
         diceLength: diceValues.length,
         pointsLength: pointsArray.length,
@@ -206,6 +215,11 @@ export const mapGameStateToBoardState = (
         currentPlayerColor: turn === 'light' ? 1 : 2,
         hasBoard: !!gameState.board
     });
+    if (debugStore) {
+        try {
+            debugStore.getState().addLog(debugMsg, 'info');
+        } catch (e) {}
+    }
     
     // Only calculate moves if we have dice and a valid board
     if (diceValues.length > 0 && pointsArray.length === 24) {
@@ -246,7 +260,13 @@ export const mapGameStateToBoardState = (
                 });
             });
             
-            console.log('[mappers] Calculated legal moves:', legalMoves.length, legalMoves);
+            const successMsg = `[mappers] Calculated ${legalMoves.length} legal moves`;
+            console.log(successMsg, legalMoves);
+            if (debugStore) {
+                try {
+                    debugStore.getState().addLog(successMsg, 'success');
+                } catch (e) {}
+            }
         } catch (error) {
             console.warn('[mappers] Error calculating legal moves:', error);
             // Fallback to gameState.validMoves if calculation fails
@@ -275,12 +295,18 @@ export const mapGameStateToBoardState = (
                 });
             }
         }
-    } else {
-        console.warn('[mappers] Cannot calculate legal moves:', {
+        } else {
+        const errorMsg = `[mappers] Cannot calculate legal moves: dice=${diceValues.length}, points=${pointsArray.length}`;
+        console.warn(errorMsg, {
             diceLength: diceValues.length,
             pointsLength: pointsArray.length,
             hasBoard: !!gameState.board
         });
+        if (debugStore) {
+            try {
+                debugStore.getState().addLog(errorMsg, 'warning');
+            } catch (e) {}
+        }
     }
 
     return {
