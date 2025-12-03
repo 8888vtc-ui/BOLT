@@ -1,14 +1,10 @@
-import React, { memo, useCallback, useState, useMemo } from 'react';
-import { BoardProps, PipIndex, LegalMove } from '../types';
+import React, { memo, useCallback, useState, useEffect } from 'react';
+import { BoardProps, PipIndex } from '../types';
 import BoardSVG from './BoardSVG';
 import MatchHeader from './MatchHeader';
 import '../styles/gurugammon.css';
 
-interface ExtendedBoardProps extends BoardProps {
-    canDouble?: boolean;
-}
-
-const BoardWrap = memo<ExtendedBoardProps>(({
+const BoardWrap = memo<BoardProps>(({
     state,
     matchState,
     onMove,
@@ -17,71 +13,114 @@ const BoardWrap = memo<ExtendedBoardProps>(({
     onTake,
     onPass,
     pendingDouble,
-    canDouble = false,
     theme = 'dark'
 }) => {
     const [selectedPip, setSelectedPip] = useState<PipIndex | 'bar' | null>(null);
+    const [lastMoveAnnouncement, setLastMoveAnnouncement] = useState<string>('');
 
-    // Check if a pip has legal moves from it
-    const hasLegalMovesFrom = useCallback((pip: PipIndex | 'bar'): boolean => {
-        return state.legalMoves.some(m => m.from === pip);
-    }, [state.legalMoves]);
+    // Clear selection when turn changes
+    useEffect(() => {
+        setSelectedPip(null);
+    }, [state.turn]);
 
-    // Check if a move is legal
-    const isLegalMove = useCallback((from: PipIndex | 'bar', to: PipIndex | 'borne'): boolean => {
-        return state.legalMoves.some(m => m.from === from && m.to === to);
-    }, [state.legalMoves]);
+    // Announce moves for screen readers
+    const announceMove = useCallback((from: PipIndex | 'bar', to: PipIndex | 'borne') => {
+        const fromStr = from === 'bar' ? 'bar' : `point ${from}`;
+        const toStr = to === 'borne' ? 'home' : `point ${to}`;
+        setLastMoveAnnouncement(`Moved checker from ${fromStr} to ${toStr}`);
+    }, []);
 
     const handlePipClick = useCallback((pip: PipIndex | 'bar' | 'borne') => {
-        // If nothing selected, try to select this pip
+        // If clicking on borne (home), try to bear off
+        if (pip === 'borne') {
+            if (selectedPip !== null) {
+                // Check if bearing off is a legal move
+                const canBearOff = state.legalMoves.some(
+                    m => m.from === selectedPip && m.to === 'borne'
+                );
+                if (canBearOff && onMove) {
+                    onMove(selectedPip, 'borne');
+                    announceMove(selectedPip, 'borne');
+                }
+                setSelectedPip(null);
+            }
+            return;
+        }
+
         if (selectedPip === null) {
-            // Can only select if it has our checkers AND has legal moves
-            const hasOurCheckers = state.checkers.some(c => c.pip === pip && c.color === state.turn);
-            const hasLegalMoves = pip !== 'borne' && hasLegalMovesFrom(pip as PipIndex | 'bar');
+            // Select if it has checkers of current turn color AND has legal moves
+            const hasPlayableChecker = state.checkers.some(
+                c => c.pip === pip && c.color === state.turn
+            );
+            const hasLegalMoves = state.legalMoves.some(m => m.from === pip);
             
-            if (hasOurCheckers && hasLegalMoves) {
-                setSelectedPip(pip as PipIndex | 'bar');
+            if (hasPlayableChecker && hasLegalMoves) {
+                setSelectedPip(pip);
             }
         } else {
-            // Something is selected - try to move there
-            if (pip !== 'bar' && isLegalMove(selectedPip, pip as PipIndex | 'borne')) {
-                if (onMove) {
-                    onMove(selectedPip, pip as PipIndex | 'borne');
-                }
+            // Try to move
+            const isValidMove = state.legalMoves.some(
+                m => m.from === selectedPip && m.to === pip
+            );
+            
+            if (isValidMove && onMove) {
+                onMove(selectedPip, pip as PipIndex);
+                announceMove(selectedPip, pip as PipIndex);
             }
-            // Always deselect after click
+            
+            // Clear selection (even if move was invalid)
             setSelectedPip(null);
         }
-    }, [selectedPip, state.checkers, state.turn, hasLegalMovesFrom, isLegalMove, onMove]);
+    }, [selectedPip, state.checkers, state.turn, state.legalMoves, onMove, announceMove]);
 
     const handleCheckerDragStart = useCallback((id: string) => {
         const checker = state.checkers.find(c => c.id === id);
         if (checker && checker.color === state.turn) {
-            const pip = checker.pip as PipIndex | 'bar';
-            if (hasLegalMovesFrom(pip)) {
-                setSelectedPip(pip);
+            const hasLegalMoves = state.legalMoves.some(m => m.from === checker.pip);
+            if (hasLegalMoves) {
+                setSelectedPip(checker.pip as PipIndex | 'bar');
             }
         }
-    }, [state.checkers, state.turn, hasLegalMovesFrom]);
+    }, [state.checkers, state.turn, state.legalMoves]);
 
     const handleCheckerDragEnd = useCallback((pip: PipIndex | 'bar' | 'borne' | null) => {
-        if (pip && selectedPip && pip !== 'bar') {
-            if (isLegalMove(selectedPip, pip as PipIndex | 'borne')) {
-                if (onMove) {
-                    onMove(selectedPip, pip as PipIndex | 'borne');
-                }
+        if (pip && selectedPip) {
+            const isValidMove = state.legalMoves.some(
+                m => m.from === selectedPip && m.to === pip
+            );
+            
+            if (isValidMove && onMove) {
+                onMove(selectedPip, pip as PipIndex | 'borne');
+                announceMove(selectedPip, pip as PipIndex | 'borne');
             }
         }
         setSelectedPip(null);
-    }, [selectedPip, isLegalMove, onMove]);
+    }, [selectedPip, state.legalMoves, onMove, announceMove]);
 
-    // Determine if we should show the roll button
-    const showRollButton = useMemo(() => {
-        return !state.dice.values && !state.dice.rolling && onRollDice;
-    }, [state.dice.values, state.dice.rolling, onRollDice]);
+    // Determine if current player can roll dice
+    const canRoll = !state.dice.values && !state.dice.rolling && !!onRollDice;
+    
+    // Determine if current player can double
+    const canDouble = state.cube.owner === 'center' || state.cube.owner === state.turn;
 
     return (
-        <div className="flex flex-col gap-4 w-full max-w-6xl mx-auto p-4" data-theme={theme}>
+        <div 
+            className="flex flex-col gap-4 w-full max-w-6xl mx-auto p-4" 
+            data-theme={theme}
+            role="region"
+            aria-label="Backgammon game board"
+        >
+            {/* Screen reader announcements */}
+            <div 
+                role="status" 
+                aria-live="polite" 
+                aria-atomic="true" 
+                className="sr-only"
+            >
+                {lastMoveAnnouncement}
+            </div>
+
+            {/* Match Header */}
             {matchState && (
                 <MatchHeader
                     state={matchState}
@@ -90,6 +129,7 @@ const BoardWrap = memo<ExtendedBoardProps>(({
                 />
             )}
 
+            {/* Board Container */}
             <div className="gg-board-container">
                 <BoardSVG
                     state={state}
@@ -97,77 +137,109 @@ const BoardWrap = memo<ExtendedBoardProps>(({
                     onPipClick={handlePipClick}
                     onCheckerDragStart={handleCheckerDragStart}
                     onCheckerDragEnd={handleCheckerDragEnd}
+                    onRollDice={onRollDice}
                     onDouble={onDouble}
-                    canDouble={canDouble}
+                    canRoll={canRoll}
+                    canDouble={canDouble && !pendingDouble}
                 />
 
-                {/* Dice Roll Button Overlay - Premium Style */}
-                {showRollButton && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                {/* Dice Roll Button Overlay (alternative position) */}
+                {canRoll && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                         <button
                             onClick={onRollDice}
-                            className="pointer-events-auto px-8 py-4 bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-2xl transform transition-all duration-200 hover:scale-110 active:scale-95 border border-emerald-400/30"
-                            style={{
-                                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                                boxShadow: '0 10px 40px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)'
-                            }}
+                            className="pointer-events-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-lg rounded-full shadow-2xl transform transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
+                            aria-label="Roll the dice"
                         >
                             🎲 ROLL DICE
                         </button>
                     </div>
                 )}
 
-                {/* Double Button - Show when can double and no dice rolled */}
-                {canDouble && !state.dice.values && onDouble && !pendingDouble && (
-                    <div className="absolute top-4 right-4 pointer-events-auto">
-                        <button
-                            onClick={onDouble}
-                            className="px-4 py-2 bg-gradient-to-br from-amber-500 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95 border border-amber-400/30"
-                        >
-                            ×2 DOUBLE
-                        </button>
-                    </div>
-                )}
-
-                {/* Doubling Offer Overlay - Premium Style */}
+                {/* Doubling Offer Overlay */}
                 {pendingDouble && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-50 backdrop-blur-md">
-                        <div 
-                            className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-3xl border-2 border-amber-500/50 shadow-2xl text-center max-w-sm mx-4"
-                            style={{
-                                boxShadow: '0 25px 80px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
-                            }}
-                        >
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center text-3xl font-bold text-gray-900 shadow-lg">
+                    <div 
+                        className="absolute inset-0 flex items-center justify-center bg-black/70 z-50 backdrop-blur-sm"
+                        role="dialog"
+                        aria-labelledby="double-title"
+                        aria-describedby="double-desc"
+                    >
+                        <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl border-2 border-yellow-500/50 shadow-2xl text-center max-w-sm mx-4 transform animate-pulse-slow">
+                            {/* Cube icon */}
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center text-3xl font-bold text-gray-900 shadow-lg">
                                 {state.cube.value * 2}
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-2">Double Proposed!</h3>
-                            <p className="text-gray-400 mb-6">Accept the stakes or forfeit the game?</p>
+                            
+                            <h3 
+                                id="double-title" 
+                                className="text-2xl font-bold text-white mb-2"
+                            >
+                                Double Offered!
+                            </h3>
+                            <p 
+                                id="double-desc" 
+                                className="text-gray-400 mb-6"
+                            >
+                                Your opponent wants to double the stakes to {state.cube.value * 2}
+                            </p>
 
                             {onTake && onPass ? (
                                 <div className="flex gap-4 justify-center">
                                     <button
                                         onClick={onTake}
-                                        className="px-6 py-3 bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95"
+                                        className="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-500/50"
+                                        aria-label="Accept the double"
                                     >
                                         ✓ TAKE
                                     </button>
                                     <button
                                         onClick={onPass}
-                                        className="px-6 py-3 bg-gradient-to-br from-red-500 to-red-700 hover:from-red-400 hover:to-red-600 text-white font-bold rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95"
+                                        className="px-8 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500/50"
+                                        aria-label="Decline the double and forfeit"
                                     >
                                         ✗ PASS
                                     </button>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center gap-3">
-                                    <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-amber-400 font-bold animate-pulse">Waiting for opponent...</p>
+                                    <div className="w-10 h-10 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-yellow-400 font-semibold animate-pulse">
+                                        Waiting for opponent's response...
+                                    </p>
                                 </div>
                             )}
                         </div>
                     </div>
                 )}
+
+                {/* Turn Indicator */}
+                <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/50 px-3 py-2 rounded-lg backdrop-blur-sm">
+                    <div 
+                        className={`w-4 h-4 rounded-full ${
+                            state.turn === 'light' 
+                                ? 'bg-gray-100 border-2 border-gray-300' 
+                                : 'bg-gray-800 border-2 border-gray-600'
+                        }`}
+                        aria-hidden="true"
+                    />
+                    <span className="text-sm font-medium text-white">
+                        {state.turn === 'light' ? 'Light' : 'Dark'}'s turn
+                    </span>
+                </div>
+
+                {/* Selected Checker Indicator */}
+                {selectedPip && (
+                    <div className="absolute top-4 left-4 bg-blue-500/80 px-3 py-1 rounded-lg text-sm font-medium text-white backdrop-blur-sm">
+                        Selected: {selectedPip === 'bar' ? 'Bar' : `Point ${selectedPip}`}
+                    </div>
+                )}
+            </div>
+
+            {/* Keyboard shortcuts help */}
+            <div className="text-center text-xs text-gray-500 mt-2">
+                <span className="hidden sm:inline">
+                    Click to select • Click destination to move • Tab for keyboard navigation
+                </span>
             </div>
         </div>
     );

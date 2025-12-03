@@ -16,6 +16,7 @@ import Tournaments from './pages/Tournaments';
 import Leaderboard from './pages/Leaderboard';
 import StubPage from './pages/StubPage';
 import Profile from './pages/Profile';
+import DemoBoard from './board/DemoBoard';
 
 function LayoutWithNavbar() {
   const location = useLocation();
@@ -48,6 +49,7 @@ function App() {
           <Route path="/" element={<GurugammonLanding />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/demo-board" element={<DemoBoard />} />
 
           {/* Routes avec Navbar - Lobby et GameRoom accessibles en guest */}
           <Route element={<LayoutWithNavbar />}>

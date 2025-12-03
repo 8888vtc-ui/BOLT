@@ -22,29 +22,35 @@ const Dice = memo<DiceProps>(({ value, x, y, size, rolling, used }) => {
     };
 
     const pips = pipPositions[value] || [];
-    const pipRadius = size * 0.09;
-    const cornerRadius = size * 0.18;
-    const uniqueId = `dice-${x}-${y}`;
+    const pipRadius = size * 0.08;
+    const cornerRadius = size * 0.15;
+    const uniqueId = `dice-${x}-${y}-${value}`;
 
     return (
         <g
             className={rolling ? 'gg-dice-rolling' : ''}
-            opacity={used ? 0.35 : 1}
-            role="img"
+            opacity={used ? 0.4 : 1}
             aria-label={`Die showing ${value}${used ? ', used' : ''}`}
+            role="img"
         >
-            {/* Die shadow */}
-            <rect
-                x={x + 2}
-                y={y + 3}
-                width={size}
-                height={size}
-                rx={cornerRadius}
-                ry={cornerRadius}
-                fill="rgba(0,0,0,0.3)"
-            />
+            {/* Inline gradients */}
+            <defs>
+                <linearGradient id={`${uniqueId}-face`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFFFFF" />
+                    <stop offset="50%" stopColor="#F3F4F6" />
+                    <stop offset="100%" stopColor="#E5E7EB" />
+                </linearGradient>
+                <linearGradient id={`${uniqueId}-shine`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                    <stop offset="30%" stopColor="rgba(255,255,255,0.3)" />
+                    <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+                <filter id={`${uniqueId}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="1" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.3" />
+                </filter>
+            </defs>
 
-            {/* Die body */}
+            {/* Die body with 3D effect */}
             <rect
                 x={x}
                 y={y}
@@ -52,31 +58,37 @@ const Dice = memo<DiceProps>(({ value, x, y, size, rolling, used }) => {
                 height={size}
                 rx={cornerRadius}
                 ry={cornerRadius}
-                fill={`url(#${uniqueId}-gradient)`}
+                fill={`url(#${uniqueId}-face)`}
                 stroke="rgba(0,0,0,0.15)"
                 strokeWidth="1"
+                filter={`url(#${uniqueId}-shadow)`}
             />
 
-            {/* Proper SVG gradient defined inline */}
-            <defs>
-                <linearGradient id={`${uniqueId}-gradient`} x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FFFFFF" />
-                    <stop offset="30%" stopColor="var(--gg-die-face)" />
-                    <stop offset="100%" stopColor="#D1D5DB" />
-                </linearGradient>
-            </defs>
-
-            {/* Top highlight reflection */}
+            {/* Top shine overlay - proper SVG gradient */}
             <rect
                 x={x + 2}
                 y={y + 2}
                 width={size - 4}
                 height={size * 0.4}
-                rx={cornerRadius - 2}
-                fill="rgba(255,255,255,0.25)"
+                rx={cornerRadius - 1}
+                ry={cornerRadius - 1}
+                fill={`url(#${uniqueId}-shine)`}
             />
 
-            {/* Pips with depth effect */}
+            {/* Inner border for depth */}
+            <rect
+                x={x + 1}
+                y={y + 1}
+                width={size - 2}
+                height={size - 2}
+                rx={cornerRadius - 0.5}
+                ry={cornerRadius - 0.5}
+                fill="none"
+                stroke="rgba(255,255,255,0.4)"
+                strokeWidth="0.5"
+            />
+
+            {/* Pips with shadow effect */}
             {pips.map(([px, py], i) => (
                 <g key={i}>
                     {/* Pip shadow */}
@@ -86,7 +98,7 @@ const Dice = memo<DiceProps>(({ value, x, y, size, rolling, used }) => {
                         r={pipRadius}
                         fill="rgba(0,0,0,0.2)"
                     />
-                    {/* Pip body */}
+                    {/* Pip */}
                     <circle
                         cx={x + px * size}
                         cy={y + py * size}
@@ -103,13 +115,13 @@ const Dice = memo<DiceProps>(({ value, x, y, size, rolling, used }) => {
                 </g>
             ))}
 
-            {/* Used indicator - strikethrough */}
+            {/* Used indicator - crossed out effect */}
             {used && (
                 <line
-                    x1={x}
-                    y1={y}
-                    x2={x + size}
-                    y2={y + size}
+                    x1={x + size * 0.2}
+                    y1={y + size * 0.2}
+                    x2={x + size * 0.8}
+                    y2={y + size * 0.8}
                     stroke="var(--gg-danger)"
                     strokeWidth="3"
                     strokeLinecap="round"

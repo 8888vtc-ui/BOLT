@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useRef, useCallback } from 'react';
+import React, { memo, useMemo } from 'react';
 import { BoardState, PipIndex } from '../types';
 import Triangle from './Triangle';
 import Bar from './Bar';
@@ -7,7 +7,7 @@ import CheckersLayer from './CheckersLayer';
 import HighlightsOverlay from './HighlightsOverlay';
 import Dice from './Dice';
 import Cube from './Cube';
-import { getPipFromCoordinates, BOARD_WIDTH, BOARD_HEIGHT, BAR_WIDTH, HOME_WIDTH, TRIANGLE_WIDTH, TRIANGLE_HEIGHT } from '../utils/coords';
+import { BOARD_WIDTH, BOARD_HEIGHT, BAR_WIDTH, HOME_WIDTH, TRIANGLE_WIDTH, TRIANGLE_HEIGHT } from '../utils/coords';
 
 interface BoardSVGProps {
     state: BoardState;
@@ -15,7 +15,9 @@ interface BoardSVGProps {
     onPipClick: (pip: PipIndex | 'bar' | 'borne') => void;
     onCheckerDragStart: (checkerId: string) => void;
     onCheckerDragEnd: (pip: PipIndex | 'bar' | 'borne' | null) => void;
+    onRollDice?: () => void;
     onDouble?: () => void;
+    canRoll?: boolean;
     canDouble?: boolean;
 }
 
@@ -25,18 +27,22 @@ const BoardSVG = memo<BoardSVGProps>(({
     onPipClick,
     onCheckerDragStart,
     onCheckerDragEnd,
+    onRollDice,
     onDouble,
+    canRoll = false,
     canDouble = false
 }) => {
-    const svgRef = useRef<SVGSVGElement>(null);
+    // Count checkers in home zones for display
+    const lightHomeCount = useMemo(() => 
+        state.checkers.filter(c => c.pip === 'borne' && c.color === 'light').length,
+        [state.checkers]
+    );
+    const darkHomeCount = useMemo(() => 
+        state.checkers.filter(c => c.pip === 'borne' && c.color === 'dark').length,
+        [state.checkers]
+    );
 
-    // Handle drop detection
-    const handleDragEnd = useCallback((checkerId: string) => {
-        // For now, just pass null - the actual drop target is handled by click
-        onCheckerDragEnd(null);
-    }, [onCheckerDragEnd]);
-
-    // Generate triangles with memoization
+    // Generate triangles with proper positioning
     const triangles = useMemo(() => {
         const result: JSX.Element[] = [];
 
@@ -57,6 +63,10 @@ const BoardSVG = memo<BoardSVGProps>(({
             const y = isTop ? 0 : BOARD_HEIGHT;
             const isDark = i % 2 === 0;
 
+            // Check if this pip is a valid destination for the selected checker
+            const isHighlighted = selectedPip !== null && 
+                state.legalMoves.some(m => m.to === pip && m.from === selectedPip);
+
             result.push(
                 <Triangle
                     key={pip}
@@ -67,7 +77,7 @@ const BoardSVG = memo<BoardSVGProps>(({
                     height={TRIANGLE_HEIGHT}
                     isTop={isTop}
                     isDark={isDark}
-                    isHighlighted={state.legalMoves.some(m => m.to === pip && m.from === selectedPip)}
+                    isHighlighted={isHighlighted}
                     onClick={() => onPipClick(pip)}
                 />
             );
@@ -76,132 +86,152 @@ const BoardSVG = memo<BoardSVGProps>(({
         return result;
     }, [state.legalMoves, selectedPip, onPipClick]);
 
-    // Check if current player can bear off
-    const canBearOff = useMemo(() => {
-        return state.legalMoves.some(m => m.to === 'borne');
-    }, [state.legalMoves]);
+    // Check if borne is a valid destination
+    const isBorneHighlighted = selectedPip !== null && 
+        state.legalMoves.some(m => m.to === 'borne' && m.from === selectedPip);
 
     return (
         <svg
-            ref={svgRef}
             viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
             className="w-full h-full"
-            style={{ background: 'var(--gg-bg)' }}
+            preserveAspectRatio="xMidYMid meet"
             role="application"
-            aria-label="Backgammon board"
-            aria-live="polite"
+            aria-label="Backgammon board - GuruGammon"
         >
-            {/* Defs for gradients and filters */}
+            {/* ═══════════════════════════════════════════════════════════════
+                SVG Definitions - Gradients, Filters, Patterns
+                ═══════════════════════════════════════════════════════════════ */}
             <defs>
-                {/* Board texture gradient */}
-                <linearGradient id="gg-board-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#1a2332" />
-                    <stop offset="50%" stopColor="var(--gg-bg)" />
-                    <stop offset="100%" stopColor="#1a2332" />
+                {/* Board background gradient */}
+                <linearGradient id="gg-board-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#0d1520" />
+                    <stop offset="15%" stopColor="#0B0F1A" />
+                    <stop offset="85%" stopColor="#0B0F1A" />
+                    <stop offset="100%" stopColor="#0d1520" />
                 </linearGradient>
 
-                {/* Triangle shine gradients (proper SVG gradients) */}
-                <linearGradient id="gg-tri-shine-top" x1="50%" y1="0%" x2="50%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.12)" />
-                    <stop offset="100%" stopColor="transparent" />
-                </linearGradient>
-                <linearGradient id="gg-tri-shine-bottom" x1="50%" y1="100%" x2="50%" y2="0%">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.12)" />
-                    <stop offset="100%" stopColor="transparent" />
+                {/* Playing surface gradient */}
+                <linearGradient id="gg-surface-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#111827" />
+                    <stop offset="50%" stopColor="#0f1729" />
+                    <stop offset="100%" stopColor="#111827" />
                 </linearGradient>
 
-                {/* Triangle shadow filter */}
-                <filter id="gg-triangle-shadow" x="-5%" y="-5%" width="110%" height="110%">
-                    <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#000" floodOpacity="0.3" />
-                </filter>
+                {/* Felt texture pattern */}
+                <pattern id="gg-felt" patternUnits="userSpaceOnUse" width="6" height="6">
+                    <rect width="6" height="6" fill="transparent" />
+                    <circle cx="1" cy="1" r="0.5" fill="rgba(255,255,255,0.01)" />
+                    <circle cx="4" cy="4" r="0.5" fill="rgba(0,0,0,0.02)" />
+                </pattern>
 
-                {/* Checker shadow - premium depth */}
+                {/* Light checker gradient - Premium pearl effect */}
+                <radialGradient id="gg-checker-light-gradient" cx="35%" cy="25%" r="65%" fx="30%" fy="20%">
+                    <stop offset="0%" stopColor="#FFFFFF" />
+                    <stop offset="30%" stopColor="#F8FAFC" />
+                    <stop offset="60%" stopColor="#E2E8F0" />
+                    <stop offset="85%" stopColor="#CBD5E1" />
+                    <stop offset="100%" stopColor="#94A3B8" />
+                </radialGradient>
+
+                {/* Dark checker gradient - Premium slate effect */}
+                <radialGradient id="gg-checker-dark-gradient" cx="35%" cy="25%" r="65%" fx="30%" fy="20%">
+                    <stop offset="0%" stopColor="#475569" />
+                    <stop offset="30%" stopColor="#334155" />
+                    <stop offset="60%" stopColor="#1E293B" />
+                    <stop offset="85%" stopColor="#0F172A" />
+                    <stop offset="100%" stopColor="#020617" />
+                </radialGradient>
+
+                {/* Checker shadow filter */}
                 <filter id="gg-checker-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                    <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.4" />
                 </filter>
 
-                {/* Checker glow for playable pieces */}
+                {/* Checker glow filter for playable/selected */}
                 <filter id="gg-checker-glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feGaussianBlur stdDeviation="4" result="blur" />
                     <feMerge>
                         <feMergeNode in="blur" />
                         <feMergeNode in="SourceGraphic" />
                     </feMerge>
                 </filter>
 
-                {/* Light checker gradient - premium ivory look */}
-                <radialGradient id="gg-checker-light-gradient" cx="35%" cy="25%" r="65%">
-                    <stop offset="0%" stopColor="#FFFFFF" />
-                    <stop offset="35%" stopColor="#F8F8F8" />
-                    <stop offset="70%" stopColor="#E8E8E8" />
-                    <stop offset="100%" stopColor="#B8B8B8" />
-                </radialGradient>
+                {/* Board frame shadow */}
+                <filter id="gg-frame-shadow" x="-10%" y="-10%" width="120%" height="120%">
+                    <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#000" floodOpacity="0.5" />
+                </filter>
 
-                {/* Dark checker gradient - premium onyx look */}
-                <radialGradient id="gg-checker-dark-gradient" cx="35%" cy="25%" r="65%">
-                    <stop offset="0%" stopColor="#4a4a4a" />
-                    <stop offset="35%" stopColor="#2a2a2a" />
-                    <stop offset="70%" stopColor="#1a1a1a" />
-                    <stop offset="100%" stopColor="#000000" />
-                </radialGradient>
-
-                {/* Cube gradient */}
-                <linearGradient id="gg-cube-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#F0F0F0" />
-                    <stop offset="50%" stopColor="#D0D0D0" />
-                    <stop offset="100%" stopColor="#A0A0A0" />
-                </linearGradient>
-
-                {/* Board frame gradient */}
-                <linearGradient id="gg-frame-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#2a3a4a" />
-                    <stop offset="100%" stopColor="#1a2a3a" />
-                </linearGradient>
+                {/* Inner glow for surface */}
+                <filter id="gg-inner-glow" x="-10%" y="-10%" width="120%" height="120%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur" />
+                    <feOffset in="blur" dx="0" dy="0" result="offsetBlur" />
+                    <feFlood floodColor="#34D399" floodOpacity="0.1" result="color" />
+                    <feComposite in="color" in2="offsetBlur" operator="in" result="shadow" />
+                    <feComposite in="shadow" in2="SourceGraphic" operator="over" />
+                </filter>
             </defs>
 
-            {/* Board frame/border */}
+            {/* ═══════════════════════════════════════════════════════════════
+                Board Background & Frame
+                ═══════════════════════════════════════════════════════════════ */}
+            
+            {/* Outer background */}
             <rect
                 x="0"
                 y="0"
                 width={BOARD_WIDTH}
                 height={BOARD_HEIGHT}
-                fill="url(#gg-frame-gradient)"
-                rx="8"
-                ry="8"
+                fill="url(#gg-board-bg)"
             />
 
-            {/* Inner board background */}
+            {/* Playing surface */}
             <rect
-                x="4"
-                y="4"
-                width={BOARD_WIDTH - 8}
-                height={BOARD_HEIGHT - 8}
-                fill="url(#gg-board-gradient)"
-                rx="4"
-                ry="4"
+                x={HOME_WIDTH - 5}
+                y="5"
+                width={BOARD_WIDTH - 2 * HOME_WIDTH + 10}
+                height={BOARD_HEIGHT - 10}
+                rx="8"
+                fill="url(#gg-surface-gradient)"
+                filter="url(#gg-frame-shadow)"
             />
 
-            {/* Home zones */}
+            {/* Felt texture overlay */}
+            <rect
+                x={HOME_WIDTH - 5}
+                y="5"
+                width={BOARD_WIDTH - 2 * HOME_WIDTH + 10}
+                height={BOARD_HEIGHT - 10}
+                rx="8"
+                fill="url(#gg-felt)"
+            />
+
+            {/* ═══════════════════════════════════════════════════════════════
+                Home Zones
+                ═══════════════════════════════════════════════════════════════ */}
             <HomeZone
                 x={0}
                 y={0}
                 width={HOME_WIDTH}
                 height={BOARD_HEIGHT}
-                side="light"
+                side="dark"
                 onClick={() => onPipClick('borne')}
-                isHighlighted={canBearOff && state.turn === 'light' && selectedPip !== null}
+                isHighlighted={isBorneHighlighted && state.turn === 'dark'}
+                checkerCount={darkHomeCount}
             />
             <HomeZone
                 x={BOARD_WIDTH - HOME_WIDTH}
                 y={0}
                 width={HOME_WIDTH}
                 height={BOARD_HEIGHT}
-                side="dark"
+                side="light"
                 onClick={() => onPipClick('borne')}
-                isHighlighted={canBearOff && state.turn === 'dark' && selectedPip !== null}
+                isHighlighted={isBorneHighlighted && state.turn === 'light'}
+                checkerCount={lightHomeCount}
             />
 
-            {/* Bar */}
+            {/* ═══════════════════════════════════════════════════════════════
+                Bar (Center)
+                ═══════════════════════════════════════════════════════════════ */}
             <Bar
                 x={HOME_WIDTH + 6 * TRIANGLE_WIDTH}
                 y={0}
@@ -210,10 +240,14 @@ const BoardSVG = memo<BoardSVGProps>(({
                 onClick={() => onPipClick('bar')}
             />
 
-            {/* Triangles */}
+            {/* ═══════════════════════════════════════════════════════════════
+                Triangles (Points)
+                ═══════════════════════════════════════════════════════════════ */}
             {triangles}
 
-            {/* Highlights overlay for move hints */}
+            {/* ═══════════════════════════════════════════════════════════════
+                Highlights Overlay (Move Hints)
+                ═══════════════════════════════════════════════════════════════ */}
             <HighlightsOverlay
                 legalMoves={state.legalMoves}
                 selectedPip={selectedPip}
@@ -225,7 +259,9 @@ const BoardSVG = memo<BoardSVGProps>(({
                 boardHeight={BOARD_HEIGHT}
             />
 
-            {/* Checkers layer */}
+            {/* ═══════════════════════════════════════════════════════════════
+                Checkers Layer
+                ═══════════════════════════════════════════════════════════════ */}
             <CheckersLayer
                 checkers={state.checkers}
                 turn={state.turn}
@@ -242,12 +278,14 @@ const BoardSVG = memo<BoardSVGProps>(({
                 onCheckerClick={(pip) => onPipClick(pip)}
             />
 
-            {/* Dice - positioned in center */}
+            {/* ═══════════════════════════════════════════════════════════════
+                Dice (Center of board)
+                ═══════════════════════════════════════════════════════════════ */}
             {state.dice.values && (
                 <g aria-label="Dice">
                     <Dice
                         value={state.dice.values[0]}
-                        x={BOARD_WIDTH / 2 - 55}
+                        x={BOARD_WIDTH / 2 - 70}
                         y={BOARD_HEIGHT / 2 - 22}
                         size={44}
                         rolling={state.dice.rolling}
@@ -255,7 +293,7 @@ const BoardSVG = memo<BoardSVGProps>(({
                     />
                     <Dice
                         value={state.dice.values[1]}
-                        x={BOARD_WIDTH / 2 + 11}
+                        x={BOARD_WIDTH / 2 + 26}
                         y={BOARD_HEIGHT / 2 - 22}
                         size={44}
                         rolling={state.dice.rolling}
@@ -264,26 +302,68 @@ const BoardSVG = memo<BoardSVGProps>(({
                 </g>
             )}
 
-            {/* Cube - positioned based on owner */}
+            {/* Roll Dice Button (when no dice shown) */}
+            {!state.dice.values && !state.dice.rolling && canRoll && (
+                <g 
+                    onClick={onRollDice}
+                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    aria-label="Roll dice"
+                    tabIndex={0}
+                >
+                    <rect
+                        x={BOARD_WIDTH / 2 - 60}
+                        y={BOARD_HEIGHT / 2 - 20}
+                        width={120}
+                        height={40}
+                        rx={20}
+                        fill="var(--gg-primary-600)"
+                        filter="url(#gg-checker-shadow)"
+                    />
+                    <text
+                        x={BOARD_WIDTH / 2}
+                        y={BOARD_HEIGHT / 2}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize="14"
+                        fontWeight="bold"
+                        fill="white"
+                        fontFamily="'SF Pro Display', system-ui, sans-serif"
+                    >
+                        ROLL DICE
+                    </text>
+                </g>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════
+                Doubling Cube
+                ═══════════════════════════════════════════════════════════════ */}
             <Cube
                 state={state.cube}
-                x={
-                    state.cube.owner === 'center' 
-                        ? HOME_WIDTH + 6 * TRIANGLE_WIDTH + BAR_WIDTH / 2 - 20
-                        : state.cube.owner === 'light'
-                            ? 20
-                            : BOARD_WIDTH - 60
-                }
-                y={
-                    state.cube.owner === 'center'
-                        ? 20
-                        : BOARD_HEIGHT / 2 - 20
-                }
-                size={40}
+                x={HOME_WIDTH + 6 * TRIANGLE_WIDTH + BAR_WIDTH / 2 - 22}
+                y={BOARD_HEIGHT / 2 - 22}
+                size={44}
                 canDouble={canDouble}
                 onDouble={onDouble}
             />
 
+            {/* ═══════════════════════════════════════════════════════════════
+                Board Labels & Decorations
+                ═══════════════════════════════════════════════════════════════ */}
+            
+            {/* GuruGammon watermark */}
+            <text
+                x={BOARD_WIDTH / 2}
+                y={BOARD_HEIGHT - 8}
+                textAnchor="middle"
+                fontSize="8"
+                fill="rgba(255,255,255,0.1)"
+                fontFamily="'SF Pro Display', system-ui, sans-serif"
+                fontWeight="500"
+                style={{ userSelect: 'none' }}
+            >
+                GURUGAMMON
+            </text>
         </svg>
     );
 });

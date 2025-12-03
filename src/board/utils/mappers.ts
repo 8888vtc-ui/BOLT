@@ -2,26 +2,31 @@ import { BoardState, CheckerState, Color, CubeState, DiceState, LegalMove, PipIn
 
 // Define the shape of the existing GameState (approximate)
 interface LegacyGameState {
-    board?: {
+    board: {
         points?: { player: number | null; count: number }[];
     } | { player: number | null; count: number }[];
-    dice?: number[];
-    turn?: string;
-    bar?: { 
-        player1?: number; 
-        player2?: number;
-        [key: string]: number | undefined; 
-    };
-    off?: { 
-        player1?: number;
-        player2?: number;
-        [key: string]: number | undefined; 
-    };
+    dice: number[];
+    turn: string;
+    bar: { player1?: number; player2?: number; [key: string]: number | undefined };
+    off: { player1?: number; player2?: number; [key: string]: number | undefined };
     cubeValue?: number;
     cubeOwner?: string | null;
     validMoves?: any[];
-    usedDice?: number[];
+    matchLength?: number;
 }
+
+// Helper to get points array from various legacy formats
+const getPointsArray = (board: LegacyGameState['board']): { player: number | null; count: number }[] => {
+    if (Array.isArray(board)) {
+        return board;
+    }
+    if (board && 'points' in board && Array.isArray(board.points)) {
+        return board.points;
+    }
+    // Fallback: create empty board
+    console.warn('[mappers] Invalid board structure, creating empty board');
+    return Array(24).fill({ player: null, count: 0 });
+};
 
 export const mapGameStateToBoardState = (
     gameState: LegacyGameState,
@@ -30,50 +35,35 @@ export const mapGameStateToBoardState = (
 ): BoardState => {
     const checkers: CheckerState[] = [];
 
-    // Helper to determine color
+    // Helper to determine color from player ID or number
     const getColor = (playerId: string | number | null | undefined): Color => {
         if (playerId === null || playerId === undefined) return 'light';
         
-        // Numeric player IDs
-        if (playerId === 1 || playerId === 'player1') return 'light';
-        if (playerId === 2 || playerId === 'player2') return 'dark';
+        // Numeric player ID (1 or 2)
+        if (playerId === 1) return 'light';
+        if (playerId === 2) return 'dark';
 
-        // String IDs - look up in players array
-        const p = players.find(pl => pl.id === playerId);
-        if (p) return p.color === 1 ? 'light' : 'dark';
+        // String ID - look up in players array
+        const p = players.find(p => p.id === String(playerId));
+        if (p) {
+            return p.color === 1 ? 'light' : 'dark';
+        }
+
+        // Fallback: Check if it's the current user
+        if (String(playerId) === myId) return 'light';
         
-        // Fallback: first player is light
-        if (players.length > 0 && playerId === players[0].id) return 'light';
-        
+        // Default to dark for opponent/bot
         return 'dark';
     };
 
-    // Get the board points array - handle both formats
-    const boardPoints: { player: number | null; count: number }[] = 
-        Array.isArray(gameState.board) 
-            ? gameState.board 
-            : (gameState.board?.points || []);
-
-    // Validate board structure
-    if (!boardPoints || boardPoints.length !== 24) {
-        console.warn('[mappers] Invalid board structure, using empty board', {
-            hasBoard: !!gameState.board,
-            boardLength: boardPoints?.length
-        });
-        // Return empty but valid state
-        return {
-            checkers: [],
-            dice: { values: null, rolling: false, used: [false, false] },
-            cube: { value: 1, owner: 'center' },
-            legalMoves: [],
-            turn: 'light'
-        };
-    }
+    // Get points array safely
+    const points = getPointsArray(gameState.board);
 
     // Map Board Points (0-23 in legacy -> 1-24 in GuruGammon)
-    boardPoints.forEach((point, index) => {
+    points.forEach((point, index) => {
         if (point && point.count > 0 && point.player !== null) {
-            const color: Color = point.player === 1 ? 'light' : 'dark';
+            const color = getColor(point.player);
+            // Map index 0-23 to PipIndex 1-24
             const pip = (index + 1) as PipIndex;
 
             for (let i = 0; i < point.count; i++) {
@@ -87,9 +77,9 @@ export const mapGameStateToBoardState = (
         }
     });
 
-    // Map Bar - handle both old and new formats
+    // Map Bar - handle both formats: { player1: n, player2: n } and { 'user-id': n }
     if (gameState.bar) {
-        // New format: { player1: N, player2: N }
+        // Try player1/player2 format first
         if (typeof gameState.bar.player1 === 'number' && gameState.bar.player1 > 0) {
             for (let i = 0; i < gameState.bar.player1; i++) {
                 checkers.push({
@@ -110,8 +100,8 @@ export const mapGameStateToBoardState = (
                 });
             }
         }
-        
-        // Old format: { 'playerId': N }
+
+        // Also check for user ID keys
         Object.entries(gameState.bar).forEach(([playerId, count]) => {
             if (playerId !== 'player1' && playerId !== 'player2' && typeof count === 'number' && count > 0) {
                 const color = getColor(playerId);
@@ -127,7 +117,7 @@ export const mapGameStateToBoardState = (
         });
     }
 
-    // Map Off (Borne) - handle both formats
+    // Map Off (Borne) - same dual format handling
     if (gameState.off) {
         if (typeof gameState.off.player1 === 'number' && gameState.off.player1 > 0) {
             for (let i = 0; i < gameState.off.player1; i++) {
@@ -149,7 +139,7 @@ export const mapGameStateToBoardState = (
                 });
             }
         }
-        
+
         Object.entries(gameState.off).forEach(([playerId, count]) => {
             if (playerId !== 'player1' && playerId !== 'player2' && typeof count === 'number' && count > 0) {
                 const color = getColor(playerId);
@@ -165,55 +155,62 @@ export const mapGameStateToBoardState = (
         });
     }
 
-    // Map Dice with used tracking
-    const diceValues = gameState.dice || [];
-    const usedDice = gameState.usedDice || [];
+    // Map Dice
+    const diceValues = gameState.dice && gameState.dice.length >= 2 
+        ? [gameState.dice[0], gameState.dice[1]] as [number, number]
+        : null;
+    
     const dice: DiceState = {
-        values: diceValues.length >= 2 ? [diceValues[0], diceValues[1]] : null,
+        values: diceValues,
         rolling: false,
-        used: [
-            usedDice.includes(0) || (diceValues.length > 0 && diceValues[0] === 0),
-            usedDice.includes(1) || (diceValues.length > 1 && diceValues[1] === 0)
-        ]
+        used: gameState.dice?.length > 2 
+            ? [gameState.dice[2] === 0, gameState.dice[3] === 0] // Some formats store used state
+            : [false, false]
     };
 
     // Map Cube
-    const cubeValue = gameState.cubeValue || 1;
-    const validCubeValues = [1, 2, 4, 8, 16, 32, 64] as const;
+    const cubeValue = (gameState.cubeValue || 1) as 1 | 2 | 4 | 8 | 16 | 32 | 64;
+    let cubeOwner: 'center' | 'light' | 'dark' = 'center';
+    
+    if (gameState.cubeOwner) {
+        const ownerColor = getColor(gameState.cubeOwner);
+        cubeOwner = ownerColor;
+    }
+
     const cube: CubeState = {
-        value: validCubeValues.includes(cubeValue as any) ? cubeValue as 1|2|4|8|16|32|64 : 1,
-        owner: gameState.cubeOwner 
-            ? (getColor(gameState.cubeOwner) === 'light' ? 'light' : 'dark') 
-            : 'center'
+        value: cubeValue,
+        owner: cubeOwner
     };
 
     // Map Turn
     const turn = getColor(gameState.turn);
 
-    // Map Legal Moves with proper validation
-    const legalMoves: LegalMove[] = (gameState.validMoves || [])
-        .filter((m: any) => m && (typeof m.from === 'number' || m.bar))
-        .map((m: any) => {
-            let from: PipIndex | 'bar';
-            let to: PipIndex | 'borne';
-            
-            // Handle 'from'
-            if (m.bar || m.from === -1 || m.from === 24 || m.from === 25) {
-                from = 'bar';
-            } else {
-                // Convert 0-23 to 1-24
-                from = (m.from + 1) as PipIndex;
-            }
-            
-            // Handle 'to'
-            if (m.to === -1 || m.to === 24 || m.to === 25 || m.off || m.borne) {
-                to = 'borne';
-            } else {
-                to = (m.to + 1) as PipIndex;
-            }
-            
-            return { from, to };
-        });
+    // Map Legal Moves
+    const legalMoves: LegalMove[] = (gameState.validMoves || []).map((m: any) => {
+        // Handle various move formats
+        let from: PipIndex | 'bar';
+        let to: PipIndex | 'borne';
+
+        // From position
+        if (m.bar || m.from === 'bar' || m.from === -1 || m.from === 24) {
+            from = 'bar';
+        } else if (typeof m.from === 'number') {
+            from = (m.from + 1) as PipIndex; // Convert 0-23 to 1-24
+        } else {
+            from = m.from as PipIndex;
+        }
+
+        // To position
+        if (m.to === -1 || m.to === 24 || m.to === 'off' || m.to === 'borne') {
+            to = 'borne';
+        } else if (typeof m.to === 'number') {
+            to = (m.to + 1) as PipIndex; // Convert 0-23 to 1-24
+        } else {
+            to = m.to as PipIndex;
+        }
+
+        return { from, to };
+    });
 
     return {
         checkers,
@@ -222,4 +219,15 @@ export const mapGameStateToBoardState = (
         legalMoves,
         turn
     };
+};
+
+// Reverse mapper: Convert BoardState move back to legacy format
+export const mapMoveToLegacy = (
+    from: PipIndex | 'bar',
+    to: PipIndex | 'borne'
+): { from: number; to: number } => {
+    const legacyFrom = from === 'bar' ? -1 : (from as number) - 1;
+    const legacyTo = to === 'borne' ? -1 : (to as number) - 1;
+    
+    return { from: legacyFrom, to: legacyTo };
 };

@@ -1,112 +1,108 @@
-import { PipIndex, Color } from '../types';
+import { PipIndex } from '../types';
 
+// Board dimensions - designed for 2:1 aspect ratio
 export const BOARD_WIDTH = 1000;
 export const BOARD_HEIGHT = 500;
 export const BAR_WIDTH = 60;
 export const HOME_WIDTH = 80;
 export const TRIANGLE_WIDTH = (BOARD_WIDTH - BAR_WIDTH - HOME_WIDTH * 2) / 12;
 export const TRIANGLE_HEIGHT = BOARD_HEIGHT * 0.42;
-export const CHECKER_RADIUS = TRIANGLE_WIDTH * 0.42;
-export const CHECKER_SPACING = CHECKER_RADIUS * 1.85; // Slight overlap for stacking
-export const MAX_VISIBLE_STACK = 5; // After this, show count instead of stacking
+export const CHECKER_RADIUS = TRIANGLE_WIDTH * 0.42; // Slightly smaller for better spacing
+
+// Maximum checkers before stacking compression kicks in
+const MAX_VISIBLE_STACK = 5;
+const CHECKER_SPACING = CHECKER_RADIUS * 1.85; // Slight overlap for aesthetics
 
 /**
- * Calculate the center coordinates for a checker at a given position
- * @param pip - The pip index (1-24), 'bar', or 'borne'
- * @param z - The stack position (0 = bottom)
- * @param color - The checker color (needed for bar/borne positioning)
+ * Get the SVG coordinates for a checker at a given pip and stack position
  */
 export const getPipCoordinates = (
     pip: PipIndex | 'bar' | 'borne', 
     z: number = 0,
-    color?: Color
+    color?: 'light' | 'dark'
 ): { x: number; y: number } => {
     
-    // Bar - split by color, light on top half, dark on bottom half
+    // === BAR ===
     if (pip === 'bar') {
-        const x = HOME_WIDTH + 6 * TRIANGLE_WIDTH + BAR_WIDTH / 2;
+        const barCenterX = HOME_WIDTH + 6 * TRIANGLE_WIDTH + BAR_WIDTH / 2;
+        
+        // Split bar by color: light on bottom half, dark on top half
         const isLight = color === 'light';
-        
-        // Stack from center outward
         const baseY = isLight 
-            ? BOARD_HEIGHT * 0.25  // Top quarter for light
-            : BOARD_HEIGHT * 0.75; // Bottom quarter for dark
+            ? BOARD_HEIGHT * 0.75 // Bottom half
+            : BOARD_HEIGHT * 0.25; // Top half
         
-        // Stack toward center
-        const stackOffset = isLight 
-            ? z * CHECKER_SPACING 
-            : -z * CHECKER_SPACING;
+        // Stack vertically from base
+        const stackOffset = z * CHECKER_RADIUS * 1.5;
+        const y = isLight 
+            ? baseY - stackOffset 
+            : baseY + stackOffset;
         
-        return { x, y: baseY + stackOffset };
+        return { x: barCenterX, y };
     }
 
-    // Borne (Home) - stack horizontally in home zone
+    // === BORNE (Home/Off) ===
     if (pip === 'borne') {
+        // Light checkers bear off to the right side
+        // Dark checkers bear off to the left side
         const isLight = color === 'light';
-        
-        // Light bears off to bottom-right, Dark to top-right (standard orientation)
         const x = isLight 
             ? BOARD_WIDTH - HOME_WIDTH / 2 
             : HOME_WIDTH / 2;
         
-        // Stack vertically in home zone
-        const baseY = isLight 
-            ? BOARD_HEIGHT - CHECKER_RADIUS - 10
-            : CHECKER_RADIUS + 10;
+        // Stack horizontally in the home zone
+        const baseY = BOARD_HEIGHT / 2;
+        const stackOffset = (z - 7) * CHECKER_RADIUS * 0.5; // Center around 7 checkers
+        const y = baseY + stackOffset;
         
-        // Horizontal stacking for borne checkers (laid flat)
-        const stackY = isLight
-            ? baseY - z * (CHECKER_RADIUS * 0.4) // Stack upward
-            : baseY + z * (CHECKER_RADIUS * 0.4); // Stack downward
-        
-        return { x, y: stackY };
+        return { x, y };
     }
 
-    // Regular pip (1-24)
+    // === BOARD POINTS (1-24) ===
     const i = pip as number;
-    const isTop = i >= 13;
+    const isTop = i >= 13; // Points 13-24 are on top
     const isLeftHalf = (i >= 7 && i <= 12) || (i >= 13 && i <= 18);
 
     // Calculate X position
     let x: number;
     if (isLeftHalf) {
+        // Left half of board (between left home and bar)
         const idx = isTop ? (i - 13) : (12 - i);
         x = HOME_WIDTH + idx * TRIANGLE_WIDTH + TRIANGLE_WIDTH / 2;
     } else {
+        // Right half of board (between bar and right home)
         const idx = isTop ? (i - 19) : (6 - i);
         x = HOME_WIDTH + 6 * TRIANGLE_WIDTH + BAR_WIDTH + idx * TRIANGLE_WIDTH + TRIANGLE_WIDTH / 2;
     }
 
     // Calculate Y position with smart stacking
     let y: number;
-    const effectiveZ = Math.min(z, MAX_VISIBLE_STACK - 1);
+    const baseOffset = CHECKER_RADIUS + 2; // Small padding from edge
     
-    if (isTop) {
-        // Top triangles: stack downward from top
-        const baseY = CHECKER_RADIUS + 8;
-        y = baseY + effectiveZ * CHECKER_SPACING;
-        
-        // Compress if stack would exceed triangle height
-        const maxY = TRIANGLE_HEIGHT - CHECKER_RADIUS;
-        if (y > maxY) {
-            // Redistribute spacing to fit
-            const availableSpace = maxY - baseY;
-            const neededSpace = effectiveZ * CHECKER_SPACING;
-            const compressionRatio = availableSpace / neededSpace;
-            y = baseY + effectiveZ * CHECKER_SPACING * compressionRatio;
-        }
+    if (z < MAX_VISIBLE_STACK) {
+        // Normal stacking
+        const stackOffset = z * CHECKER_SPACING;
+        y = isTop 
+            ? baseOffset + stackOffset 
+            : BOARD_HEIGHT - baseOffset - stackOffset;
     } else {
-        // Bottom triangles: stack upward from bottom
-        const baseY = BOARD_HEIGHT - CHECKER_RADIUS - 8;
-        y = baseY - effectiveZ * CHECKER_SPACING;
+        // Compressed stacking for 6+ checkers
+        // First 5 checkers stack normally, then compress remaining
+        const normalHeight = (MAX_VISIBLE_STACK - 1) * CHECKER_SPACING;
+        const extraCheckers = z - MAX_VISIBLE_STACK + 1;
+        const compressedSpacing = CHECKER_RADIUS * 0.6; // Tighter spacing
+        const compressedOffset = extraCheckers * compressedSpacing;
         
-        // Compress if stack would exceed triangle height
-        const minY = BOARD_HEIGHT - TRIANGLE_HEIGHT + CHECKER_RADIUS;
-        if (y < minY) {
-            const availableSpace = baseY - minY;
-            const neededSpace = effectiveZ * CHECKER_SPACING;
-            const compressionRatio = availableSpace / neededSpace;
-            y = baseY - effectiveZ * CHECKER_SPACING * compressionRatio;
+        y = isTop
+            ? baseOffset + normalHeight + compressedOffset
+            : BOARD_HEIGHT - baseOffset - normalHeight - compressedOffset;
+        
+        // Ensure we don't overflow the triangle
+        const maxY = isTop ? TRIANGLE_HEIGHT - CHECKER_RADIUS : BOARD_HEIGHT - TRIANGLE_HEIGHT + CHECKER_RADIUS;
+        if (isTop && y > maxY) {
+            y = maxY;
+        } else if (!isTop && y < maxY) {
+            y = maxY;
         }
     }
 
@@ -114,47 +110,81 @@ export const getPipCoordinates = (
 };
 
 /**
- * Get the pip index from screen coordinates (for drop detection)
+ * Get the pip index from SVG coordinates (for drop detection)
  */
 export const getPipFromCoordinates = (
-    screenX: number, 
-    screenY: number,
-    svgRect: DOMRect
+    x: number, 
+    y: number
 ): PipIndex | 'bar' | 'borne' | null => {
-    // Convert screen coords to SVG coords
-    const x = (screenX - svgRect.left) / svgRect.width * BOARD_WIDTH;
-    const y = (screenY - svgRect.top) / svgRect.height * BOARD_HEIGHT;
-    
-    // Check bar
+    // Check if in bar area
     const barLeft = HOME_WIDTH + 6 * TRIANGLE_WIDTH;
     const barRight = barLeft + BAR_WIDTH;
     if (x >= barLeft && x <= barRight) {
         return 'bar';
     }
-    
-    // Check home zones
-    if (x < HOME_WIDTH) return 'borne'; // Left home
-    if (x > BOARD_WIDTH - HOME_WIDTH) return 'borne'; // Right home
-    
-    // Determine which triangle
+
+    // Check if in home zones
+    if (x < HOME_WIDTH) {
+        return 'borne'; // Left home (dark)
+    }
+    if (x > BOARD_WIDTH - HOME_WIDTH) {
+        return 'borne'; // Right home (light)
+    }
+
+    // Determine if top or bottom half
     const isTop = y < BOARD_HEIGHT / 2;
+
+    // Determine if left or right of bar
     const isLeftHalf = x < barLeft;
-    
-    let triangleIndex: number;
+
+    // Calculate triangle index
+    let triangleIdx: number;
     if (isLeftHalf) {
-        const localX = x - HOME_WIDTH;
-        const idx = Math.floor(localX / TRIANGLE_WIDTH);
-        triangleIndex = isTop ? (13 + idx) : (12 - idx);
+        triangleIdx = Math.floor((x - HOME_WIDTH) / TRIANGLE_WIDTH);
     } else {
-        const localX = x - barRight;
-        const idx = Math.floor(localX / TRIANGLE_WIDTH);
-        triangleIndex = isTop ? (19 + idx) : (6 - idx);
+        triangleIdx = Math.floor((x - barRight) / TRIANGLE_WIDTH);
     }
-    
-    // Validate range
-    if (triangleIndex >= 1 && triangleIndex <= 24) {
-        return triangleIndex as PipIndex;
+
+    // Clamp to valid range
+    triangleIdx = Math.max(0, Math.min(5, triangleIdx));
+
+    // Convert to pip number
+    let pip: number;
+    if (isTop) {
+        pip = isLeftHalf ? (13 + triangleIdx) : (19 + triangleIdx);
+    } else {
+        pip = isLeftHalf ? (12 - triangleIdx) : (6 - triangleIdx);
     }
-    
+
+    // Validate pip range
+    if (pip >= 1 && pip <= 24) {
+        return pip as PipIndex;
+    }
+
     return null;
+};
+
+/**
+ * Check if coordinates are within a specific pip's clickable area
+ */
+export const isWithinPip = (
+    x: number, 
+    y: number, 
+    pip: PipIndex
+): boolean => {
+    const pipCoords = getPipCoordinates(pip, 0);
+    const halfWidth = TRIANGLE_WIDTH / 2;
+    const isTop = pip >= 13;
+    
+    // Check X bounds
+    if (x < pipCoords.x - halfWidth || x > pipCoords.x + halfWidth) {
+        return false;
+    }
+    
+    // Check Y bounds (within triangle height)
+    if (isTop) {
+        return y >= 0 && y <= TRIANGLE_HEIGHT;
+    } else {
+        return y >= BOARD_HEIGHT - TRIANGLE_HEIGHT && y <= BOARD_HEIGHT;
+    }
 };

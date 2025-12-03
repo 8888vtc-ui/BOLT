@@ -31,53 +31,36 @@ const CheckersLayer = memo<CheckersLayerProps>(({
     // Pre-compute which pips have legal moves for performance
     const playablePips = useMemo(() => {
         const pips = new Set<PipIndex | 'bar'>();
-        legalMoves.forEach(m => pips.add(m.from));
+        legalMoves.forEach(m => {
+            if (m.from === 'bar' || typeof m.from === 'number') {
+                pips.add(m.from);
+            }
+        });
         return pips;
     }, [legalMoves]);
 
-    // Group checkers by pip for proper stacking
-    const checkersByPip = useMemo(() => {
-        const grouped = new Map<PipIndex | 'bar' | 'borne', CheckerState[]>();
-        checkers.forEach(c => {
-            const existing = grouped.get(c.pip) || [];
-            existing.push(c);
-            grouped.set(c.pip, existing);
-        });
-        // Sort each group by z-index
-        grouped.forEach((group) => {
-            group.sort((a, b) => (a.z || 0) - (b.z || 0));
-        });
-        return grouped;
+    // Sort checkers by z-index for proper rendering order
+    const sortedCheckers = useMemo(() => {
+        return [...checkers].sort((a, b) => (a.z || 0) - (b.z || 0));
     }, [checkers]);
 
-    // Flatten back with correct z values
-    const sortedCheckers = useMemo(() => {
-        const result: CheckerState[] = [];
-        checkersByPip.forEach((group) => {
-            group.forEach((checker, idx) => {
-                result.push({ ...checker, z: idx });
-            });
-        });
-        return result;
-    }, [checkersByPip]);
-
     return (
-        <g aria-label="Checkers">
+        <g aria-label="Checkers layer">
             {sortedCheckers.map((checker) => {
-                const { x, y } = getPipCoordinates(checker.pip, checker.z || 0, checker.color);
+                const { x, y } = getPipCoordinates(checker.pip, checker.z || 0);
                 
                 // A checker is playable if:
-                // 1. It's the current player's turn
-                // 2. It's the current player's color
-                // 3. Its pip has at least one legal move
-                // 4. It's on top of the stack (highest z-index for this pip)
-                const stackForPip = checkersByPip.get(checker.pip) || [];
-                const isTopOfStack = stackForPip.length === 0 || 
-                    checker.z === stackForPip.length - 1;
+                // 1. It's the current player's turn (same color)
+                // 2. There are legal moves from this pip
+                const isCurrentPlayerChecker = turn === checker.color;
+                const hasLegalMoves = playablePips.has(checker.pip as PipIndex | 'bar');
+                const isPlayable = isCurrentPlayerChecker && hasLegalMoves;
                 
-                const isPlayable = turn === checker.color && 
-                    playablePips.has(checker.pip as PipIndex | 'bar') &&
-                    isTopOfStack;
+                // Only the top checker of a stack should be playable
+                const isTopOfStack = !checkers.some(
+                    c => c.pip === checker.pip && (c.z || 0) > (checker.z || 0)
+                );
+                const canPlay = isPlayable && isTopOfStack;
                 
                 const isSelected = checker.pip === selectedPip;
 
@@ -89,12 +72,12 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                         cx={x}
                         cy={y}
                         radius={CHECKER_RADIUS}
-                        isPlayable={isPlayable}
+                        isPlayable={canPlay}
                         isSelected={isSelected}
                         zIndex={10 + (checker.z || 0)}
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
-                        onClick={() => onCheckerClick(checker.pip)}
+                        onClick={() => canPlay && onCheckerClick(checker.pip)}
                     />
                 );
             })}

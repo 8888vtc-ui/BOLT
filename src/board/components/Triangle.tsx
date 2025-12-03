@@ -29,44 +29,41 @@ const Triangle = memo<TriangleProps>(({
         : `${x},${y} ${x + width},${y} ${x + width / 2},${y - height}`;
 
     const fillColor = isDark ? 'var(--gg-tri-a)' : 'var(--gg-tri-b)';
-    const gradientId = isTop ? 'gg-tri-shine-top' : 'gg-tri-shine-bottom';
+    const uniqueId = `tri-${pip}`;
 
     return (
-        <g 
-            onClick={onClick} 
-            role="button" 
-            aria-label={`Point ${pip}`}
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick()}
-            style={{ cursor: 'pointer' }}
-        >
-            {/* Triangle body with premium shadow */}
+        <g onClick={onClick} role="button" aria-label={`Point ${pip}`} tabIndex={0}>
+            {/* Inline gradient for shine effect */}
+            <defs>
+                <linearGradient 
+                    id={`${uniqueId}-shine`} 
+                    x1="0%" 
+                    y1={isTop ? "0%" : "100%"} 
+                    x2="0%" 
+                    y2={isTop ? "100%" : "0%"}
+                >
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.12)" />
+                    <stop offset="40%" stopColor="rgba(255,255,255,0.05)" />
+                    <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+            </defs>
+
+            {/* Triangle body */}
             <polygon
                 points={points}
                 fill={fillColor}
-                stroke="rgba(0,0,0,0.4)"
-                strokeWidth="1.5"
-                filter="url(#gg-triangle-shadow)"
+                stroke="rgba(0,0,0,0.3)"
+                strokeWidth="1"
+                style={{ cursor: 'pointer', transition: 'fill 0.2s ease' }}
             />
 
-            {/* Inner glow effect using proper SVG gradient */}
+            {/* Subtle gradient overlay - using proper SVG gradient */}
             <polygon
                 points={points}
-                fill={`url(#${gradientId})`}
-                opacity="0.6"
+                fill={`url(#${uniqueId}-shine)`}
             />
 
-            {/* Edge highlight for 3D effect */}
-            <line
-                x1={x + width / 2}
-                y1={isTop ? y + height : y - height}
-                x2={x + (isTop ? 0 : width)}
-                y2={y}
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth="1"
-            />
-
-            {/* Highlight overlay for valid moves */}
+            {/* Highlight overlay */}
             {isHighlighted && (
                 <polygon
                     points={points}
@@ -75,16 +72,15 @@ const Triangle = memo<TriangleProps>(({
                 />
             )}
 
-            {/* Point number with better visibility */}
+            {/* Point number */}
             <text
                 x={x + width / 2}
-                y={isTop ? y - 6 : y + 14}
+                y={isTop ? y - 8 : y + 16}
                 textAnchor="middle"
-                fontSize="11"
-                fontWeight="500"
+                fontSize="10"
                 fill="var(--gg-muted)"
                 fontFamily="'SF Pro Display', system-ui, sans-serif"
-                opacity="0.7"
+                style={{ userSelect: 'none' }}
             >
                 {pip}
             </text>
