@@ -201,8 +201,26 @@ export const mapGameStateToBoardState = (
     // Determine current player color (1 or 2)
     const currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
     
-    // Get dice values
-    const diceValues = gameState.dice && gameState.dice.length > 0 ? gameState.dice : [];
+    // Get dice values - handle various formats
+    let diceValues: number[] = [];
+    if (gameState.dice) {
+        if (Array.isArray(gameState.dice)) {
+            // If array has 4 elements (double), extract unique values
+            if (gameState.dice.length === 4) {
+                diceValues = [gameState.dice[0], gameState.dice[1]];
+            } else if (gameState.dice.length >= 2) {
+                diceValues = [gameState.dice[0], gameState.dice[1]];
+            } else if (gameState.dice.length > 0) {
+                diceValues = gameState.dice;
+            }
+        }
+    }
+    
+    console.warn('[mappers] DICE EXTRACTION:', {
+        originalDice: gameState.dice,
+        extractedDice: diceValues,
+        diceLength: diceValues.length
+    });
     
     // Get points array safely
     const pointsArray = getPointsArray(gameState.board);
