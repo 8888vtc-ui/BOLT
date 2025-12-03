@@ -360,7 +360,7 @@ export const mapGameStateToBoardState = (
         
         // FALLBACK: Try to use gameState.validMoves if available
         if (gameState.validMoves && Array.isArray(gameState.validMoves) && gameState.validMoves.length > 0) {
-            console.warn('[mappers] Using fallback: gameState.validMoves');
+            console.error('[mappers] ✅✅✅ USING FALLBACK: gameState.validMoves ✅✅✅', gameState.validMoves.length, gameState.validMoves.slice(0, 5));
             gameState.validMoves.forEach((move: any) => {
                 if (move.from !== undefined && move.to !== undefined) {
                     const from: PipIndex | 'bar' = typeof move.from === 'number' 
@@ -372,7 +372,18 @@ export const mapGameStateToBoardState = (
                     legalMoves.push({ from, to });
                 }
             });
-            console.warn('[mappers] Fallback legalMoves:', legalMoves.length);
+            console.error('[mappers] ✅✅✅ FALLBACK legalMoves CREATED: ✅✅✅', legalMoves.length, legalMoves.slice(0, 5));
+            if (debugStore) {
+                try {
+                    debugStore.getState().addLog(`[mappers] ✅ Fallback: ${legalMoves.length} legal moves from validMoves`, 'success');
+                } catch (e) {}
+            }
+        } else {
+            console.error('[mappers] ❌❌❌ NO VALIDMOVES FALLBACK AVAILABLE ❌❌❌', {
+                hasValidMoves: !!gameState.validMoves,
+                isArray: Array.isArray(gameState.validMoves),
+                length: gameState.validMoves?.length
+            });
         }
         
         if (debugStore) {
