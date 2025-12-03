@@ -474,6 +474,32 @@ const GameRoom = () => {
         return true;
     }, [isMyTurn, pendingDouble, canDoubleCalc, dice]);
 
+    // Handlers - MUST BE BEFORE CONDITIONAL RETURNS
+    const handleRollDice = useCallback(() => {
+        const addLog = useDebugStore.getState().addLog;
+        const diceArray = gameState?.dice || [];
+        const canRoll = isMyTurn && diceArray.length === 0;
+        
+        addLog('Tentative de lancer les dés', 'info', { 
+            isMyTurn, 
+            diceLength: diceArray.length,
+            turn: gameState?.turn,
+            myId: user?.id || players[0]?.id,
+            canRoll
+        });
+
+        if (canRoll) {
+            sendGameAction('rollDice', {});
+        } else {
+            addLog('Action refusée', 'warning', { 
+                reason: !isMyTurn ? 'Pas votre tour' : 'Dés déjà lancés',
+                isMyTurn,
+                diceLength: diceArray.length,
+                turn: gameState?.turn
+            });
+        }
+    }, [isMyTurn, gameState, user?.id, players, sendGameAction]);
+
     // === END OF HOOKS THAT MUST BE BEFORE CONDITIONAL RETURNS ===
 
     // Check if game is loaded - FORCER l'initialisation si manquant
@@ -584,33 +610,7 @@ const GameRoom = () => {
 
     // Variables déjà extraites au début du composant (avant les returns conditionnels)
     // board, dice, turn, score, cubeValue, cubeOwner, pendingDouble sont déjà définis
-    // isMyTurn, canDoubleCalc, boardState, matchState, handleBoardMove, canDoubleNow sont déjà définis
-
-    // Handlers
-    const handleRollDice = useCallback(() => {
-        const addLog = useDebugStore.getState().addLog;
-        const diceArray = gameState?.dice || [];
-        const canRoll = isMyTurn && diceArray.length === 0;
-        
-        addLog('Tentative de lancer les dés', 'info', { 
-            isMyTurn, 
-            diceLength: diceArray.length,
-            turn: gameState?.turn,
-            myId: user?.id || players[0]?.id,
-            canRoll
-        });
-
-        if (canRoll) {
-            sendGameAction('rollDice', {});
-        } else {
-            addLog('Action refusée', 'warning', { 
-                reason: !isMyTurn ? 'Pas votre tour' : 'Dés déjà lancés',
-                isMyTurn,
-                diceLength: diceArray.length,
-                turn: gameState?.turn
-            });
-        }
-    }, [isMyTurn, gameState, user?.id, players, sendGameAction]);
+    // isMyTurn, canDoubleCalc, boardState, matchState, handleBoardMove, canDoubleNow, handleRollDice sont déjà définis
 
     const handleAskCoach = async () => {
         if (isAnalyzing) return;
