@@ -198,6 +198,15 @@ export const mapGameStateToBoardState = (
     // Get points array safely
     const pointsArray = getPointsArray(gameState.board);
     
+    console.log('[mappers] Calculating legal moves:', {
+        diceValues,
+        diceLength: diceValues.length,
+        pointsLength: pointsArray.length,
+        turn,
+        currentPlayerColor: turn === 'light' ? 1 : 2,
+        hasBoard: !!gameState.board
+    });
+    
     // Only calculate moves if we have dice and a valid board
     if (diceValues.length > 0 && pointsArray.length === 24) {
         try {

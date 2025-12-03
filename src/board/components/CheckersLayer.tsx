@@ -62,6 +62,20 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                 );
                 const canPlay = isPlayable && isTopOfStack;
                 
+                // Debug logging for first checker on point 6
+                if (checker.pip === 6 && checker.color === 'light' && (checker.z || 0) === 0) {
+                    console.log('[CheckersLayer] Checker on point 6:', {
+                        turn,
+                        checkerColor: checker.color,
+                        isCurrentPlayerChecker,
+                        hasLegalMoves,
+                        isTopOfStack,
+                        canPlay,
+                        playablePips: Array.from(playablePips),
+                        legalMovesCount: legalMoves.length
+                    });
+                }
+                
                 const isSelected = checker.pip === selectedPip;
 
                 return (
