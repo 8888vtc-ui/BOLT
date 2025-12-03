@@ -223,6 +223,14 @@ export const mapGameStateToBoardState = (
     }
     
     // Only calculate moves if we have dice and a valid board
+    console.warn('[mappers] CHECKING CONDITIONS:', {
+        diceValuesLength: diceValues.length,
+        pointsArrayLength: pointsArray.length,
+        hasDice: diceValues.length > 0,
+        hasValidBoard: pointsArray.length === 24,
+        willCalculate: diceValues.length > 0 && pointsArray.length === 24
+    });
+    
     if (diceValues.length > 0 && pointsArray.length === 24) {
         try {
             // Convert to BoardState format for getValidMoves
@@ -297,15 +305,18 @@ export const mapGameStateToBoardState = (
             }
         }
         } else {
-        const errorMsg = `[mappers] Cannot calculate legal moves: dice=${diceValues.length}, points=${pointsArray.length}`;
-        console.warn(errorMsg, {
+        const errorMsg = `[mappers] ❌ CANNOT CALCULATE LEGAL MOVES: dice=${diceValues.length}, points=${pointsArray.length}`;
+        console.error(errorMsg, {
             diceLength: diceValues.length,
             pointsLength: pointsArray.length,
-            hasBoard: !!gameState.board
+            hasBoard: !!gameState.board,
+            boardType: typeof gameState.board,
+            boardIsArray: Array.isArray(gameState.board),
+            boardHasPoints: gameState.board && typeof gameState.board === 'object' && 'points' in gameState.board
         });
         if (debugStore) {
             try {
-                debugStore.getState().addLog(errorMsg, 'warning');
+                debugStore.getState().addLog(errorMsg, 'error');
             } catch (e) {}
         }
     }
