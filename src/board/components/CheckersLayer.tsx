@@ -47,7 +47,7 @@ const CheckersLayer = memo<CheckersLayerProps>(({
     return (
         <g 
             aria-label="Checkers layer"
-            style={{ pointerEvents: 'all' }}
+            style={{ pointerEvents: 'none' }} // Let clicks pass through to triangles
         >
             {sortedCheckers.map((checker) => {
                 const { x, y } = getPipCoordinates(checker.pip, checker.z || 0);
