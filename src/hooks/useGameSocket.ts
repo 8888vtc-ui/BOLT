@@ -831,58 +831,42 @@ export const useGameSocket = () => {
     const botAnalysisInProgress = useRef<string | null>(null); // Verrou pour éviter les appels multiples
 
     useEffect(() => {
-        if (!currentRoom || !gameState) {
-            const addLog = useDebugStore.getState().addLog;
-            addLog('🤖 Bot: Skipping - no room or gameState', 'warning', {
-                hasRoom: !!currentRoom,
-                hasGameState: !!gameState
-            });
-            return;
+        // Vérifier que tout est initialisé
+        if (!currentRoom || !gameState || !gameState.board || !gameState.board.points) {
+            return; // Attendre l'initialisation complète
         }
 
         // Check if it's a solo training game
-        // We assume it's solo if the name starts with 'Entraînement' OR if there is only 1 player and we are playing
-        // Also explicitly check for 'offline-bot' ID
         const isSoloGame = currentRoom.id === 'offline-bot' ||
             currentRoom.name?.startsWith('Entraînement') ||
             (players && players.length <= 1);
 
         if (!isSoloGame) {
-            const addLog = useDebugStore.getState().addLog;
-            addLog('🤖 Bot: Not a solo game, skipping', 'info', {
-                roomId: currentRoom.id,
-                roomName: currentRoom.name,
-                playersCount: players?.length || 0
-            });
-            return;
+            return; // Pas un jeu solo, ignorer
         }
 
         // CRITIQUE : Vérifier que players contient 2 joueurs avant de continuer
         if (!players || players.length < 2) {
-            const addLog = useDebugStore.getState().addLog;
-            addLog('🤖 Bot: Waiting for players to be set (need 2)', 'warning', {
-                playersCount: players?.length || 0,
-                players: players?.map(p => ({ id: p.id, username: p.username }))
-            });
             return; // Attendre que les 2 joueurs soient définis
         }
 
         // Check if it's Bot's turn
-        // Bot is 'bot' or any ID that is not me
-        // Fix: Utiliser l'ID du premier joueur (players[0]) pour cohérence
         const myId = user?.id || (players.length > 0 ? players[0].id : 'guest');
         const currentTurn = gameState.turn;
 
         // CRITIQUE : Identifier le bot depuis la liste des joueurs
         // Le bot est toujours le deuxième joueur dans offline-bot mode
         const botId = players && players.length > 1 ? players[1].id : 'bot';
+        
         // Vérifier TOUTES les conditions possibles pour le tour du bot
+        // Le bot peut être identifié par son ID, 'bot', ou être le joueur 2
         const isBotTurn = (
             currentTurn === botId ||
             currentTurn === 'bot' ||
-            (players && players.length > 1 && currentTurn === players[1].id)
+            (players && players.length > 1 && currentTurn === players[1].id) ||
+            // Fallback: si ce n'est pas mon tour et qu'on a 2 joueurs, c'est probablement le bot
+            (currentTurn !== myId && players && players.length === 2 && currentTurn !== 'guest' && currentTurn !== 'guest-1')
         );
-        // console.log('🤖 [BOT] Détection tour:', { currentTurn, botId, isBotTurn, players: players?.map(p => p.id) });
 
         // Créer une clé unique pour cette analyse (turn + dice)
         // Gérer le cas où les dés sont vides (avant le premier lancer)

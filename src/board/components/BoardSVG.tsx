@@ -124,22 +124,22 @@ const BoardSVG = memo<BoardSVGProps>(({
                     <circle cx="4" cy="4" r="0.5" fill="rgba(0,0,0,0.02)" />
                 </pattern>
 
-                {/* Light checker gradient - Premium pearl effect */}
-                <radialGradient id="gg-checker-light-gradient" cx="35%" cy="25%" r="65%" fx="30%" fy="20%">
-                    <stop offset="0%" stopColor="#FFFFFF" />
-                    <stop offset="30%" stopColor="#F8FAFC" />
-                    <stop offset="60%" stopColor="#E2E8F0" />
-                    <stop offset="85%" stopColor="#CBD5E1" />
-                    <stop offset="100%" stopColor="#94A3B8" />
+                {/* Light checker gradient - LUXURY Ivory Pearl */}
+                <radialGradient id="gg-checker-light-gradient" cx="32%" cy="22%" r="68%" fx="28%" fy="18%">
+                    <stop offset="0%" stopColor="#FFFEF8" />
+                    <stop offset="25%" stopColor="#F5F3E8" />
+                    <stop offset="55%" stopColor="#E8E4D5" />
+                    <stop offset="80%" stopColor="#D4C9B0" />
+                    <stop offset="100%" stopColor="#C4B89A" />
                 </radialGradient>
 
-                {/* Dark checker gradient - Premium slate effect */}
-                <radialGradient id="gg-checker-dark-gradient" cx="35%" cy="25%" r="65%" fx="30%" fy="20%">
-                    <stop offset="0%" stopColor="#475569" />
-                    <stop offset="30%" stopColor="#334155" />
-                    <stop offset="60%" stopColor="#1E293B" />
-                    <stop offset="85%" stopColor="#0F172A" />
-                    <stop offset="100%" stopColor="#020617" />
+                {/* Dark checker gradient - LUXURY Ebony Onyx */}
+                <radialGradient id="gg-checker-dark-gradient" cx="32%" cy="22%" r="68%" fx="28%" fy="18%">
+                    <stop offset="0%" stopColor="#2A2D35" />
+                    <stop offset="25%" stopColor="#1A1C22" />
+                    <stop offset="55%" stopColor="#0F1115" />
+                    <stop offset="80%" stopColor="#050608" />
+                    <stop offset="100%" stopColor="#000000" />
                 </radialGradient>
 
                 {/* Checker shadow filter */}

@@ -21,17 +21,18 @@
   --gg-muted: #9CA3AF;
 
   /* ─────────────────────────────────────────────────────────────────────────
-     Board & Checkers - Premium Colors
+     Board & Checkers - LUXURY Premium Colors
      ───────────────────────────────────────────────────────────────────────── */
-  --gg-tri-a: #1E3A5F;          /* Dark triangle - deep blue */
-  --gg-tri-b: #2D5A87;          /* Light triangle - medium blue */
-  --gg-bar: #1F2937;            /* Central bar */
-  --gg-home: #162133;           /* Home zones */
-  --gg-checker-light: #F8FAFC;  /* Light checker - pearl white */
-  --gg-checker-dark: #1E293B;   /* Dark checker - slate */
+  --gg-tri-a: #1A2E4A;          /* Dark triangle - rich navy */
+  --gg-tri-b: #2A4A6B;          /* Light triangle - deep blue */
+  --gg-bar: #1A1F2E;            /* Central bar - luxury dark */
+  --gg-home: #0F1419;           /* Home zones - premium black */
+  --gg-checker-light: #F5F3E8;  /* Light checker - luxury ivory pearl */
+  --gg-checker-dark: #1A1C22;   /* Dark checker - luxury ebony onyx */
+  --gg-checker-gold: #FFD700;   /* Gold accent - luxury border */
   --gg-checker-red: #DC2626;    /* Alternative red checker */
-  --gg-highlight: rgba(52, 211, 153, 0.25);
-  --gg-shadow: rgba(0, 0, 0, 0.4);
+  --gg-highlight: rgba(255, 215, 0, 0.3);  /* Gold highlight */
+  --gg-shadow: rgba(0, 0, 0, 0.6);  /* Deeper shadows */
 
   /* ─────────────────────────────────────────────────────────────────────────
      Cube & Dice - Premium Colors
