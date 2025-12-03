@@ -4,7 +4,8 @@ import { getValidMoves, PlayerColor, Point } from '../../lib/gameLogic';
 // Import debug store for visible logging
 let debugStore: any = null;
 try {
-    debugStore = require('../../stores/useDebugStore').useDebugStore;
+    const debugModule = require('../../stores/debugStore');
+    debugStore = debugModule.useDebugStore;
 } catch (e) {
     // Fallback if debug store not available
 }
