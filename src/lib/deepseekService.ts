@@ -1,8 +1,20 @@
 /**
- * DeepSeek API Service for Backgammon Coach
- * Provides contextual AI coaching based on game state, rules, or strategy
+ * DeepSeek Coach Service - Utilise Ollama (GRATUIT) en priorité
+ * Fallback vers DeepSeek API si Ollama non disponible
+ * 
+ * Configuration Ollama (GRATUIT):
+ * - OLLAMA_URL: URL du serveur Ollama (Railway/Render)
+ * - OLLAMA_MODEL: Modèle à utiliser (deepseek-coder par défaut)
+ * 
+ * Configuration DeepSeek API (Payant - Fallback):
+ * - VITE_DEEPSEEK_API_KEY: Clé API DeepSeek (seulement si Ollama non disponible)
  */
 
+// Configuration Ollama (GRATUIT - Priorité 1)
+const OLLAMA_URL = import.meta.env.VITE_OLLAMA_URL || 'https://bot-production-b9d6.up.railway.app';
+const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'deepseek-coder';
+
+// Configuration DeepSeek API (Payant - Fallback)
 const DEEPSEEK_API_URL = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
 
@@ -18,10 +30,25 @@ export interface GameContext {
 export type ContextType = 'game' | 'rules' | 'strategy' | 'clubs' | 'tournaments';
 
 /**
+ * Vérifier si Ollama est disponible
+ */
+async function isOllamaAvailable(): Promise<boolean> {
+    try {
+        const response = await fetch(`${OLLAMA_URL}/api/tags`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000) // Timeout 5s
+        });
+        return response.ok;
+    } catch (error) {
+        console.warn('[Ollama] Not available, using fallback');
+        return false;
+    }
+}
+
+/**
  * Detect language from user question
  */
 function detectLanguage(text: string): string {
-    // Simple detection based on common words
     const frenchWords = ['comment', 'pourquoi', 'quand', 'où', 'commentaire', 'règle', 'stratégie'];
     const spanishWords = ['cómo', 'por qué', 'cuándo', 'dónde', 'regla', 'estrategia'];
     
@@ -34,7 +61,6 @@ function detectLanguage(text: string): string {
         return 'es';
     }
     
-    // Default to English
     return 'en';
 }
 
@@ -108,31 +134,57 @@ function getSystemPrompt(contextType: ContextType, language: string = 'en'): str
 }
 
 /**
- * Ask DeepSeek coach a question
+ * Ask coach using Ollama (GRATUIT)
  */
-export async function askDeepSeekCoach(
+async function askOllamaCoach(
     question: string,
-    gameContext?: GameContext,
-    contextType: ContextType = 'game'
+    systemPrompt: string,
+    userMessage: string
+): Promise<string> {
+    try {
+        const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: OLLAMA_MODEL,
+                prompt: `${systemPrompt}\n\n${userMessage}`,
+                stream: false,
+                options: {
+                    temperature: 0.7,
+                    num_predict: 500,
+                    top_p: 0.9,
+                    top_k: 40
+                }
+            }),
+            signal: AbortSignal.timeout(30000) // Timeout 30s
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ollama API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const answer = data.response || 'No response from AI coach.';
+        
+        return answer.trim();
+    } catch (error: any) {
+        console.error('[Ollama] Error:', error);
+        throw error;
+    }
+}
+
+/**
+ * Ask coach using DeepSeek API (Payant - Fallback)
+ */
+async function askDeepSeekAPICoach(
+    question: string,
+    systemPrompt: string,
+    userMessage: string
 ): Promise<string> {
     if (!DEEPSEEK_API_KEY) {
-        console.warn('DeepSeek API key not configured');
-        return 'AI Coach is not configured. Please set VITE_DEEPSEEK_API_KEY environment variable.';
-    }
-
-    // Detect language from question
-    const language = detectLanguage(question);
-    
-    // Build system prompt
-    const systemPrompt = getSystemPrompt(contextType, language);
-    
-    // Format game context if available
-    const contextInfo = formatGameContext(gameContext);
-    
-    // Build user message
-    let userMessage = question;
-    if (contextInfo && contextType === 'game') {
-        userMessage = `${contextInfo}\n\nQuestion: ${question}`;
+        throw new Error('DeepSeek API key not configured');
     }
 
     try {
@@ -156,7 +208,8 @@ export async function askDeepSeekCoach(
                 ],
                 temperature: 0.7,
                 max_tokens: 500
-            })
+            }),
+            signal: AbortSignal.timeout(30000)
         });
 
         if (!response.ok) {
@@ -169,8 +222,59 @@ export async function askDeepSeekCoach(
         
         return answer;
     } catch (error: any) {
-        console.error('DeepSeek API error:', error);
-        return `Error: ${error.message || 'Failed to get response from AI coach.'}`;
+        console.error('[DeepSeek API] Error:', error);
+        throw error;
     }
 }
 
+/**
+ * Ask DeepSeek coach a question
+ * Utilise Ollama (GRATUIT) en priorité, fallback vers DeepSeek API
+ */
+export async function askDeepSeekCoach(
+    question: string,
+    gameContext?: GameContext,
+    contextType: ContextType = 'game'
+): Promise<string> {
+    // Detect language from question
+    const language = detectLanguage(question);
+    
+    // Build system prompt
+    const systemPrompt = getSystemPrompt(contextType, language);
+    
+    // Format game context if available
+    const contextInfo = formatGameContext(gameContext);
+    
+    // Build user message
+    let userMessage = question;
+    if (contextInfo && contextType === 'game') {
+        userMessage = `${contextInfo}\n\nQuestion: ${question}`;
+    }
+
+    // PRIORITÉ 1 : Utiliser Ollama (GRATUIT)
+    const ollamaAvailable = await isOllamaAvailable();
+    
+    if (ollamaAvailable) {
+        try {
+            console.log('[AI Coach] Using Ollama (FREE)');
+            return await askOllamaCoach(question, systemPrompt, userMessage);
+        } catch (error: any) {
+            console.warn('[AI Coach] Ollama failed, trying DeepSeek API fallback:', error.message);
+            // Continue to fallback
+        }
+    }
+
+    // PRIORITÉ 2 : Fallback vers DeepSeek API (si configuré)
+    if (DEEPSEEK_API_KEY) {
+        try {
+            console.log('[AI Coach] Using DeepSeek API (fallback)');
+            return await askDeepSeekAPICoach(question, systemPrompt, userMessage);
+        } catch (error: any) {
+            console.error('[AI Coach] DeepSeek API also failed:', error.message);
+            return `Error: ${error.message || 'Failed to get response from AI coach.'}`;
+        }
+    }
+
+    // Aucune option disponible
+    return 'AI Coach is not configured. Please set VITE_OLLAMA_URL (recommended, FREE) or VITE_DEEPSEEK_API_KEY environment variable.';
+}

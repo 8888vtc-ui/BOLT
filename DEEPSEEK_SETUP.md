@@ -1,12 +1,59 @@
-# 🔧 Configuration DeepSeek API pour AI Coach
+# 🔧 Configuration AI Coach - Ollama GRATUIT
 
 ## 📋 Vue d'ensemble
 
-L'AI Coach utilise l'API DeepSeek pour fournir des conseils stratégiques en temps réel. Cette fonctionnalité est **optionnelle** - le jeu fonctionne sans elle, mais l'AI Coach ne sera pas disponible.
+L'AI Coach utilise **Ollama (GRATUIT)** en priorité, avec fallback vers DeepSeek API si nécessaire. Cette fonctionnalité est **optionnelle** - le jeu fonctionne sans elle, mais l'AI Coach ne sera pas disponible.
+
+## 🆓 Solution GRATUITE : Ollama (Recommandé)
+
+**Le bot utilise déjà Ollama sur Railway - le frontend utilise la même URL !**
+
+- ✅ **100% GRATUIT** (pas de coûts API)
+- ✅ **Déjà configuré** (utilise la même URL que le bot)
+- ✅ **URL par défaut:** `https://bot-production-b9d6.up.railway.app`
 
 ## 🚀 Configuration Rapide
 
-### 1. Obtenir une clé API DeepSeek
+### Option 1 : Ollama GRATUIT (Recommandé) ✅
+
+**Le frontend utilise automatiquement la même URL Ollama que le bot !**
+
+#### Configuration Locale (Développement)
+
+Créez un fichier `.env.local` à la racine du projet (optionnel - l'URL par défaut fonctionne) :
+
+```bash
+# Utilise l'Ollama du bot (déjà configuré)
+VITE_OLLAMA_URL=https://bot-production-b9d6.up.railway.app
+VITE_OLLAMA_MODEL=deepseek-coder
+```
+
+#### Configuration Netlify (Production)
+
+**Aucune configuration nécessaire !** Le frontend utilise l'URL par défaut qui pointe vers l'Ollama du bot.
+
+Si vous voulez utiliser un autre serveur Ollama :
+
+1. Allez sur [https://app.netlify.com/](https://app.netlify.com/)
+2. Sélectionnez votre site **gurugammon-react**
+3. Allez dans **Site settings** → **Environment variables**
+4. Ajoutez (optionnel) :
+   - **Key:** `VITE_OLLAMA_URL`
+   - **Value:** `https://bot-production-b9d6.up.railway.app` (ou votre URL Ollama)
+5. **Key:** `VITE_OLLAMA_MODEL`
+   - **Value:** `deepseek-coder`
+6. Cliquez sur **Save**
+7. **Redéployez** votre site
+
+**C'est tout !** ✅ **100% GRATUIT**
+
+---
+
+### Option 2 : DeepSeek API (Payant - Fallback)
+
+**Seulement si Ollama n'est pas disponible**
+
+#### 1. Obtenir une clé API DeepSeek
 
 1. Visitez [https://platform.deepseek.com/](https://platform.deepseek.com/)
 2. Créez un compte ou connectez-vous
@@ -14,7 +61,7 @@ L'AI Coach utilise l'API DeepSeek pour fournir des conseils stratégiques en tem
 4. Créez une nouvelle clé API
 5. **Copiez la clé** (elle ne sera affichée qu'une seule fois)
 
-### 2. Configuration Locale (Développement)
+#### 2. Configuration Locale (Développement)
 
 Créez un fichier `.env.local` à la racine du projet :
 
@@ -24,9 +71,9 @@ VITE_DEEPSEEK_API_KEY=sk-votre-cle-api-ici
 
 **⚠️ Important :** Le fichier `.env.local` est dans `.gitignore` et ne sera pas commité.
 
-### 3. Configuration Netlify (Production)
+#### 3. Configuration Netlify (Production)
 
-#### Option A : Via l'interface Netlify
+#### Via l'interface Netlify
 
 1. Allez sur [https://app.netlify.com/](https://app.netlify.com/)
 2. Sélectionnez votre site **gurugammon-react**
@@ -38,12 +85,22 @@ VITE_DEEPSEEK_API_KEY=sk-votre-cle-api-ici
 6. Cliquez sur **Save**
 7. **Redéployez** votre site (Build & deploy → Trigger deploy → Deploy site)
 
-#### Option B : Via Netlify CLI
+#### Via Netlify CLI
 
 ```bash
 netlify env:set VITE_DEEPSEEK_API_KEY "sk-votre-cle-api-ici"
 netlify deploy --prod
 ```
+
+---
+
+## 🎯 Priorité d'Utilisation
+
+Le système utilise automatiquement :
+
+1. **Ollama (GRATUIT)** - Si `VITE_OLLAMA_URL` est configuré ou si l'URL par défaut fonctionne
+2. **DeepSeek API (Payant)** - Seulement si Ollama n'est pas disponible ET si `VITE_DEEPSEEK_API_KEY` est configuré
+3. **Message d'erreur** - Si aucune option n'est disponible
 
 ### 4. Vérification
 
