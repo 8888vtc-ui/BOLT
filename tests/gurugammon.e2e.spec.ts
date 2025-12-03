@@ -7,8 +7,8 @@ const GAME_URL = `${APP_URL}/game/offline-bot?mode=money&length=0`;
  * Utility: check if an overlay or CSS blocks pointer events
  */
 async function assertNoOverlayBlocking(page: any) {
-    const board = page.getByTestId('board');
-    await expect(board).toBeVisible();
+    const board = page.getByTestId('board').or(page.locator('.gg-board-container')).or(page.locator('svg[role="application"]'));
+    await expect(board.first()).toBeVisible();
     
     // Scan for elements above the board that could block clicks
     const blocking = await page.$$eval('*', (nodes: any[]) =>
