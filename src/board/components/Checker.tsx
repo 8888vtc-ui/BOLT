@@ -103,22 +103,25 @@ const Checker = memo<CheckerProps>(({
 
             // If minimal movement, treat as click
             if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-                console.log('[Checker] Click detected, calling onClick');
-                onClick();
+                console.error('[Checker] ✅✅✅ CLICK DETECTED ✅✅✅', { isPlayable, id, color });
+                if (isPlayable) {
+                    onClick();
+                } else {
+                    console.error('[Checker] ❌ Not playable, but click detected');
+                }
             } else {
                 // Drop - will be resolved by hit test in parent
                 onDragEnd(null);
             }
         } else {
             // If pointerDown was never captured, treat as click anyway
-            console.log('[Checker] PointerUp without drag, treating as click');
-            if (isPlayable) {
-                onClick();
-            }
+            console.error('[Checker] ✅✅✅ POINTER UP WITHOUT DRAG - TREATING AS CLICK ✅✅✅', { isPlayable, id, color });
+            // ALWAYS call onClick, even if not playable (for debugging)
+            onClick();
         }
         
         setDragOffset({ x: 0, y: 0 });
-    }, [onClick, onDragEnd, isPlayable]);
+    }, [onClick, onDragEnd, isPlayable, id, color]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (!isPlayable) return;
@@ -136,7 +139,8 @@ const Checker = memo<CheckerProps>(({
     return (
         <g
             style={{
-                cursor: isPlayable ? (isDraggingNow ? 'grabbing' : 'grab') : 'default',
+                cursor: isPlayable ? (isDraggingNow ? 'grabbing' : 'grab') : 'pointer', // Always pointer for debugging
+                pointerEvents: 'all', // Force pointer events
             }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -144,9 +148,17 @@ const Checker = memo<CheckerProps>(({
             onPointerEnter={() => setIsHovered(true)}
             onPointerLeave={() => setIsHovered(false)}
             onKeyDown={handleKeyDown}
+            onClick={(e) => {
+                // Direct click handler as fallback
+                console.error('[Checker] ✅✅✅ DIRECT CLICK HANDLER ✅✅✅', { isPlayable, id, color });
+                e.stopPropagation();
+                if (isPlayable) {
+                    onClick();
+                }
+            }}
             role="button"
             aria-label={`${color} checker${isPlayable ? ', playable' : ''}${isSelected ? ', selected' : ''}`}
-            tabIndex={isPlayable ? 0 : -1}
+            tabIndex={0} // Always focusable for debugging
             data-z={zIndex}
         >
             {/* LUXURY GRADIENTS */}

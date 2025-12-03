@@ -32,7 +32,21 @@ const Triangle = memo<TriangleProps>(({
     const uniqueId = `tri-${pip}`;
 
     return (
-        <g onClick={onClick} role="button" aria-label={`Point ${pip}`} tabIndex={0}>
+        <g 
+            onClick={(e) => {
+                console.error('[Triangle] ✅✅✅ CLICK ON POINT ✅✅✅', { pip });
+                e.stopPropagation();
+                onClick();
+            }}
+            onPointerDown={(e) => {
+                console.error('[Triangle] ✅✅✅ POINTER DOWN ON POINT ✅✅✅', { pip });
+                e.stopPropagation();
+            }}
+            style={{ cursor: 'pointer', pointerEvents: 'all' }}
+            role="button" 
+            aria-label={`Point ${pip}`} 
+            tabIndex={0}
+        >
             {/* Inline gradient for shine effect */}
             <defs>
                 <linearGradient 
