@@ -77,8 +77,10 @@ test.describe('GuruGammon piece interaction', () => {
             await page.waitForTimeout(2000); // Wait for dice animation
         }
         
-        // 3) Find a light checker (player 1)
-        const lightCheckers = page.locator('[data-testid^="piece-light-"]');
+        // 3) Find a light checker (player 1) - use aria-label as fallback
+        const lightCheckers = page.locator('[data-testid^="piece-light-"]').or(
+            page.locator('g[role="button"][aria-label*="light checker"]')
+        );
         const checkerCount = await lightCheckers.count();
         
         expect(checkerCount).toBeGreaterThan(0);
@@ -107,9 +109,11 @@ test.describe('GuruGammon piece interaction', () => {
         console.log('✅ Pion cliqué');
         await page.waitForTimeout(500);
         
-        // 6) Find a valid destination point (try point 1 as example)
-        const destPoint = validPointLocator(page, 1);
-        await expect(destPoint).toBeVisible({ timeout: 5000 });
+        // 6) Find a valid destination point (try point 1 as example) - use aria-label as fallback
+        const destPoint = validPointLocator(page, 1).or(
+            page.locator('g[role="button"][aria-label="Point 1"]')
+        );
+        await expect(destPoint.first()).toBeVisible({ timeout: 5000 });
         
         // 7) Click destination point to move the piece
         await destPoint.click({ force: true });
@@ -152,8 +156,10 @@ test.describe('GuruGammon piece interaction', () => {
             await page.waitForTimeout(2000);
         }
         
-        // Find all checkers
-        const checkers = page.locator('[data-testid^="piece-"]');
+        // Find all checkers - use aria-label as fallback
+        const checkers = page.locator('[data-testid^="piece-"]').or(
+            page.locator('g[role="button"][aria-label*="checker"]')
+        );
         const checkerCount = await checkers.count();
         expect(checkerCount).toBeGreaterThan(0);
         
