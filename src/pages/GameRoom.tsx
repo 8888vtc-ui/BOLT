@@ -363,13 +363,33 @@ const GameRoom = () => {
 
     // isMyTurn calculation (safe even when gameState is null)
     const isMyTurn = useMemo(() => {
-        if (!user || !gameState) return false;
+        if (!gameState) return false;
+        
+        // In offline-bot mode, player is always players[0]
+        if (currentRoom?.id === 'offline-bot' && players && players.length > 0) {
+            const myId = players[0].id;
+            const currentTurn = turn;
+            // Check if it's the first player's turn
+            return currentTurn === myId || 
+                   currentTurn === 'guest' || 
+                   currentTurn === 'guest-1' ||
+                   (currentTurn === players[0].id);
+        }
+        
+        // Normal mode: check against user ID
+        if (!user) return false;
         const myId = user.id;
         if (turn === myId) return true;
         if (turn === 'guest-1' && myId === 'guest-1') return true;
         if (turn === 'guest' && !user.id) return true;
+        
+        // Fallback: check if turn matches first player
+        if (players && players.length > 0 && turn === players[0].id) {
+            return players[0].id === myId;
+        }
+        
         return false;
-    }, [user, gameState, turn]);
+    }, [user, gameState, turn, currentRoom?.id, players]);
 
     // canDouble calculation
     const hasDiceRolled = dice && dice.length > 0;
@@ -567,16 +587,30 @@ const GameRoom = () => {
     // isMyTurn, canDoubleCalc, boardState, matchState, handleBoardMove, canDoubleNow sont déjà définis
 
     // Handlers
-    const handleRollDice = () => {
+    const handleRollDice = useCallback(() => {
         const addLog = useDebugStore.getState().addLog;
-        addLog('Tentative de lancer les dés', 'info', { isMyTurn, diceLength: dice.length });
+        const diceArray = gameState?.dice || [];
+        const canRoll = isMyTurn && diceArray.length === 0;
+        
+        addLog('Tentative de lancer les dés', 'info', { 
+            isMyTurn, 
+            diceLength: diceArray.length,
+            turn: gameState?.turn,
+            myId: user?.id || players[0]?.id,
+            canRoll
+        });
 
-        if (isMyTurn && dice.length === 0) {
+        if (canRoll) {
             sendGameAction('rollDice', {});
         } else {
-            addLog('Action refusée', 'error', { reason: !isMyTurn ? 'Pas votre tour' : 'Dés déjà lancés' });
+            addLog('Action refusée', 'warning', { 
+                reason: !isMyTurn ? 'Pas votre tour' : 'Dés déjà lancés',
+                isMyTurn,
+                diceLength: diceArray.length,
+                turn: gameState?.turn
+            });
         }
-    };
+    }, [isMyTurn, gameState, user?.id, players, sendGameAction]);
 
     const handleAskCoach = async () => {
         if (isAnalyzing) return;
