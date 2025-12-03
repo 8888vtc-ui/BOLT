@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useState, useEffect } from 'react';
-import { BoardProps, PipIndex } from '../types';
+import { BoardProps, PipIndex, LegalMove } from '../types';
 import BoardSVG from './BoardSVG';
 import MatchHeader from './MatchHeader';
 import '../styles/gurugammon.css';
@@ -43,78 +43,126 @@ const BoardWrap = memo<BoardProps>(({
         setLastMoveAnnouncement(`Moved checker from ${fromStr} to ${toStr}`);
     }, []);
 
+    /**
+     * 🎯 DÉPLACEMENT AUTOMATIQUE EN UN SEUL CLIC
+     * Calcule la meilleure destination pour un pion
+     * Priorité: frappe > bear off > avancement max
+     */
+    const getBestDestination = useCallback((fromPip: PipIndex | 'bar'): LegalMove | null => {
+        const movesFromPip = state.legalMoves.filter(m => m.from === fromPip);
+        
+        if (movesFromPip.length === 0) return null;
+        if (movesFromPip.length === 1) return movesFromPip[0];
+        
+        // Priorité 1: Bear off (sortir les pions)
+        const bearOffMove = movesFromPip.find(m => m.to === 'borne');
+        if (bearOffMove) {
+            console.log('[BoardWrap] 🏠 Auto-selecting bear off move');
+            return bearOffMove;
+        }
+        
+        // Priorité 2: Frappe (hitting) - destination avec un pion adverse isolé
+        const hitMoves = movesFromPip.filter(m => {
+            if (m.to === 'borne') return false;
+            const destCheckers = state.checkers.filter(c => c.pip === m.to);
+            const oppositeColor = state.turn === 'light' ? 'dark' : 'light';
+            return destCheckers.length === 1 && destCheckers[0].color === oppositeColor;
+        });
+        
+        if (hitMoves.length > 0) {
+            // Prendre le hit avec le plus grand dé utilisé
+            const bestHit = hitMoves.reduce((best, curr) => {
+                const bestDist = typeof best.from === 'number' && typeof best.to === 'number' 
+                    ? Math.abs(best.from - best.to) : 0;
+                const currDist = typeof curr.from === 'number' && typeof curr.to === 'number'
+                    ? Math.abs(curr.from - curr.to) : 0;
+                return currDist > bestDist ? curr : best;
+            });
+            console.log('[BoardWrap] 💥 Auto-selecting HIT move:', bestHit);
+            return bestHit;
+        }
+        
+        // Priorité 3: Avancer le plus loin possible (utiliser le plus grand dé)
+        const sortedMoves = [...movesFromPip].sort((a, b) => {
+            const aDist = typeof a.from === 'number' && typeof a.to === 'number' 
+                ? Math.abs(a.from - a.to) : 0;
+            const bDist = typeof b.from === 'number' && typeof b.to === 'number'
+                ? Math.abs(b.from - b.to) : 0;
+            return bDist - aDist; // Plus grand dé en premier
+        });
+        
+        console.log('[BoardWrap] ➡️ Auto-selecting best advance move:', sortedMoves[0]);
+        return sortedMoves[0];
+    }, [state.legalMoves, state.checkers, state.turn]);
+
     const handlePipClick = useCallback((pip: PipIndex | 'bar' | 'borne') => {
-        console.error('[BoardWrap] 🔥🔥🔥 handlePipClick CALLED 🔥🔥🔥', { 
+        console.error('[BoardWrap] 🔥🔥🔥 handlePipClick - AUTO MOVE 🔥🔥🔥', { 
             pip, 
-            selectedPip, 
             legalMovesCount: state.legalMoves.length, 
             turn: state.turn,
-            allLegalMoves: state.legalMoves.slice(0, 10),
             timestamp: new Date().toISOString()
         });
         
-        // If clicking on borne (home), try to bear off
+        // Si clic sur la zone de sortie (borne), bear off automatique
         if (pip === 'borne') {
-            if (selectedPip !== null) {
-                // Check if bearing off is a legal move
-                const canBearOff = state.legalMoves.some(
-                    m => m.from === selectedPip && m.to === 'borne'
-                );
-                console.error('[BoardWrap] Bear off attempt:', { selectedPip, canBearOff });
-                if (canBearOff && onMove) {
-                    onMove(selectedPip, 'borne');
-                    announceMove(selectedPip, 'borne');
-                }
-                setSelectedPip(null);
+            const bearOffMoves = state.legalMoves.filter(m => m.to === 'borne');
+            if (bearOffMoves.length > 0 && onMove) {
+                const move = bearOffMoves[0];
+                console.error('[BoardWrap] 🏠 AUTO BEAR OFF:', move);
+                onMove(move.from, 'borne');
+                announceMove(move.from, 'borne');
             }
+            setSelectedPip(null);
             return;
         }
 
-        if (selectedPip === null) {
-            // Select if it has checkers of current turn color AND has legal moves
-            const hasPlayableChecker = state.checkers.some(
-                c => c.pip === pip && c.color === state.turn
-            );
-            const hasLegalMoves = state.legalMoves.some(m => m.from === pip);
+        // Vérifier si le clic est sur un pion jouable du joueur actuel
+        const hasPlayableChecker = state.checkers.some(
+            c => c.pip === pip && c.color === state.turn
+        );
+        const movesFromPip = state.legalMoves.filter(m => m.from === pip);
+        const hasLegalMoves = movesFromPip.length > 0;
+        
+        console.error('[BoardWrap] 🎯 CLICK ANALYSIS:', { 
+            pip, 
+            hasPlayableChecker, 
+            hasLegalMoves, 
+            movesFromPip
+        });
+        
+        // 🎯 DÉPLACEMENT AUTOMATIQUE EN UN CLIC !
+        if (hasPlayableChecker && hasLegalMoves && onMove) {
+            const bestMove = getBestDestination(pip);
             
-            console.error('[BoardWrap] Selection attempt:', { pip, hasPlayableChecker, hasLegalMoves, legalMoves: state.legalMoves.filter(m => m.from === pip) });
-            
-            if (hasPlayableChecker && hasLegalMoves) {
-                setSelectedPip(pip);
-                console.log('[BoardWrap] Selected pip:', pip);
+            if (bestMove) {
+                console.error('[BoardWrap] ✅✅✅ AUTO-MOVE EXECUTED ✅✅✅', { 
+                    from: pip, 
+                    to: bestMove.to,
+                    allOptions: movesFromPip,
+                    timestamp: new Date().toISOString()
+                });
+                
+                onMove(pip, bestMove.to);
+                announceMove(pip, bestMove.to as PipIndex | 'borne');
+                setSelectedPip(null);
+                return;
             }
-        } else {
-            // Try to move
+        }
+        
+        // Fallback: si on clique sur une destination quand un pion est sélectionné
+        if (selectedPip !== null) {
             const isValidMove = state.legalMoves.some(
                 m => m.from === selectedPip && m.to === pip
             );
             
-            console.log('[BoardWrap] Move attempt:', { from: selectedPip, to: pip, isValidMove, matchingMoves: state.legalMoves.filter(m => m.from === selectedPip && m.to === pip) });
-            
             if (isValidMove && onMove) {
-                console.error('[BoardWrap] ✅✅✅ EXECUTING MOVE ✅✅✅', { 
-                    from: selectedPip, 
-                    to: pip,
-                    isValidMove,
-                    onMoveAvailable: !!onMove,
-                    timestamp: new Date().toISOString()
-                });
+                console.error('[BoardWrap] ✅ Fallback move:', { from: selectedPip, to: pip });
                 onMove(selectedPip, pip as PipIndex);
                 announceMove(selectedPip, pip as PipIndex);
-            } else {
-                console.error('[BoardWrap] ❌ Invalid move or onMove not available', {
-                    isValidMove,
-                    onMoveAvailable: !!onMove,
-                    selectedPip,
-                    pip,
-                    matchingMoves: state.legalMoves.filter(m => m.from === selectedPip && m.to === pip)
-                });
             }
-            
-            // Clear selection (even if move was invalid)
             setSelectedPip(null);
         }
-    }, [selectedPip, state.checkers, state.turn, state.legalMoves, onMove, announceMove]);
+    }, [selectedPip, state.checkers, state.turn, state.legalMoves, onMove, announceMove, getBestDestination]);
 
     const handleCheckerDragStart = useCallback((id: string) => {
         const checker = state.checkers.find(c => c.id === id);
@@ -271,18 +319,12 @@ const BoardWrap = memo<BoardProps>(({
                     </span>
                 </div>
 
-                {/* Selected Checker Indicator */}
-                {selectedPip && (
-                    <div className="absolute top-4 left-4 bg-blue-500/80 px-3 py-1 rounded-lg text-sm font-medium text-white backdrop-blur-sm">
-                        Selected: {selectedPip === 'bar' ? 'Bar' : `Point ${selectedPip}`}
-                    </div>
-                )}
             </div>
 
             {/* Keyboard shortcuts help */}
             <div className="text-center text-xs text-gray-500 mt-2">
                 <span className="hidden sm:inline">
-                    Click to select • Click destination to move • Tab for keyboard navigation
+                    🎯 Un clic = mouvement auto • Tab pour navigation clavier
                 </span>
             </div>
         </div>
