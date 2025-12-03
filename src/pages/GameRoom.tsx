@@ -407,18 +407,19 @@ const GameRoom = () => {
     // Map state for new board - MUST BE BEFORE CONDITIONAL RETURNS
     const boardState = useMemo(() => {
         if (!gameState) {
-            addLog('[GameRoom] No gameState for boardState', 'warning');
+            useDebugStore.getState().addLog('[GameRoom] No gameState for boardState', 'warning');
             return null;
         }
         const mappedPlayers = players.map((p, i) => ({
             id: p.id,
             color: i === 0 ? 1 : 2
         }));
+        const addLog = useDebugStore.getState().addLog;
         addLog(`[GameRoom] Mapping gameState to boardState: dice=${gameState.dice?.length || 0}, turn=${gameState.turn}`, 'info');
         const mapped = mapGameStateToBoardState(gameState as any, user?.id || 'guest', mappedPlayers);
         addLog(`[GameRoom] Mapped boardState: legalMoves=${mapped.legalMoves.length}, checkers=${mapped.checkers.length}`, 'info');
         return mapped;
-    }, [gameState, user?.id, players, addLog]);
+    }, [gameState, user?.id, players]);
 
     const matchState = useMemo(() => ({
         players: [
