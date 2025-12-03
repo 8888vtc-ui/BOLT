@@ -241,13 +241,22 @@ export const mapGameStateToBoardState = (
     }
     
     // Only calculate moves if we have dice and a valid board
-    console.warn('[mappers] CHECKING CONDITIONS:', {
+    // FORCE LOGS TO BE VISIBLE
+    const conditionCheck = {
         diceValuesLength: diceValues.length,
         pointsArrayLength: pointsArray.length,
         hasDice: diceValues.length > 0,
         hasValidBoard: pointsArray.length === 24,
-        willCalculate: diceValues.length > 0 && pointsArray.length === 24
-    });
+        willCalculate: diceValues.length > 0 && pointsArray.length === 24,
+        diceValues: diceValues,
+        pointsArraySample: pointsArray.slice(0, 3)
+    };
+    console.error('[mappers] ⚠️⚠️⚠️ CHECKING CONDITIONS ⚠️⚠️⚠️', conditionCheck);
+    if (debugStore) {
+        try {
+            debugStore.getState().addLog(`[mappers] Conditions: dice=${diceValues.length}, points=${pointsArray.length}`, 'error');
+        } catch (e) {}
+    }
     
     if (diceValues.length > 0 && pointsArray.length === 24) {
         try {
