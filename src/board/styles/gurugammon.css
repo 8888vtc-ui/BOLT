@@ -1,0 +1,285 @@
+/* ============================================
+   GuruGammon Premium Board - CSS Variables
+   A world-class backgammon experience
+   ============================================ */
+
+:root {
+  /* Brand Colors - Premium Dark Theme */
+  --gg-bg: #0B0F1A;
+  --gg-surface: #111827;
+  --gg-primary: #34D399;
+  --gg-primary-600: #10B981;
+  --gg-primary-glow: rgba(52, 211, 153, 0.4);
+  --gg-secondary: #60A5FA;
+  --gg-secondary-600: #3B82F6;
+  --gg-danger: #EF4444;
+  --gg-warning: #F59E0B;
+  --gg-text: #E5E7EB;
+  --gg-muted: #9CA3AF;
+
+  /* Board & Checkers - Rich Wood Tones */
+  --gg-tri-a: #1E3A5F;
+  --gg-tri-b: #2D5A87;
+  --gg-bar: #1A2942;
+  --gg-home: #0F1A2A;
+  --gg-checker-light: #F5F5F5;
+  --gg-checker-dark: #1A1A1A;
+  --gg-checker-red: #B91C1C;
+  --gg-highlight: rgba(52, 211, 153, 0.35);
+  --gg-shadow: rgba(0, 0, 0, 0.5);
+
+  /* Cube & Dice - Ivory Look */
+  --gg-cube: #E8E8E8;
+  --gg-cube-owned: #34D399;
+  --gg-die-face: #FAFAFA;
+  --gg-die-pip: #1A1A1A;
+
+  /* Sizing */
+  --gg-board-ratio: 2 / 1;
+  --gg-checker-size: 8%;
+  --gg-triangle-height: 42%;
+  --gg-bar-width: 6%;
+  --gg-home-width: 8%;
+
+  /* Animation Timing */
+  --gg-transition-fast: 150ms;
+  --gg-transition-normal: 250ms;
+  --gg-transition-slow: 400ms;
+}
+
+/* ============================================
+   Theme Variants
+   ============================================ */
+
+/* High Contrast Theme - WCAG AAA */
+[data-theme="high-contrast"] {
+  --gg-bg: #000000;
+  --gg-surface: #1a1a1a;
+  --gg-tri-a: #1a1a1a;
+  --gg-tri-b: #4a4a4a;
+  --gg-checker-light: #FFFFFF;
+  --gg-checker-dark: #000000;
+  --gg-text: #FFFFFF;
+  --gg-muted: #CCCCCC;
+  --gg-highlight: rgba(255, 255, 0, 0.5);
+  --gg-primary: #00FF00;
+  --gg-danger: #FF0000;
+}
+
+/* Daltonism Theme - Colorblind Friendly */
+[data-theme="daltonism"] {
+  --gg-checker-light: #56B4E9; /* Blue - distinguishable */
+  --gg-checker-dark: #E69F00; /* Orange - distinguishable */
+  --gg-primary: #009E73; /* Teal */
+  --gg-danger: #D55E00; /* Vermillion */
+  --gg-tri-a: #0072B2; /* Blue */
+  --gg-tri-b: #CC79A7; /* Pink */
+}
+
+/* ============================================
+   Board Container - Premium Frame
+   ============================================ */
+
+.gg-board-container {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  aspect-ratio: var(--gg-board-ratio);
+  background: linear-gradient(145deg, #0d1320, #080c14);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 0 4px var(--gg-surface),
+    0 25px 60px -12px rgba(0, 0, 0, 0.7),
+    0 0 100px -20px var(--gg-primary-glow);
+}
+
+.gg-board-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent, rgba(255,255,255,0.05));
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .gg-board-container {
+    max-width: 100%;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .gg-board-container {
+    aspect-ratio: 4 / 3;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gg-board-container {
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+  }
+}
+
+/* ============================================
+   Accessibility - Reduced Motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .gg-board-container *,
+  .gg-board-container *::before,
+  .gg-board-container *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus Visible for Keyboard Navigation */
+.gg-board-container *:focus-visible {
+  outline: 3px solid var(--gg-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   Animations - Smooth & Premium
+   ============================================ */
+
+@keyframes gg-checker-pulse {
+  0%, 100% { 
+    filter: drop-shadow(0 0 6px var(--gg-primary)); 
+    transform: scale(1);
+  }
+  50% { 
+    filter: drop-shadow(0 0 16px var(--gg-primary)); 
+    transform: scale(1.02);
+  }
+}
+
+@keyframes gg-dice-shake {
+  0% { transform: rotate(0deg) scale(1); }
+  10% { transform: rotate(-12deg) scale(1.08); }
+  20% { transform: rotate(12deg) scale(1.06); }
+  30% { transform: rotate(-10deg) scale(1.04); }
+  40% { transform: rotate(10deg) scale(1.02); }
+  50% { transform: rotate(-8deg) scale(1.01); }
+  60% { transform: rotate(8deg) scale(1); }
+  70% { transform: rotate(-5deg); }
+  80% { transform: rotate(5deg); }
+  90% { transform: rotate(-2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes gg-dice-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes gg-highlight-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes gg-glow-rotate {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+@keyframes gg-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* ============================================
+   Component Classes
+   ============================================ */
+
+.gg-checker-playable {
+  animation: gg-checker-pulse 1.8s ease-in-out infinite;
+  cursor: grab;
+  transition: transform var(--gg-transition-fast) ease-out;
+}
+
+.gg-checker-playable:hover {
+  transform: scale(1.08);
+}
+
+.gg-checker-dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+  transform: scale(1.1);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+}
+
+.gg-dice-rolling {
+  animation: gg-dice-shake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.gg-dice-idle {
+  animation: gg-dice-bounce 2s ease-in-out infinite;
+}
+
+.gg-highlight-active {
+  animation: gg-highlight-pulse 1.2s ease-in-out infinite;
+}
+
+.gg-cube-can-double {
+  animation: gg-float 2s ease-in-out infinite;
+}
+
+/* ============================================
+   SVG Specific Styles
+   ============================================ */
+
+.gg-board-container svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.gg-board-container svg text {
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Smooth transitions for interactive elements */
+.gg-board-container svg g[role="button"] {
+  transition: opacity var(--gg-transition-fast) ease-out;
+}
+
+.gg-board-container svg g[role="button"]:hover {
+  opacity: 0.9;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.gg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
