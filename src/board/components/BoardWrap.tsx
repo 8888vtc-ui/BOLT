@@ -72,11 +72,23 @@ const BoardWrap = memo<BoardProps>(({
             console.log('[BoardWrap] Move attempt:', { from: selectedPip, to: pip, isValidMove, matchingMoves: state.legalMoves.filter(m => m.from === selectedPip && m.to === pip) });
             
             if (isValidMove && onMove) {
-                console.log('[BoardWrap] Executing move:', selectedPip, '->', pip);
+                console.error('[BoardWrap] ✅✅✅ EXECUTING MOVE ✅✅✅', { 
+                    from: selectedPip, 
+                    to: pip,
+                    isValidMove,
+                    onMoveAvailable: !!onMove,
+                    timestamp: new Date().toISOString()
+                });
                 onMove(selectedPip, pip as PipIndex);
                 announceMove(selectedPip, pip as PipIndex);
             } else {
-                console.warn('[BoardWrap] Invalid move or onMove not available');
+                console.error('[BoardWrap] ❌ Invalid move or onMove not available', {
+                    isValidMove,
+                    onMoveAvailable: !!onMove,
+                    selectedPip,
+                    pip,
+                    matchingMoves: state.legalMoves.filter(m => m.from === selectedPip && m.to === pip)
+                });
             }
             
             // Clear selection (even if move was invalid)

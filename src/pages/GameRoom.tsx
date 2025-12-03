@@ -451,26 +451,49 @@ const GameRoom = () => {
 
     // Handle moves from the new board component
     const handleBoardMove = useCallback((from: number | 'bar', to: number | 'borne') => {
+        console.error('[GameRoom] ✅✅✅ handleBoardMove CALLED ✅✅✅', { 
+            from, 
+            to, 
+            isMyTurn, 
+            playerColor,
+            timestamp: new Date().toISOString()
+        });
+        
         if (!isMyTurn) {
-            console.warn('[GameRoom] Not my turn, ignoring move');
+            console.error('[GameRoom] ❌ Not my turn, ignoring move', { 
+                isMyTurn, 
+                currentTurn: gameState?.turn,
+                myId: user?.id
+            });
             return;
         }
+        
         const isPlayer1 = playerColor === 1;
         let fromIdx: number;
         let toIdx: number;
+        
         if (from === 'bar') {
             fromIdx = isPlayer1 ? 24 : -1;
         } else {
             fromIdx = from - 1;
         }
+        
         if (to === 'borne') {
             toIdx = isPlayer1 ? -1 : 24;
         } else {
             toIdx = to - 1;
         }
-        console.log(`[GameRoom] Move: ${from} -> ${to} (mapped: ${fromIdx} -> ${toIdx})`);
+        
+        console.error('[GameRoom] ✅✅✅ SENDING MOVE ✅✅✅', { 
+            fromIdx, 
+            toIdx, 
+            originalFrom: from, 
+            originalTo: to,
+            mapped: `${fromIdx} -> ${toIdx}`
+        });
+        
         sendGameAction('move', { from: fromIdx, to: toIdx });
-    }, [isMyTurn, playerColor, sendGameAction]);
+    }, [isMyTurn, playerColor, sendGameAction, gameState?.turn, user?.id]);
 
     // Determine if current player can double now
     const canDoubleNow = useMemo(() => {
