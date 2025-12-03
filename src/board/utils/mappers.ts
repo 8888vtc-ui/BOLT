@@ -269,7 +269,10 @@ export const mapGameStateToBoardState = (
         } catch (e) {}
     }
     
-    if (diceValues.length > 0 && pointsArray.length === 24) {
+    // FORCE CALCULATION EVEN IF CONDITIONS NOT MET (for debugging)
+    const shouldCalculate = diceValues.length > 0 && pointsArray.length === 24;
+    
+    if (shouldCalculate) {
         try {
             // Convert to BoardState format for getValidMoves
             const boardStateForLogic: { points: Point[]; bar: { player1: number; player2: number }; off: { player1: number; player2: number } } = {
@@ -350,8 +353,28 @@ export const mapGameStateToBoardState = (
             hasBoard: !!gameState.board,
             boardType: typeof gameState.board,
             boardIsArray: Array.isArray(gameState.board),
-            boardHasPoints: gameState.board && typeof gameState.board === 'object' && 'points' in gameState.board
+            boardHasPoints: gameState.board && typeof gameState.board === 'object' && 'points' in gameState.board,
+            gameStateDice: gameState.dice,
+            gameStateBoard: gameState.board
         });
+        
+        // FALLBACK: Try to use gameState.validMoves if available
+        if (gameState.validMoves && Array.isArray(gameState.validMoves) && gameState.validMoves.length > 0) {
+            console.warn('[mappers] Using fallback: gameState.validMoves');
+            gameState.validMoves.forEach((move: any) => {
+                if (move.from !== undefined && move.to !== undefined) {
+                    const from: PipIndex | 'bar' = typeof move.from === 'number' 
+                        ? (move.from === -1 ? 'bar' : (move.from + 1) as PipIndex)
+                        : move.from;
+                    const to: PipIndex | 'bar' | 'borne' = typeof move.to === 'number'
+                        ? (move.to === -1 || move.to === 24 ? 'borne' : (move.to + 1) as PipIndex)
+                        : move.to;
+                    legalMoves.push({ from, to });
+                }
+            });
+            console.warn('[mappers] Fallback legalMoves:', legalMoves.length);
+        }
+        
         if (debugStore) {
             try {
                 debugStore.getState().addLog(errorMsg, 'error');
