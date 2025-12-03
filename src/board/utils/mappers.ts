@@ -209,14 +209,6 @@ export const mapGameStateToBoardState = (
     // Calculate Legal Moves dynamically using gameLogic
     const legalMoves: LegalMove[] = [];
     
-    // LOG: Check if validMoves exists in gameState
-    console.error('[mappers] 🔍 CHECKING gameState.validMoves:', {
-        hasValidMoves: !!gameState.validMoves,
-        isArray: Array.isArray(gameState.validMoves),
-        length: gameState.validMoves?.length,
-        sample: gameState.validMoves?.slice(0, 3)
-    });
-    
     // Determine current player color (1 or 2)
     const currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
     
@@ -277,29 +269,75 @@ export const mapGameStateToBoardState = (
         } catch (e) {}
     }
     
-    // FORCE CALCULATION EVEN IF CONDITIONS NOT MET (for debugging)
-    const shouldCalculate = diceValues.length > 0 && pointsArray.length === 24;
-    
-    if (shouldCalculate) {
+    if (diceValues.length > 0 && pointsArray.length === 24) {
         try {
             // Convert to BoardState format for getValidMoves
+            // CRITICAL: Map player IDs to colors (1 or 2)
+            // players[0] is light (1), players[1] is dark (2)
+            const player0Id = players[0]?.id;
+            const player1Id = players[1]?.id;
+            
             const boardStateForLogic: { points: Point[]; bar: { player1: number; player2: number }; off: { player1: number; player2: number } } = {
-                points: pointsArray.map(p => ({
-                    player: (p.player === 1 || p.player === 2) ? p.player : null,
-                    count: p.count || 0
-                })),
+                points: pointsArray.map((p, idx) => {
+                    let mappedPlayer: 1 | 2 | null = null;
+                    
+                    if (p.player !== null && p.player !== undefined) {
+                        // If numeric, use directly
+                        if (typeof p.player === 'number' && (p.player === 1 || p.player === 2)) {
+                            mappedPlayer = p.player;
+                        } else {
+                            // If string ID, map to color
+                            const playerStr = String(p.player);
+                            if (playerStr === player0Id) {
+                                mappedPlayer = 1; // Light
+                            } else if (playerStr === player1Id) {
+                                mappedPlayer = 2; // Dark
+                            }
+                        }
+                    }
+                    
+                    return {
+                        player: mappedPlayer,
+                        count: p.count || 0
+                    };
+                }),
                 bar: {
-                    player1: gameState.bar?.player1 || (gameState.bar && typeof gameState.bar[players[0]?.id || ''] === 'number' ? (gameState.bar[players[0]?.id || ''] as number) : 0),
-                    player2: gameState.bar?.player2 || (gameState.bar && typeof gameState.bar[players[1]?.id || ''] === 'number' ? (gameState.bar[players[1]?.id || ''] as number) : 0)
+                    player1: gameState.bar?.player1 || (gameState.bar && typeof gameState.bar[player0Id || ''] === 'number' ? (gameState.bar[player0Id || ''] as number) : 0),
+                    player2: gameState.bar?.player2 || (gameState.bar && typeof gameState.bar[player1Id || ''] === 'number' ? (gameState.bar[player1Id || ''] as number) : 0)
                 },
                 off: {
-                    player1: gameState.off?.player1 || (gameState.off && typeof gameState.off[players[0]?.id || ''] === 'number' ? (gameState.off[players[0]?.id || ''] as number) : 0),
-                    player2: gameState.off?.player2 || (gameState.off && typeof gameState.off[players[1]?.id || ''] === 'number' ? (gameState.off[players[1]?.id || ''] as number) : 0)
+                    player1: gameState.off?.player1 || (gameState.off && typeof gameState.off[player0Id || ''] === 'number' ? (gameState.off[player0Id || ''] as number) : 0),
+                    player2: gameState.off?.player2 || (gameState.off && typeof gameState.off[player1Id || ''] === 'number' ? (gameState.off[player1Id || ''] as number) : 0)
                 }
             };
             
+            console.error('[mappers] ⚠️⚠️⚠️ BOARD STATE FOR LOGIC ⚠️⚠️⚠️', {
+                pointsWithPlayers: boardStateForLogic.points.filter(p => p.player !== null).slice(0, 5),
+                bar: boardStateForLogic.bar,
+                off: boardStateForLogic.off,
+                currentPlayerColor,
+                player0Id,
+                player1Id
+            });
+            
             // Use getValidMoves to calculate all valid moves
+            console.error('[mappers] ⚠️⚠️⚠️ CALLING getValidMoves ⚠️⚠️⚠️', {
+                boardStateForLogic: {
+                    pointsLength: boardStateForLogic.points.length,
+                    pointsSample: boardStateForLogic.points.slice(0, 3),
+                    bar: boardStateForLogic.bar,
+                    off: boardStateForLogic.off
+                },
+                currentPlayerColor,
+                diceValues
+            });
+            
             const validMovesMap = getValidMoves(boardStateForLogic, currentPlayerColor, diceValues);
+            
+            console.error('[mappers] ⚠️⚠️⚠️ getValidMoves RESULT ⚠️⚠️⚠️', {
+                mapSize: validMovesMap.size,
+                mapEntries: Array.from(validMovesMap.entries()).slice(0, 5)
+            });
             
             // Convert Map to LegalMove array
             validMovesMap.forEach((destinations, fromIndex) => {
@@ -318,8 +356,8 @@ export const mapGameStateToBoardState = (
                 });
             });
             
-            const successMsg = `[mappers] Calculated ${legalMoves.length} legal moves`;
-            console.log(successMsg, legalMoves);
+            const successMsg = `[mappers] ✅ Calculated ${legalMoves.length} legal moves`;
+            console.error('[mappers] ✅✅✅ SUCCESS ✅✅✅', successMsg, legalMoves);
             if (debugStore) {
                 try {
                     debugStore.getState().addLog(successMsg, 'success');
@@ -361,39 +399,8 @@ export const mapGameStateToBoardState = (
             hasBoard: !!gameState.board,
             boardType: typeof gameState.board,
             boardIsArray: Array.isArray(gameState.board),
-            boardHasPoints: gameState.board && typeof gameState.board === 'object' && 'points' in gameState.board,
-            gameStateDice: gameState.dice,
-            gameStateBoard: gameState.board
+            boardHasPoints: gameState.board && typeof gameState.board === 'object' && 'points' in gameState.board
         });
-        
-        // FALLBACK: Try to use gameState.validMoves if available
-        if (gameState.validMoves && Array.isArray(gameState.validMoves) && gameState.validMoves.length > 0) {
-            console.error('[mappers] ✅✅✅ USING FALLBACK: gameState.validMoves ✅✅✅', gameState.validMoves.length, gameState.validMoves.slice(0, 5));
-            gameState.validMoves.forEach((move: any) => {
-                if (move.from !== undefined && move.to !== undefined) {
-                    const from: PipIndex | 'bar' = typeof move.from === 'number' 
-                        ? (move.from === -1 ? 'bar' : (move.from + 1) as PipIndex)
-                        : move.from;
-                    const to: PipIndex | 'bar' | 'borne' = typeof move.to === 'number'
-                        ? (move.to === -1 || move.to === 24 ? 'borne' : (move.to + 1) as PipIndex)
-                        : move.to;
-                    legalMoves.push({ from, to });
-                }
-            });
-            console.error('[mappers] ✅✅✅ FALLBACK legalMoves CREATED: ✅✅✅', legalMoves.length, legalMoves.slice(0, 5));
-            if (debugStore) {
-                try {
-                    debugStore.getState().addLog(`[mappers] ✅ Fallback: ${legalMoves.length} legal moves from validMoves`, 'success');
-                } catch (e) {}
-            }
-        } else {
-            console.error('[mappers] ❌❌❌ NO VALIDMOVES FALLBACK AVAILABLE ❌❌❌', {
-                hasValidMoves: !!gameState.validMoves,
-                isArray: Array.isArray(gameState.validMoves),
-                length: gameState.validMoves?.length
-            });
-        }
-        
         if (debugStore) {
             try {
                 debugStore.getState().addLog(errorMsg, 'error');

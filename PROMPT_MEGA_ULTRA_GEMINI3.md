@@ -827,7 +827,7 @@ useEffect(() => {
 **MODIFIER** pour utiliser le vrai username :
 ```typescript
 // CRITIQUE : Utiliser le vrai username de user, pas 'Invité'
-const soloPlayers = user 
+const soloPlayers = user    
     ? [
         { 
             id: user.id, 

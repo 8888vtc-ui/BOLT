@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState, Player } from '../stores/gameStore';
-import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore, getValidMoves } from '../lib/gameLogic';
+import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
 import { analyzeMove } from '../lib/aiService';
@@ -648,29 +648,6 @@ export const useGameSocket = () => {
             const dice2 = Math.floor(Math.random() * 6) + 1;
             newState.dice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
             addLog(`Dice rolled: ${newState.dice.join(', ')}`, 'success');
-            
-            // Calculate valid moves after rolling dice
-            try {
-                const currentPlayerColor = newState.currentPlayer || 1;
-                const diceValues = newState.dice.length === 4 
-                    ? [newState.dice[0], newState.dice[1]] 
-                    : newState.dice;
-                
-                const validMovesMap = getValidMoves(newState.board, currentPlayerColor, diceValues);
-                const validMoves: any[] = [];
-                validMovesMap.forEach((destinations, fromIndex) => {
-                    destinations.forEach((toIndex) => {
-                        validMoves.push({ from: fromIndex, to: toIndex });
-                    });
-                });
-                newState.validMoves = validMoves;
-                addLog(`✅ Calculated ${validMoves.length} valid moves`, 'success');
-                console.log('[useGameSocket] Valid moves calculated:', validMoves.length, validMoves.slice(0, 5));
-            } catch (error) {
-                console.error('[useGameSocket] Error calculating validMoves:', error);
-                addLog(`❌ Error calculating validMoves: ${error}`, 'error');
-                newState.validMoves = [];
-            }
         } else if (action === 'move') {
             const { from, to, die } = payload; // Récupérer le die si fourni par l'API
 
