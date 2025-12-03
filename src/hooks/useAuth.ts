@@ -15,9 +15,10 @@ export function useAuth() {
 
   useEffect(() => {
     let isMounted = true;
-    const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+    // FORCER MODE RÉEL - Toujours essayer Supabase
+    const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    // Si mode démo, ne pas essayer Supabase
+    // Si mode démo, ne pas essayer Supabase (DÉSACTIVÉ)
     if (DEMO_MODE) {
       console.log('Demo mode: Supabase not configured, skipping auth');
       setLoading(false);
@@ -181,7 +182,7 @@ export function useAuth() {
         role: 'guest'
       });
       setLoading(false);
-      return;
+      return { error: null };
     }
 
     // Sign in anonymously
@@ -190,7 +191,16 @@ export function useAuth() {
 
       if (error) {
         console.error('Guest login error:', error);
-        return;
+        // Retourner l'erreur pour affichage à l'utilisateur
+        if (error.code === 'anonymous_provider_disabled') {
+          return { 
+            error: {
+              message: 'Les connexions anonymes sont désactivées. Veuillez activer "Anonymous sign-ins" dans les paramètres Supabase.',
+              code: 'anonymous_provider_disabled'
+            }
+          };
+        }
+        return { error };
       }
 
       if (data?.user) {
@@ -202,8 +212,11 @@ export function useAuth() {
           data: { username: guestName, avatar_url: avatar }
         });
       }
-    } catch (error) {
+      
+      return { error: null };
+    } catch (error: any) {
       console.error('Guest login catch error:', error);
+      return { error: error || { message: 'Erreur lors de la connexion en tant qu\'invité' } };
     }
   };
 

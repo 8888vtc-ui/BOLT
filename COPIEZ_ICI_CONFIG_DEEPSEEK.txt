@@ -1,0 +1,66 @@
+CONFIGURATION DEEPSEEK API NETLIFY
+
+Clé API: sk-56ff5e77bb064dad93cbadb750fd2c3
+
+📋 CONFIGURATION NETLIFY
+
+Backend (botgammon):
+https://app.netlify.com/sites/botgammon/configuration/env
+
+Variables à ajouter:
+OLLAMA_URL=https://bot-production-b9d6.up.railway.app
+OLLAMA_MODEL=deepseek-coder:latest
+DEEPSEEK_API_KEY=sk-56ff5e77bb064dad93cbadb750fd2c3
+
+Frontend (gurugammon-react):
+https://app.netlify.com/sites/gurugammon-react/configuration/env
+
+Variable à ajouter:
+VITE_COACH_API_URL=https://botgammon.netlify.app/.netlify/functions/coach
+
+🔄 REDÉPLOIEMENT
+
+Backend:
+- Variables configurées → Redéploiement automatique
+- Ou manuel: https://app.netlify.com/sites/botgammon/deploys
+
+Frontend:
+- Variable configurée → Redéploiement automatique
+- Ou manuel: https://app.netlify.com/sites/gurugammon-react/deploys
+
+🧪 TEST
+
+Test fonction:
+curl -X POST https://botgammon.netlify.app/.netlify/functions/coach \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Comment jouer un double 1?", "contextType": "rules"}'
+
+Test frontend:
+1. Ouvrir jeu
+2. Chat → Poser question
+3. Vérifier console: "[AI Coach] Using Netlify Function (recommended)"
+
+✅ CHECKLIST
+
+Configuration:
+- [ ] Variables backend configurées
+- [ ] Variable frontend configurée
+- [ ] DEEPSEEK_API_KEY marquée "Sensitive"
+
+Déploiement:
+- [ ] coach.ts commitée et pushée
+- [ ] Netlify backend redéployé
+- [ ] Netlify frontend redéployé
+
+Test:
+- [ ] Test fonction réussi
+- [ ] Test frontend réussi
+- [ ] Coach répond aux questions
+
+🎯 RÉSULTAT ATTENDU
+
+✅ Coach fonctionne via Netlify Function
+✅ DeepSeek API fallback si Ollama échoue
+✅ Réponses en français automatiquement
+✅ Pas de problème CORS
+

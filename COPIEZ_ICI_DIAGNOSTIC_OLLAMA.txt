@@ -1,0 +1,79 @@
+DIAGNOSTIC SERVEUR OLLAMA - Problème Identifié
+
+🔴 PROBLÈME: Mémoire Insuffisante (OOM)
+
+Erreur dans les logs:
+"llama runner process has terminated: signal: killed"
+
+Le processus Ollama est tué par le système → OOM Killer (Out of Memory).
+
+📊 ANALYSE
+
+Mémoire requise:
+- Poids modèle: 703.4 MiB
+- Cache KV: 768.0 MiB
+- Total: 1.4 GiB (~1433 MB)
+
+Mémoire disponible Railway:
+- RAM totale: 953.7 MiB (~954 MB)
+- RAM libre: 909.7 MiB (~910 MB)
+
+❌ Le modèle nécessite 1.4 GB mais Railway n'a que ~950 MB
+
+✅ SOLUTIONS
+
+Solution 1: Augmenter Ressources Railway (RECOMMANDÉ)
+- Railway Dashboard → Service Ollama → Settings → Resources
+- Passer à plan payant avec 2GB+ RAM
+- Coût: ~$5-10/mois
+
+Solution 2: Modèle Plus Léger
+- Changer OLLAMA_MODEL=phi:2.7b (plus petit)
+- Moins de capacités mais fonctionne
+
+Solution 3: Réduire Cache KV
+- OLLAMA_NUM_CTX=2048 (réduire contexte)
+- Moins performant
+
+Solution 4: DeepSeek API (MEILLEURE SOLUTION)
+- Obtenir clé sur https://platform.deepseek.com
+- Ajouter VITE_DEEPSEEK_API_KEY dans .env
+- Fonctionne immédiatement, coût très faible
+- Le code utilise automatiquement DeepSeek si Ollama échoue
+
+🎯 RECOMMANDATION
+
+Solution immédiate: DeepSeek API
+- Configuration rapide (5 min)
+- Fonctionne immédiatement
+- Coût: ~$0.14 pour 1M tokens
+- Pas de problème mémoire
+
+Solution long terme: Augmenter Railway
+- Si vous voulez garder Ollama local
+- Nécessite plan payant
+
+📋 ACTIONS IMMÉDIATES
+
+Option A: DeepSeek API (Recommandé)
+1. https://platform.deepseek.com
+2. Créer compte (gratuit)
+3. Générer clé API
+4. Ajouter dans .env: VITE_DEEPSEEK_API_KEY=sk-votre_cle
+5. Redémarrer serveur dev
+6. Tester coach
+
+Option B: Augmenter Railway
+1. Railway Dashboard → Service Ollama → Settings → Resources
+2. Passer à plan 2GB+ RAM
+3. Redémarrer service
+4. Tester API
+
+✅ VÉRIFICATION
+
+Après correction:
+- /api/generate retourne Status 200
+- /api/chat retourne Status 200
+- Coach répond aux questions
+- Pas d'erreur "signal: killed" dans logs
+

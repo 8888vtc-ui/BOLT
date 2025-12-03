@@ -1,0 +1,54 @@
+Salut Opus — bug critique : bot ne joue pas automatiquement
+
+🐞 Problème
+Après que le joueur termine son tour, le tour passe au bot, mais le bot ne joue pas automatiquement. Le jeu reste bloqué.
+
+Comportement attendu
+- Bot lance les dés automatiquement quand c'est son tour
+- Bot joue ses mouvements automatiquement
+- Bot passe le tour au joueur quand terminé
+
+Comportement actuel
+- Tour change correctement (guest → bot)
+- Bouton "Roll the dice" apparaît
+- MAIS bot ne lance pas les dés
+- AUCUN log du bot dans la console
+
+🔎 Cause probable
+Fichier: src/hooks/useGameSocket.ts ligne ~1003
+
+Le useEffect qui gère le bot ne se déclenche pas quand gameState.turn change, ou isBotTurn est false.
+
+Logs attendus mais absents:
+- 🤖 Bot: Checking turn...
+- 🤖 Bot: Found X move(s)
+- 🤖 Bot: Playing move...
+
+✅ Correctif attendu
+1. Vérifier que le useEffect a gameState.turn dans ses dépendances
+2. Ajouter des logs de debug pour diagnostiquer
+3. Vérifier que isBotTurn est true quand gameState.turn === 'bot'
+4. Tester que le bot joue automatiquement
+
+🧪 Tests effectués
+- ✅ Tour change correctement
+- ✅ Bouton "Roll the dice" apparaît
+- ❌ Bot ne lance pas les dés
+- ❌ Aucun log du bot
+- ❌ Jeu bloqué sur tour du bot
+
+📊 Logs capturés
+[16:17:48] 🔄 [MOVE] Tour alterné: guest → bot
+[16:17:48] Updating local game state...
+[16:17:48] Local game state updated
+
+(Logs du bot absents)
+
+🎯 Actions attendues
+1. Corriger le useEffect du bot pour qu'il se déclenche quand le tour change
+2. Ajouter logs de debug
+3. Tester que le bot joue automatiquement
+4. Commit et push avec message clair
+
+⚠️ Impact: Critique — Le jeu est bloqué en mode offline-bot
+

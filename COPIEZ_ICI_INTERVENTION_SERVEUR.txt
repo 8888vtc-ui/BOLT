@@ -1,0 +1,108 @@
+Salut — guide d'intervention serveur Ollama Railway
+
+Résumé
+Le serveur Ollama sur Railway retourne une erreur 500. Voici les étapes pour diagnostiquer et corriger le problème.
+
+🎯 Actions Immédiates
+
+1. Accéder à Railway Dashboard
+   - Aller sur https://railway.app
+   - Se connecter
+   - Trouver le projet avec le service Ollama
+   - URL actuelle: https://bot-production-b9d6.up.railway.app
+
+2. Consulter les Logs (PRIORITÉ 1)
+   - Ouvrir le service Ollama
+   - Aller dans l'onglet "Logs"
+   - Chercher les erreurs récentes:
+     * Error 500
+     * Out of memory (OOM)
+     * Model not found
+     * Failed to load model
+     * Timeout
+
+3. Redémarrer le Serveur (Solution Rapide)
+   - Dans Railway Dashboard
+   - Service Ollama → Settings → Restart
+   - Attendre 1-2 minutes
+   - Tester à nouveau
+
+4. Vérifier les Variables d'Environnement
+   - Service Ollama → Variables
+   - Vérifier: OLLAMA_MODEL=deepseek-coder:latest
+   - Si manquant, l'ajouter
+
+5. Vérifier les Ressources
+   - Service Ollama → Settings → Resources
+   - RAM disponible: Le modèle deepseek-coder nécessite ~2-4GB
+   - Plan gratuit Railway = 512MB (insuffisant!)
+
+🔧 Solutions Selon le Problème
+
+Problème: Mémoire Insuffisante (OOM)
+Solutions:
+1. Augmenter les ressources Railway (plan payant)
+2. Utiliser un modèle plus léger (mistral:7b, llama2:7b)
+3. Modifier VITE_OLLAMA_MODEL dans .env
+
+Problème: Modèle Non Chargé
+Solutions:
+1. Vérifier: ollama list (via Railway CLI ou terminal)
+2. Télécharger: ollama pull deepseek-coder:latest
+3. Vérifier variable OLLAMA_MODEL
+
+Problème: Timeout
+Solutions:
+1. Réduire num_predict dans les options
+2. Utiliser un modèle plus rapide
+
+🚀 Solution Alternative: DeepSeek API (Recommandé)
+
+Si Ollama continue à poser problème:
+
+1. Obtenir une clé API DeepSeek
+   - https://platform.deepseek.com
+   - Créer compte (gratuit)
+   - Générer clé API
+
+2. Configurer dans le projet
+   - Créer/modifier .env à la racine
+   - Ajouter: VITE_DEEPSEEK_API_KEY=sk-votre_cle
+   - Redémarrer le serveur dev
+
+3. Test
+   - Le coach utilisera automatiquement DeepSeek API
+   - Fonctionne immédiatement
+   - Coût: ~$0.14 pour 1M tokens
+
+📋 Checklist
+
+Diagnostic:
+- [ ] Consulter logs Railway
+- [ ] Identifier type d'erreur
+- [ ] Vérifier variables d'environnement
+- [ ] Vérifier ressources (RAM)
+
+Actions:
+- [ ] Redémarrer serveur Ollama
+- [ ] Vérifier modèle chargé
+- [ ] Augmenter ressources si nécessaire
+- [ ] Tester API après corrections
+
+Alternative:
+- [ ] Configurer DeepSeek API fallback
+- [ ] Tester coach avec DeepSeek API
+
+✅ Résultat Attendu
+
+Après intervention:
+- ✅ /api/generate retourne Status 200
+- ✅ /api/chat retourne Status 200
+- ✅ Coach répond aux questions
+- ✅ Réponses en français
+
+📄 Fichiers créés:
+- GUIDE_INTERVENTION_SERVEUR_OLLAMA.md (guide détaillé)
+- INTERVENTION_SERVEUR_RAILWAY.md (guide Railway)
+- COPIEZ_ICI_INTERVENTION_SERVEUR.txt (ce fichier)
+

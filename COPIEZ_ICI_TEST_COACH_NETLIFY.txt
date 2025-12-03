@@ -1,0 +1,78 @@
+RAPPORT TEST COACH AI - NETLIFY FUNCTION
+
+📊 RÉSULTATS
+
+Test 1: Netlify Function
+❌ Erreur 404 - Fonction non déployée
+URL: https://botgammon.netlify.app/.netlify/functions/coach
+
+Test 2: Ollama Direct
+❌ Erreur 500 - Problème mémoire (OOM)
+URL: https://bot-production-b9d6.up.railway.app
+
+🔍 PROBLÈMES IDENTIFIÉS
+
+1. Fonction Netlify non déployée
+   - coach.ts existe dans le code
+   - Pas encore déployée sur Netlify
+   - Erreur 404
+
+2. Ollama Railway - Mémoire insuffisante
+   - Nécessite 1.4 GB RAM
+   - Railway a ~950 MB
+   - Processus tué par OOM Killer
+
+✅ ACTIONS REQUISES
+
+1. Déployer Fonction Netlify
+   cd D:\BOLT\gurugammon-gnubg-api
+   git add netlify/functions/coach.ts
+   git commit -m "Add Netlify Function for AI Coach"
+   git push
+
+2. Configurer Variables Netlify
+
+Backend (botgammon):
+https://app.netlify.com/sites/botgammon/configuration/env
+
+OLLAMA_URL=https://bot-production-b9d6.up.railway.app
+OLLAMA_MODEL=deepseek-coder:latest
+DEEPSEEK_API_KEY=sk-votre_cle (optionnel)
+
+Frontend (gurugammon-react):
+https://app.netlify.com/sites/gurugammon-react/configuration/env
+
+VITE_COACH_API_URL=https://botgammon.netlify.app/.netlify/functions/coach
+
+3. Solution Alternative: DeepSeek API
+   - Obtenir clé: https://platform.deepseek.com
+   - Configurer DEEPSEEK_API_KEY dans Netlify
+   - Fallback automatique si Ollama échoue
+
+📋 CHECKLIST
+
+Déploiement:
+- [ ] coach.ts commitée et pushée
+- [ ] Netlify redéployé
+- [ ] Fonction visible dans Netlify Functions
+
+Configuration:
+- [ ] Variables backend configurées
+- [ ] Variable frontend configurée
+- [ ] DEEPSEEK_API_KEY configurée (optionnel)
+
+Test:
+- [ ] Test Netlify Function réussi
+- [ ] Test frontend réussi
+- [ ] Coach répond aux questions
+
+🔄 RETEST
+
+Après déploiement:
+node test-coach-netlify.js
+
+Résultats attendus:
+✅ Netlify Function: 200 OK
+✅ Réponse coach reçue
+✅ Temps < 30 secondes
+

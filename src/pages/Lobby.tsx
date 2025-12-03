@@ -159,7 +159,8 @@ const Lobby = () => {
                                             }
                                             
                                             // Vérifier si Supabase est configuré
-                                            const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+                                            // FORCER MODE RÉEL
+                                            const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
                                             
                                             if (DEMO_MODE) {
                                                 // Mode démo : utiliser offline-bot

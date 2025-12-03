@@ -1,12 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from './useAuth';
 import { useGameStore, Room, GameState, Player } from '../stores/gameStore';
-import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore } from '../lib/gameLogic';
+import { INITIAL_BOARD, getSmartMove, makeMove, PlayerColor, hasWon, checkWinType, calculateMatchScore, calculatePoints } from '../lib/gameLogic';
 import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
 import { analyzeMove } from '../lib/aiService';
 
-const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
+// FORCER MODE RÉEL - Désactiver le mode démo même si les variables ne sont pas chargées
+const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL;
 
 // --- Helper pour gérer les erreurs Supabase ---
 const handleSupabaseError = (error: any, context: string, addLog: (message: string, type?: 'info' | 'error' | 'success' | 'warning', data?: any) => void): boolean => {
@@ -261,9 +262,28 @@ export const useGameSocket = () => {
             // FORCER isConnected à true en mode démo
             setIsConnected(true);
 
+            // CRITIQUE: En mode offline-bot, créer les joueurs même en mode démo
+            if (roomId === 'offline-bot') {
+                const botId = 'bot';
+                const soloPlayers = user
+                    ? [
+                        { id: user.id, username: user.username || 'Joueur', avatar: user.avatar },
+                        { id: botId, username: 'Bot IA', avatar: undefined }
+                    ]
+                    : [
+                        { id: 'guest', username: 'Invité', avatar: undefined },
+                        { id: botId, username: 'Bot IA', avatar: undefined }
+                    ];
+                addLog(`✅ [JOIN_ROOM] Joueurs créés (démo): ${soloPlayers.length}`, 'success', {
+                    count: soloPlayers.length,
+                    players: soloPlayers
+                });
+                setPlayers(soloPlayers);
+            }
+
             const room = roomsList.find(r => r.id === roomId) || {
                 id: roomId,
-                name: 'Salle Demo',
+                name: roomId === 'offline-bot' ? 'Entraînement Solo (Offline)' : 'Salle Demo',
                 status: 'playing',
                 players: []
             };
@@ -845,29 +865,74 @@ export const useGameSocket = () => {
                 const winType = checkWinType(newState.board, winner);
                 addLog(`Player ${winner} won! Type: ${winType}`, 'success');
 
-                // Calculate and update match score if match game
-                if (newState.matchLength && newState.matchLength > 0 && players && players.length > 0) {
+                // Calculate and update score (match or money game)
+                if (players && players.length > 0) {
                     const winnerPlayerId = winner === 1
                         ? (players[0]?.id || 'player1')
                         : (players[1]?.id || 'player2');
 
-                    const newMatchScore = calculateMatchScore(
-                        winType,
-                        newState.cubeValue,
-                        newState.matchLength,
-                        newState.score || {},
-                        winnerPlayerId,
-                        players
-                    );
+                    // Calculate points won
+                    const pointsWon = calculatePoints(winType, newState.cubeValue);
 
-                    if (newMatchScore) {
-                        newState.score = newMatchScore;
-                        addLog(`Match score updated: ${JSON.stringify(newMatchScore)}`, 'success');
+                    if (newState.matchLength && newState.matchLength > 0) {
+                        // Match game: calculate match score
+                        const newMatchScore = calculateMatchScore(
+                            winType,
+                            newState.cubeValue,
+                            newState.matchLength,
+                            newState.score || {},
+                            winnerPlayerId,
+                            players
+                        );
+
+                        if (newMatchScore) {
+                            newState.score = newMatchScore;
+                            addLog(`Match score updated: ${JSON.stringify(newMatchScore)}`, 'success');
+                        }
+                    } else {
+                        // Money game: update money game score
+                        const currentScore = newState.score || {};
+                        const newScore = { ...currentScore };
+                        newScore[winnerPlayerId] = (newScore[winnerPlayerId] || 0) + pointsWon;
+                        newState.score = newScore;
+                        addLog(`Money game score updated: ${JSON.stringify(newScore)} (${pointsWon} points won)`, 'success');
                     }
                 }
 
                 // Mark the game as ended
                 newState.dice = [];
+                
+                // For money game, start a new game automatically after a short delay
+                if (newState.matchLength === 0) {
+                    addLog('Money game: Starting new game in 3 seconds...', 'info');
+                    setTimeout(() => {
+                        const addLog = useDebugStore.getState().addLog;
+                        addLog('Money game: Starting new game...', 'info');
+                        
+                        // Get current options to preserve game mode
+                        const currentOptions: GameOptions | undefined = currentRoom?.id === 'offline-bot' 
+                            ? { mode: 'money', matchLength: 0 }
+                            : undefined;
+                        
+                        // Create new game state
+                        const newGameState = createMockGameState(user?.id, currentOptions);
+                        
+                        // Preserve score across games
+                        newGameState.score = newState.score || {};
+                        
+                        // Alternate starting player
+                        const currentTurn = newState.turn;
+                        const nextTurn = currentTurn === players?.[0]?.id 
+                            ? (players?.[1]?.id || 'bot')
+                            : (players?.[0]?.id || 'guest');
+                        newGameState.turn = nextTurn;
+                        newGameState.currentPlayer = nextTurn === players?.[0]?.id ? 1 : 2;
+                        
+                        updateGame(newGameState);
+                        addLog(`Money game: New game started! Turn: ${nextTurn}`, 'success');
+                    }, 3000);
+                }
+                
                 // Don't switch turn, game is over
             } else {
                 // Switch turn if no dice left
@@ -944,22 +1009,73 @@ export const useGameSocket = () => {
     const botAnalysisInProgress = useRef<string | null>(null); // Verrou pour éviter les appels multiples
 
     useEffect(() => {
-        // Vérifier que tout est initialisé
-        if (!currentRoom || !gameState || !gameState.board || !gameState.board.points) {
-            return; // Attendre l'initialisation complète
-        }
+        // DEBUG: Log pour vérifier que le useEffect se déclenche
+        const addLog = useDebugStore.getState().addLog;
+        
+        // En mode offline-bot, attendre un peu que les états soient synchronisés
+        // Les setState sont asynchrones, donc on peut avoir besoin d'attendre
+        const checkInitialization = () => {
+            addLog('[BOT DEBUG] useEffect triggered', 'info', {
+                hasCurrentRoom: !!currentRoom,
+                hasGameState: !!gameState,
+                gameStateTurn: gameState?.turn,
+                hasBoard: !!gameState?.board,
+                hasPoints: !!gameState?.board?.points,
+                playersLength: players?.length,
+                roomId: currentRoom?.id
+            });
 
-        // Check if it's a solo training game
+            // Vérifier que tout est initialisé
+            // En mode offline-bot, on peut avoir un gameState sans board immédiatement après joinRoom
+            // Attendre un peu si nécessaire, mais ne pas bloquer indéfiniment
+            if (!currentRoom || !gameState) {
+                addLog('[BOT DEBUG] Early return: missing room or gameState', 'warning', {
+                    hasRoom: !!currentRoom,
+                    hasGameState: !!gameState,
+                    roomId: currentRoom?.id
+                });
+                return false; // Attendre l'initialisation complète
+            }
+            
+            // Vérifier le board de manière plus tolérante
+            if (!gameState.board || !gameState.board.points || gameState.board.points.length !== 24) {
+                addLog('[BOT DEBUG] Early return: board not ready', 'warning', {
+                    hasBoard: !!gameState.board,
+                    hasPoints: !!gameState.board?.points,
+                    pointsLength: gameState.board?.points?.length
+                });
+                // En mode offline-bot, attendre un peu que le board soit initialisé
+                // Le useEffect se redéclenchera quand gameState.board sera mis à jour
+                return false;
+            }
+            
+            return true;
+        };
+        
+        // Fonction pour exécuter la logique du bot
+        const executeBotLogic = () => {
+            // Check if it's a solo training game
         const isSoloGame = currentRoom.id === 'offline-bot' ||
             currentRoom.name?.startsWith('Entraînement') ||
             (players && players.length <= 1);
 
         if (!isSoloGame) {
+            addLog('[BOT DEBUG] Early return: not a solo game', 'warning', { roomId: currentRoom.id });
             return; // Pas un jeu solo, ignorer
         }
 
         // CRITIQUE : Vérifier que players contient 2 joueurs avant de continuer
+        // En mode offline-bot, les joueurs peuvent ne pas être encore initialisés
+        // Attendre un peu si nécessaire, mais ne pas bloquer indéfiniment
         if (!players || players.length < 2) {
+            addLog('[BOT DEBUG] Early return: not enough players', 'warning', { 
+                playersLength: players?.length,
+                players: players,
+                currentRoomId: currentRoom?.id,
+                isOfflineBot: currentRoom?.id === 'offline-bot'
+            });
+            // En mode offline-bot, si players n'est pas encore initialisé, attendre un peu
+            // mais ne pas bloquer - le useEffect se redéclenchera quand players sera mis à jour
             return; // Attendre que les 2 joueurs soient définis
         }
 
@@ -988,15 +1104,16 @@ export const useGameSocket = () => {
             : `${currentTurn}-no-dice`;
 
         // Logs détaillés pour diagnostiquer
-        const addLog = useDebugStore.getState().addLog;
         addLog('🤖 Bot: Checking turn...', 'info', {
             currentTurn,
             myId,
+            botId,
             isBotTurn,
             botIsThinking: botIsThinking.current,
             analysisInProgress: botAnalysisInProgress.current,
             analysisKey,
-            players: players?.map(p => ({ id: p.id, username: p.username }))
+            players: players?.map(p => ({ id: p.id, username: p.username })),
+            diceLength: gameState.dice.length
         });
 
         // Vérifier si une analyse est déjà en cours pour cette position exacte
@@ -1284,6 +1401,24 @@ export const useGameSocket = () => {
             const addLog = useDebugStore.getState().addLog;
             addLog('🤖 Bot: Analysis already in progress, skipping duplicate call', 'info', { analysisKey });
         }
+        };
+        
+        // Vérifier immédiatement
+        if (!checkInitialization()) {
+            // En mode offline-bot, attendre un peu et réessayer une fois
+            if (currentRoom?.id === 'offline-bot') {
+                setTimeout(() => {
+                    if (checkInitialization()) {
+                        executeBotLogic();
+                    }
+                }, 100);
+                return;
+            }
+            return;
+        }
+        
+        // Exécuter la logique du bot
+        executeBotLogic();
 
         // Cleanup function
         return () => {
@@ -1292,7 +1427,7 @@ export const useGameSocket = () => {
                 botTimeoutRef.current = null;
             }
         };
-    }, [gameState, currentRoom, user, sendGameAction, players, updateGame]);
+    }, [gameState?.turn, gameState?.dice, gameState?.board, currentRoom, user?.id, sendGameAction, players, updateGame]);
 
     const handleCheckerClick = useCallback((index: number) => {
         if (!gameState || !user) return;

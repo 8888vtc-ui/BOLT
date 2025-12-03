@@ -350,7 +350,8 @@ const GameRoom = () => {
 
     // Vérifier si on est en mode offline-bot (ne nécessite pas de connexion)
     const isOfflineMode = currentRoom?.id === 'offline-bot' || roomId === 'offline-bot';
-    const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
+    // FORCER MODE RÉEL - Désactiver le mode démo
+    const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     // === HOOKS QUI DOIVENT ÊTRE AVANT LES RETURNS CONDITIONNELS ===
     // Extract game state values safely (with defaults for when gameState is null)
@@ -367,12 +368,14 @@ const GameRoom = () => {
         if (!gameState) return false;
 
         // Check if we're in demo/offline mode
-        const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
+        // FORCER MODE RÉEL - Seulement offline-bot reste en mode offline
+        const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL;
         const isOfflineOrDemo = DEMO_MODE ||
-            currentRoom?.id === 'offline-bot' ||
-            currentRoom?.id?.toLowerCase().includes('demo') ||
-            currentRoom?.name?.toLowerCase().includes('demo') ||
-            !user; // No user = demo mode
+            (currentRoom?.id === 'offline-bot') || // Seulement offline-bot reste offline
+            false; // Désactiver les autres conditions de démo
+            // currentRoom?.id?.toLowerCase().includes('demo') ||
+            // currentRoom?.name?.toLowerCase().includes('demo') ||
+            // !user; // No user = demo mode - DÉSACTIVÉ
 
         // In demo/offline mode, the human player is always the one who should be able to play
         if (isOfflineOrDemo) {

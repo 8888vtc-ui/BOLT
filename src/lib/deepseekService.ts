@@ -1,20 +1,26 @@
 /**
- * DeepSeek Coach Service - Utilise Ollama (GRATUIT) en priorité
- * Fallback vers DeepSeek API si Ollama non disponible
+ * DeepSeek Coach Service - Utilise Netlify Function (RECOMMANDÉ)
+ * Fallback vers appel direct Ollama si Netlify Function non disponible
  * 
- * Configuration Ollama (GRATUIT):
- * - OLLAMA_URL: URL du serveur Ollama (Railway/Render)
- * - OLLAMA_MODEL: Modèle à utiliser (deepseek-coder par défaut)
+ * Configuration Netlify Function (RECOMMANDÉ):
+ * - VITE_COACH_API_URL: URL de la fonction Netlify coach (ex: https://botgammon.netlify.app/.netlify/functions/coach)
+ * 
+ * Configuration Ollama Directe (Fallback):
+ * - VITE_OLLAMA_URL: URL du serveur Ollama (Railway/Render) - seulement si Netlify Function non disponible
+ * - VITE_OLLAMA_MODEL: Modèle à utiliser (deepseek-coder par défaut)
  * 
  * Configuration DeepSeek API (Payant - Fallback):
  * - VITE_DEEPSEEK_API_KEY: Clé API DeepSeek (seulement si Ollama non disponible)
  */
 
-// Configuration Ollama (GRATUIT - Priorité 1)
-const OLLAMA_URL = import.meta.env.VITE_OLLAMA_URL || 'https://bot-production-b9d6.up.railway.app';
-const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'deepseek-coder';
+// Configuration Netlify Function (RECOMMANDÉ - Priorité 1)
+const COACH_API_URL = import.meta.env.VITE_COACH_API_URL || 'https://botgammon.netlify.app/.netlify/functions/coach';
 
-// Configuration DeepSeek API (Payant - Fallback)
+// Configuration Ollama Directe (Fallback - Priorité 2)
+const OLLAMA_URL = import.meta.env.VITE_OLLAMA_URL || 'https://bot-production-b9d6.up.railway.app';
+const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'deepseek-coder:latest';
+
+// Configuration DeepSeek API (Payant - Fallback - Priorité 3)
 const DEEPSEEK_API_URL = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
 
@@ -38,9 +44,11 @@ async function isOllamaAvailable(): Promise<boolean> {
             method: 'GET',
             signal: AbortSignal.timeout(5000) // Timeout 5s
         });
-        return response.ok;
+        const isAvailable = response.ok;
+        console.log(`[Ollama] Availability check: ${isAvailable ? 'Available' : 'Not available'}`);
+        return isAvailable;
     } catch (error) {
-        console.warn('[Ollama] Not available, using fallback');
+        console.warn('[Ollama] Not available, using fallback', error);
         return false;
     }
 }
@@ -142,31 +150,103 @@ async function askOllamaCoach(
     userMessage: string
 ): Promise<string> {
     try {
+        // Essayer d'abord avec /api/chat (format recommandé pour les modèles de chat)
+        const chatPayload = {
+            model: OLLAMA_MODEL,
+            messages: [
+                {
+                    role: 'system',
+                    content: systemPrompt
+                },
+                {
+                    role: 'user',
+                    content: userMessage
+                }
+            ],
+            stream: false,
+            options: {
+                temperature: 0.7,
+                num_predict: 500,
+                top_p: 0.9,
+                top_k: 40
+            }
+        };
+
+        console.log('[Ollama] Trying /api/chat endpoint...', { model: OLLAMA_MODEL });
+
+        try {
+            const chatResponse = await fetch(`${OLLAMA_URL}/api/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(chatPayload),
+                signal: AbortSignal.timeout(30000)
+            });
+
+            if (chatResponse.ok) {
+                const chatData = await chatResponse.json();
+                const answer = chatData.message?.content || chatData.response || 'No response from AI coach.';
+                console.log('[Ollama] Success with /api/chat');
+                return answer.trim();
+            }
+        } catch (chatError) {
+            console.log('[Ollama] /api/chat failed, trying /api/generate...', chatError);
+        }
+
+        // Fallback vers /api/generate avec format simplifié
+        const generatePayload = {
+            model: OLLAMA_MODEL,
+            prompt: `${systemPrompt}\n\n${userMessage}`,
+            stream: false,
+            options: {
+                temperature: 0.7,
+                num_predict: 500
+            }
+        };
+
+        console.log('[Ollama] Trying /api/generate endpoint...');
+
         const response = await fetch(`${OLLAMA_URL}/api/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                model: OLLAMA_MODEL,
-                prompt: `${systemPrompt}\n\n${userMessage}`,
-                stream: false,
-                options: {
-                    temperature: 0.7,
-                    num_predict: 500,
-                    top_p: 0.9,
-                    top_k: 40
-                }
-            }),
-            signal: AbortSignal.timeout(30000) // Timeout 30s
+            body: JSON.stringify(generatePayload),
+            signal: AbortSignal.timeout(30000)
         });
 
         if (!response.ok) {
-            throw new Error(`Ollama API error: ${response.status}`);
+            const errorText = await response.text().catch(() => 'No error details');
+            console.error('[Ollama] Error response:', response.status, errorText);
+            
+            // Dernier essai avec format minimal
+            console.log('[Ollama] Trying minimal format...');
+            const minimalPayload = {
+                model: OLLAMA_MODEL,
+                prompt: userMessage,
+                stream: false
+            };
+            
+            const retryResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(minimalPayload),
+                signal: AbortSignal.timeout(30000)
+            });
+            
+            if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+                return (retryData.response || retryData.text || 'No response from AI coach.').trim();
+            }
+            
+            throw new Error(`Ollama API error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
-        const answer = data.response || 'No response from AI coach.';
+        const answer = data.response || data.text || 'No response from AI coach.';
         
         return answer.trim();
     } catch (error: any) {
@@ -228,8 +308,45 @@ async function askDeepSeekAPICoach(
 }
 
 /**
+ * Ask coach via Netlify Function (RECOMMANDÉ)
+ */
+async function askNetlifyCoach(
+    question: string,
+    gameContext?: GameContext,
+    contextType: ContextType = 'game'
+): Promise<string> {
+    try {
+        const response = await fetch(COACH_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                question,
+                gameContext,
+                contextType
+            }),
+            signal: AbortSignal.timeout(30000)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Netlify Coach API error: ${response.status} - ${errorData.message || errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.answer || data.message || 'No response from AI coach.';
+    } catch (error: any) {
+        console.error('[AI Coach] Netlify Function error:', error);
+        throw error;
+    }
+}
+
+/**
  * Ask DeepSeek coach a question
- * Utilise Ollama (GRATUIT) en priorité, fallback vers DeepSeek API
+ * PRIORITÉ 1 : Netlify Function (appelle Ollama depuis le serveur)
+ * PRIORITÉ 2 : Ollama Direct (fallback si Netlify Function non disponible)
+ * PRIORITÉ 3 : DeepSeek API (fallback si Ollama non disponible)
  */
 export async function askDeepSeekCoach(
     question: string,
@@ -251,30 +368,47 @@ export async function askDeepSeekCoach(
         userMessage = `${contextInfo}\n\nQuestion: ${question}`;
     }
 
-    // PRIORITÉ 1 : Utiliser Ollama (GRATUIT)
+    // PRIORITÉ 1 : Utiliser Netlify Function (appelle Ollama depuis le serveur)
+    try {
+        console.log('[AI Coach] Using Netlify Function (recommended)');
+        const response = await askNetlifyCoach(question, gameContext, contextType);
+        console.log('[AI Coach] Netlify Function response received');
+        return response;
+    } catch (error: any) {
+        console.warn('[AI Coach] Netlify Function failed, trying direct Ollama...', error.message);
+        // Continue to fallback
+    }
+
+    // PRIORITÉ 2 : Utiliser Ollama Direct (Fallback)
     const ollamaAvailable = await isOllamaAvailable();
     
     if (ollamaAvailable) {
         try {
-            console.log('[AI Coach] Using Ollama (FREE)');
-            return await askOllamaCoach(question, systemPrompt, userMessage);
+            console.log('[AI Coach] Using Ollama Direct (FREE)');
+            const response = await askOllamaCoach(question, systemPrompt, userMessage);
+            console.log('[AI Coach] Ollama response received');
+            return response;
         } catch (error: any) {
             console.warn('[AI Coach] Ollama failed, trying DeepSeek API fallback:', error.message);
             // Continue to fallback
         }
+    } else {
+        console.log('[AI Coach] Ollama not available, skipping...');
     }
 
-    // PRIORITÉ 2 : Fallback vers DeepSeek API (si configuré)
+    // PRIORITÉ 3 : Fallback vers DeepSeek API (si configuré)
     if (DEEPSEEK_API_KEY) {
         try {
             console.log('[AI Coach] Using DeepSeek API (fallback)');
-            return await askDeepSeekAPICoach(question, systemPrompt, userMessage);
+            const response = await askDeepSeekAPICoach(question, systemPrompt, userMessage);
+            console.log('[AI Coach] DeepSeek API response received');
+            return response;
         } catch (error: any) {
             console.error('[AI Coach] DeepSeek API also failed:', error.message);
-            return `Error: ${error.message || 'Failed to get response from AI coach.'}`;
+            return `Désolé, le coach AI rencontre des difficultés techniques. Veuillez réessayer plus tard. (Erreur: ${error.message || 'Unknown error'})`;
         }
     }
 
-    // Aucune option disponible
-    return 'AI Coach is not configured. Please set VITE_OLLAMA_URL (recommended, FREE) or VITE_DEEPSEEK_API_KEY environment variable.';
+    // Aucune option disponible ou toutes ont échoué
+    return 'AI Coach is not configured. Please set VITE_COACH_API_URL (recommended), VITE_OLLAMA_URL (FREE), or VITE_DEEPSEEK_API_KEY environment variable.';
 }

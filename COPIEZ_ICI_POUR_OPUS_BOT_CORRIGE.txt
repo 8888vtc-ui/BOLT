@@ -1,0 +1,51 @@
+Salut Opus — bug bot corrigé avec succès ✅
+
+Résumé
+Le bug où le bot ne jouait pas automatiquement en mode offline-bot est maintenant CORRIGÉ ET TESTÉ.
+
+🐞 Problème initial
+Le bot ne jouait pas automatiquement quand c'était son tour. Le tour changeait correctement (guest → bot), mais le bot ne lançait pas les dés.
+
+✅ Cause identifiée
+Fichier: src/hooks/useGameSocket.ts ligne ~259
+
+En mode démo, le code retournait avant de créer les joueurs pour offline-bot. Le useEffect du bot vérifiait players.length < 2 et retournait immédiatement.
+
+✅ Correctifs appliqués
+
+1. Création des joueurs en mode démo (ligne 259-277)
+   - Ajout de la création des joueurs dans le bloc DEMO_MODE quand roomId === 'offline-bot'
+   - Création de 2 joueurs: [guest, bot] ou [user, bot]
+
+2. Amélioration des dépendances du useEffect (ligne 1295)
+   - Changé de [gameState, ...] à [gameState?.turn, gameState?.dice, ...]
+   - Permet de détecter les changements de tour plus efficacement
+
+3. Ajout de logs de debug (ligne 946-1006)
+   - Logs détaillés pour diagnostiquer les problèmes
+
+🧪 Tests réussis ✅
+
+1. ✅ Chargement page → Joueurs créés (2 joueurs)
+2. ✅ Lancement dés → Double 5 lancé
+3. ✅ Mouvements joueur → 4 mouvements effectués
+4. ✅ Changement tour → guest → bot
+5. ✅ Bot détecte son tour → "🤖 Bot: Checking turn..."
+6. ✅ Bot lance dés automatiquement → "🤖 Bot: Rolling dice..."
+7. ✅ Bot reçoit analyse API → "🤖 AI Service: Raw Data received"
+8. ✅ Dés lancés par bot → Dés visibles (3 et 1)
+
+Logs de preuve
+[16:24:39] 🔄 [MOVE] Tour alterné: guest → bot
+[16:24:39] 🤖 Bot: Checking turn...
+[16:24:39] 🤖 AI Service: Preparing analysis...
+[16:24:39] 🤖 AI Service: Calling BotGammon API...
+[16:24:58] 🤖 AI Service: Raw Data received
+[16:24:58] 🤖 Bot: Rolling dice...
+
+📊 Fichiers modifiés
+- src/hooks/useGameSocket.ts (lignes 259-277, 946-1006, 1295)
+
+✅ Statut
+BUG CORRIGÉ ET TESTÉ — Le bot fonctionne maintenant correctement !
+

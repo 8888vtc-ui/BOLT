@@ -64,13 +64,13 @@ const ChatBox = () => {
                 // Add to messages (would need addMessage from store)
                 const { addMessage } = useGameStore.getState();
                 addMessage(botMessage);
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error getting coach response:', error);
                 const errorMessage: ChatMessage = {
                     id: `bot-error-${Date.now()}`,
                     userId: 'ai-coach',
                     username: '🤖 AI Coach',
-                    text: 'Sorry, I encountered an error. Please try again.',
+                    text: error?.message || 'Désolé, le coach AI rencontre des difficultés techniques. Veuillez réessayer plus tard.',
                     timestamp: Date.now()
                 };
                 const { addMessage } = useGameStore.getState();

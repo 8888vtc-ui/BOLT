@@ -273,8 +273,19 @@ export default function Login() {
 
               <button
                 onClick={async () => {
-                  await loginAsGuest();
-                  navigate(redirectTo);
+                  setError('');
+                  const result = await loginAsGuest();
+                  if (result?.error) {
+                    if (result.error.code === 'anonymous_provider_disabled') {
+                      setError('Les connexions anonymes sont désactivées. Veuillez vous connecter avec Google ou Email.');
+                      showError('Connexion anonyme désactivée. Utilisez Google ou Email pour vous connecter.');
+                    } else {
+                      setError(result.error.message || 'Erreur lors de la connexion en tant qu\'invité');
+                      showError('Erreur lors de la connexion en tant qu\'invité');
+                    }
+                  } else {
+                    navigate(redirectTo);
+                  }
                 }}
                 className="w-full bg-[#1a1a1a] border-2 border-gray-700 hover:border-white text-gray-300 hover:text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 text-lg opacity-70"
               >

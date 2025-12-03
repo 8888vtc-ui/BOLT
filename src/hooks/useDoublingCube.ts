@@ -4,7 +4,8 @@ import { canOfferDouble, acceptDouble as acceptDoubleFn, rejectDouble as rejectD
 import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
 
-const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
+// FORCER MODE RÉEL
+const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL;
 
 export const useDoublingCube = (currentRoom: any, user: any) => {
     const { gameState, updateGame, addMessage } = useGameStore();

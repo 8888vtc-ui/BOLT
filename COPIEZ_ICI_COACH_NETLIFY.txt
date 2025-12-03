@@ -1,0 +1,67 @@
+CONFIGURATION COACH AI VIA NETLIFY FUNCTION
+
+✅ SOLUTION IMPLÉMENTÉE
+
+Architecture:
+Frontend → Netlify Function → Ollama Railway
+
+Avantages:
+- Appels Ollama depuis serveur (pas CORS)
+- Variables d'environnement sécurisées
+- Meilleure gestion erreurs
+- Pas de problème mémoire côté client
+
+📋 CONFIGURATION NETLIFY
+
+Étape 1: Variables d'Environnement Netlify
+https://app.netlify.com/sites/botgammon/configuration/env
+
+Ajouter:
+OLLAMA_URL=https://bot-production-b9d6.up.railway.app
+OLLAMA_MODEL=deepseek-coder:latest
+DEEPSEEK_API_KEY=sk-votre_cle (optionnel)
+
+Étape 2: Déployer Fonction Netlify
+Fichier créé: gurugammon-gnubg-api/netlify/functions/coach.ts
+
+Push sur GitHub → Netlify redéploie automatiquement
+
+Étape 3: Configuration Frontend
+Netlify: https://app.netlify.com/sites/gurugammon-react/configuration/env
+
+Ajouter:
+VITE_COACH_API_URL=https://botgammon.netlify.app/.netlify/functions/coach
+
+🔄 ORDRE DE PRIORITÉ
+
+1. Netlify Function (VITE_COACH_API_URL) - RECOMMANDÉ
+2. Ollama Direct (VITE_OLLAMA_URL) - Fallback GRATUIT
+3. DeepSeek API (VITE_DEEPSEEK_API_KEY) - Fallback Payant
+
+🧪 TEST
+
+Test Fonction:
+curl -X POST https://botgammon.netlify.app/.netlify/functions/coach \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Comment jouer un double 1?", "contextType": "rules"}'
+
+Test Frontend:
+1. Ouvrir jeu
+2. Chat → Poser question
+3. Vérifier console: "[AI Coach] Using Netlify Function (recommended)"
+
+✅ CHECKLIST
+
+Backend (botgammon):
+- [ ] OLLAMA_URL configurée
+- [ ] OLLAMA_MODEL configurée
+- [ ] DEEPSEEK_API_KEY configurée (optionnel)
+
+Frontend (gurugammon-react):
+- [ ] VITE_COACH_API_URL configurée
+
+Déploiement:
+- [ ] Fonction coach.ts déployée
+- [ ] Netlify redéployé
+- [ ] Test réussi
+

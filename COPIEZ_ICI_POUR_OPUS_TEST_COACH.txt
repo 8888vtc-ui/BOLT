@@ -1,0 +1,112 @@
+Salut Opus — test coach AI dans le chat effectué ⚠️
+
+Résumé
+J'ai testé le coach AI qui analyse les parties dans le chat. Le coach utilise Ollama (GRATUIT) en priorité, mais il y a un problème avec l'endpoint de génération.
+
+✅ Configuration du Coach
+
+Fichier: src/lib/deepseekService.ts
+
+API Utilisée:
+1. PRIORITÉ 1: Ollama (GRATUIT) ✅
+   - URL: https://bot-production-b9d6.up.railway.app
+   - Modèle: deepseek-coder
+   - Endpoint check: /api/tags
+   - Endpoint génération: /api/generate
+
+2. PRIORITÉ 2: DeepSeek API (Payant - Fallback)
+   - URL: https://api.deepseek.com/v1/chat/completions
+   - Nécessite: VITE_DEEPSEEK_API_KEY
+
+✅ Tests Effectués
+
+1. Disponibilité Ollama ✅
+   - Test: GET /api/tags
+   - Résultat: Status 200 ✅
+   - Conclusion: Le serveur Ollama est disponible
+
+2. Génération Ollama ❌
+   - Test: POST /api/generate avec prompt de test
+   - Résultat: Erreur 500 (Erreur interne du serveur)
+   - Conclusion: Le serveur répond mais la génération échoue
+
+3. Interface Chat ⏳
+   - Le chat est dans la sidebar droite (desktop)
+   - Le chat est accessible via bouton MessageCircle (mobile)
+   - Statut: Interface présente mais non testée directement
+
+🔍 Analyse du Code
+
+Fichier: src/components/game/ChatBox.tsx
+
+Fonctionnement:
+- Quand l'utilisateur envoie un message, le coach répond automatiquement
+- Le coach utilise askDeepSeekCoach() qui:
+  1. Vérifie si Ollama est disponible (timeout 5s)
+  2. Si oui → Utilise Ollama (GRATUIT)
+  3. Si non → Fallback vers DeepSeek API (si configuré)
+  4. Sinon → Message d'erreur
+
+Contexte du jeu inclus:
+- Board state
+- Dice
+- Cube value
+- Match length
+- Score
+
+⚠️ Problème Identifié
+
+Bug: Ollama /api/generate retourne erreur 500
+
+Détails:
+- Le serveur Ollama répond (200) pour /api/tags ✅
+- Modèle deepseek-coder:latest est disponible ✅
+- Mais /api/generate retourne erreur 500 ❌
+- Test avec format simple échoue aussi (erreur 500)
+- Possible causes:
+  1. Problème de configuration du serveur Ollama sur Railway
+  2. Problème avec l'endpoint /api/generate sur ce serveur
+  3. Le serveur Ollama peut nécessiter un redémarrage
+
+Impact:
+- Le coach ne peut pas générer de réponses via Ollama
+- Le fallback vers DeepSeek API fonctionnerait (si configuré)
+- Sinon, l'utilisateur verra un message d'erreur
+
+✅ Points Positifs
+
+1. ✅ Le code utilise Ollama GRATUIT en priorité
+2. ✅ Fallback vers DeepSeek API si Ollama indisponible
+3. ✅ Détection automatique de la langue (FR/ES/EN)
+4. ✅ Contexte du jeu inclus dans les requêtes
+5. ✅ Gestion des erreurs avec messages clairs
+6. ✅ Interface chat bien intégrée
+
+📋 Recommandations
+
+1. Vérifier la configuration du serveur Ollama
+   - Vérifier si le modèle deepseek-coder est disponible
+   - Vérifier les logs du serveur pour l'erreur 500
+
+2. Tester avec un autre modèle Ollama
+   - Essayer avec un modèle plus commun (llama2, mistral, etc.)
+   - Vérifier si le problème persiste
+
+3. Tester le fallback DeepSeek API
+   - Configurer VITE_DEEPSEEK_API_KEY
+   - Tester si le coach fonctionne avec DeepSeek API
+
+4. Tester le coach dans l'interface
+   - Ouvrir le chat dans le jeu
+   - Envoyer une question au coach
+   - Vérifier quelle API est utilisée
+   - Vérifier la réponse du coach
+
+✅ Conclusion
+
+Le coach utilise bien l'API gratuite Ollama en priorité, mais il y a un problème avec l'endpoint de génération (erreur 500). Le code est bien structuré avec un fallback vers DeepSeek API. Il faut vérifier la configuration du serveur Ollama ou utiliser le fallback DeepSeek API.
+
+Fichiers créés:
+- RAPPORT_TEST_COACH.md (rapport détaillé)
+- COPIEZ_ICI_POUR_OPUS_TEST_COACH.txt (ce fichier)
+

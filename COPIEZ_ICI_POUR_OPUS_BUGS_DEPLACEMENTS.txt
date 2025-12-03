@@ -1,0 +1,78 @@
+Salut Opus — bugs de déplacement identifiés lors de tests approfondis
+
+Résumé
+J'ai effectué des tests complets de déplacement jusqu'au blocage. Le jeu fonctionne correctement, mais j'ai identifié plusieurs bugs liés aux logs et à la qualité du code.
+
+Bugs identifiés
+
+1. Logs de debug excessifs avec emojis
+Sévérité: Faible
+Problème: Console polluée par des logs comme:
+- [BoardWrap] 🚨🚨🚨 STATE UPDATE 🚨🚨🚨
+- [Checker] ✅✅✅ DIRECT CLICK HANDLER ✅✅✅
+- [BoardWrap] 🔥🔥🔥 handlePipClick - AUTO MOVE 🔥🔥🔥
+
+Fichiers: BoardWrap.tsx, CheckersLayer.tsx
+Solution: Remplacer par des logs conditionnels avec console.debug
+
+2. Logs "DICE EXTRACTION" dupliqués
+Sévérité: Faible
+Problème: Le log apparaît deux fois à chaque action
+Fichier: src/board/utils/mappers.ts:181
+Solution: Identifier et supprimer le doublon
+
+3. Warnings React Router Future Flags
+Sévérité: Faible
+Problème: Deux warnings apparaissent à chaque chargement:
+- React Router will begin wrapping state updates in React.startTransition in v7
+- Relative route resolution within Splat routes is changing in v7
+
+Solution: Ajouter les future flags dans le Router:
+<Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+
+4. Messages "Demo mode" répétitifs
+Sévérité: Très faible
+Problème: "Demo mode: Supabase not configured" apparaît plusieurs fois
+Fichier: src/hooks/useAuth.ts:10
+Solution: Logger une seule fois au démarrage
+
+5. Logs avec "[object Object]" au lieu de données
+Sévérité: Faible
+Problème: Les logs affichent [object Object] au lieu des données structurées
+Exemples:
+- [mappers] DICE EXTRACTION: [object Object]
+- [16:15:42] 🎲 Envoi du mouvement... [object Object]
+
+Solution: Utiliser JSON.stringify ou spread operator:
+console.log('[mappers] DICE EXTRACTION:', { ...diceData });
+
+Observations positives
+✅ Déplacements fonctionnent correctement
+✅ Alternance de tours fonctionne
+✅ Consommation des dés correcte
+✅ Calcul des legal moves correct
+
+Actions demandées
+1. Nettoyer les logs de debug excessifs (utiliser console.debug conditionnel)
+2. Corriger les logs "[object Object]" (utiliser JSON.stringify ou spread)
+3. Réduire la duplication des logs (identifier pourquoi DICE EXTRACTION est appelé 2x)
+4. Ajouter les React Router Future Flags
+5. Optimiser les logs "Demo mode" (une seule fois)
+
+Fichiers à modifier
+- src/components/BoardWrap.tsx
+- src/board/components/CheckersLayer.tsx
+- src/board/utils/mappers.ts
+- src/hooks/useAuth.ts
+- src/router.tsx ou src/main.tsx (pour React Router flags)
+
+Tests de validation
+Après corrections, vérifier:
+- Console propre sans logs excessifs
+- Logs exploitables (données visibles)
+- Plus de warnings React Router
+- Logs "Demo mode" une seule fois
+- Déplacements fonctionnent toujours
+
+Note: Aucun bug critique de gameplay détecté. Les bugs sont principalement liés à la qualité des logs.
+
