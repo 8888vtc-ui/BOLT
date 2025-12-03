@@ -268,10 +268,13 @@ export const mapGameStateToBoardState = (
     let diceForMoves: number[] = [];
     if (gameState.dice) {
         if (Array.isArray(gameState.dice)) {
-            // If array has 4 elements (double), extract unique values
+            // CRITICAL FIX: Pour un double, utiliser TOUS les dés (4 dés)
+            // Un double [1,1,1,1] doit permettre 4 mouvements, pas seulement 2
             if (gameState.dice.length === 4) {
-                diceForMoves = [gameState.dice[0], gameState.dice[1]];
+                // Double: utiliser tous les 4 dés pour permettre 4 mouvements
+                diceForMoves = [...gameState.dice]; // [die, die, die, die]
             } else if (gameState.dice.length >= 2) {
+                // Non-double: utiliser les 2 dés
                 diceForMoves = [gameState.dice[0], gameState.dice[1]];
             } else if (gameState.dice.length > 0) {
                 diceForMoves = gameState.dice;

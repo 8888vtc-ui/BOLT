@@ -1,0 +1,53 @@
+Salut Opus — bug critique corrigé : doubles non joués correctement
+
+🐞 Problème
+Quand un double est lancé (ex: [1,1,1,1]), le système ne permettait qu'un seul mouvement au lieu de 4.
+
+🔎 Cause
+Dans src/board/utils/mappers.ts ligne 272-273, la logique utilisait seulement [dice[0], dice[1]] au lieu de tous les 4 dés.
+
+Code défectueux:
+if (gameState.dice.length === 4) {
+    diceForMoves = [gameState.dice[0], gameState.dice[1]]; // ❌ 2 dés seulement
+}
+
+✅ Correctif appliqué
+Fichier: src/board/utils/mappers.ts
+
+Correction:
+if (gameState.dice.length === 4) {
+    diceForMoves = [...gameState.dice]; // ✅ Tous les 4 dés
+}
+
+Améliorations aussi dans src/hooks/useGameSocket.ts:
+- Meilleure détection du dé à consommer
+- Logs détaillés pour debug doubles
+
+🎯 Comportement attendu
+Pour un double 1 [1,1,1,1]:
+1. Calcul legal moves avec 4 dés → 4 mouvements possibles
+2. Premier mouvement → Consomme 1 dé, reste [1,1,1]
+3. Recalcul avec [1,1,1] → 3 mouvements possibles
+4. Deuxième mouvement → Consomme 1 dé, reste [1,1]
+5. Troisième mouvement → Consomme 1 dé, reste [1]
+6. Quatrième mouvement → Consomme 1 dé, reste []
+7. Fin du tour → Changement de tour
+
+🧪 Tests à effectuer
+1. Lancer jusqu'à obtenir un double 1
+2. Vérifier que 4 mouvements sont possibles
+3. Jouer les 4 mouvements consécutivement
+4. Vérifier que le tour change seulement après le 4ème mouvement
+5. Tester aussi avec double 6
+6. Vérifier que les non-doubles fonctionnent toujours
+
+📋 Action requise
+1. Vérifier que les corrections sont correctes
+2. Tester avec un double 1 pour confirmer
+3. Vérifier que les non-doubles fonctionnent toujours
+4. Tester avec le bot pour s'assurer qu'il joue correctement les doubles
+
+Le correctif devrait permettre de jouer les 4 mouvements d'un double correctement.
+
+Merci ! 🎲
+

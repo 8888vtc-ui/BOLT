@@ -646,6 +646,7 @@ export const useGameSocket = () => {
             setHistory([]);
             const dice1 = Math.floor(Math.random() * 6) + 1;
             const dice2 = Math.floor(Math.random() * 6) + 1;
+            // Pour un double, générer 4 dés identiques pour permettre 4 mouvements
             newState.dice = dice1 === dice2 ? [dice1, dice1, dice1, dice1] : [dice1, dice2];
             addLog(`Dice rolled: ${newState.dice.join(', ')}`, 'success');
         } else if (action === 'move') {
@@ -705,7 +706,18 @@ export const useGameSocket = () => {
                 addLog(`🔍 [MOVE] Die calculé: ${dieUsed}`, 'info', { from, to, playerColor });
             }
 
-            const dieIndex = currentDice.indexOf(dieUsed);
+            // Pour un double, on doit trouver le premier dé correspondant
+            // Un double a 4 dés de la même valeur [die, die, die, die]
+            // On doit consommer un seul dé à la fois
+            let dieIndex = -1;
+            
+            // Chercher le premier dé qui correspond à dieUsed
+            for (let i = 0; i < currentDice.length; i++) {
+                if (currentDice[i] === dieUsed) {
+                    dieIndex = i;
+                    break;
+                }
+            }
 
             if (dieIndex > -1) {
                 if (!forcePlayerColor) {
@@ -713,11 +725,22 @@ export const useGameSocket = () => {
                 }
                 const newBoard = makeMove(newState.board, playerColor as PlayerColor, from, to);
                 const newDice = [...currentDice];
+                // Supprimer UN SEUL dé (correct pour doubles - on consomme un dé à la fois)
                 newDice.splice(dieIndex, 1);
 
                 newState.board = newBoard;
                 newState.dice = newDice;
-                addLog('Move executed locally', 'success');
+                
+                // Log détaillé pour les doubles
+                const isDouble = currentDice.length === 4 && currentDice[0] === currentDice[1];
+                const remainingDice = newDice.length;
+                addLog('Move executed locally', 'success', {
+                    dieUsed,
+                    diceBefore: currentDice.length,
+                    diceAfter: remainingDice,
+                    isDouble,
+                    remainingMoves: isDouble ? remainingDice : remainingDice
+                });
             } else {
                 addLog('Invalid move or no matching die', 'error', { from, to, dieUsed, dice: currentDice, playerColor });
                 return;
@@ -848,6 +871,8 @@ export const useGameSocket = () => {
                 // Don't switch turn, game is over
             } else {
                 // Switch turn if no dice left
+                // IMPORTANT: Pour un double, on doit pouvoir jouer jusqu'à 4 fois
+                // Ne changer de tour que quand TOUS les dés sont consommés
                 if (newState.dice.length === 0) {
                     const currentPlayerId = newState.turn;
                     // const myId = user?.id || 'guest-1'; // Supprimé car redéclaré plus bas
@@ -1287,8 +1312,23 @@ export const useGameSocket = () => {
             setHistory(prev => [...prev, JSON.parse(JSON.stringify(gameState))]);
             const newBoard = makeMove(gameState.board, playerColor as PlayerColor, index, smartMove.to);
             const newDice = [...gameState.dice];
-            const dieIndex = newDice.indexOf(smartMove.dieUsed);
-            if (dieIndex > -1) newDice.splice(dieIndex, 1);
+            // Pour un double, trouver le premier dé correspondant
+            let dieIndex = -1;
+            for (let i = 0; i < newDice.length; i++) {
+                if (newDice[i] === smartMove.dieUsed) {
+                    dieIndex = i;
+                    break;
+                }
+            }
+            if (dieIndex > -1) {
+                newDice.splice(dieIndex, 1);
+                // Log pour debug doubles
+                const isDouble = gameState.dice.length === 4 && gameState.dice[0] === gameState.dice[1];
+                if (isDouble) {
+                    const addLog = useDebugStore.getState().addLog;
+                    addLog(`🤖 Bot: Double joué, dés restants: ${newDice.length}`, 'info');
+                }
+            }
 
             const newState = { ...gameState, board: newBoard, dice: newDice };
             updateGame(newState);

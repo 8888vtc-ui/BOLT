@@ -533,16 +533,25 @@ const GameRoom = () => {
             myId
         });
 
-        // 6. Mettre en état pending AVANT envoi
-        setPendingMove({ from, to });
+        // 6. Mettre en état pending AVANT envoi (seulement en mode online)
+        // En mode offline-bot, pas besoin de pendingMove car pas de confirmation serveur
+        const isOfflineMode = currentRoom?.id === 'offline-bot';
+        if (!isOfflineMode) {
+            setPendingMove({ from, to });
+        }
 
         // 7. Send move to server
         sendGameAction('board:move', {
             ...legacyMove,
             playerId: myId
         });
+        
+        // 8. En mode offline, reset pendingMove immédiatement après le move
+        if (isOfflineMode && pendingMove) {
+            setPendingMove(null);
+        }
 
-    }, [isMyTurn, turn, user?.id, playerColor, sendGameAction, gameState, players, pendingMove]);
+    }, [isMyTurn, turn, user?.id, playerColor, sendGameAction, gameState, players, pendingMove, currentRoom]);
 
     // Gérer les événements move:confirmed et move:rejected
     useEffect(() => {
