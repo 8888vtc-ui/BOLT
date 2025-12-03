@@ -40,9 +40,17 @@ const Triangle = memo<TriangleProps>(({
             }}
             onPointerDown={(e) => {
                 console.error('[Triangle] ✅✅✅ POINTER DOWN ON POINT ✅✅✅', { pip });
+                // Don't stop propagation to allow checkers to also receive the event
+            }}
+            onMouseDown={(e) => {
+                console.error('[Triangle] ✅✅✅ MOUSE DOWN ON POINT ✅✅✅', { pip });
                 e.stopPropagation();
             }}
-            style={{ cursor: 'pointer', pointerEvents: 'all' }}
+            style={{ 
+                cursor: 'pointer', 
+                pointerEvents: 'all',
+                zIndex: 1 // Ensure triangles are below checkers but still clickable
+            }}
             role="button" 
             aria-label={`Point ${pip}`} 
             tabIndex={0}
