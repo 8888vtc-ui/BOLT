@@ -63,16 +63,23 @@ const Checker = memo<CheckerProps>(({
     const colors = color === 'light' ? lightColors : darkColors;
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
-        if (!isPlayable) return;
+        console.log('[Checker] PointerDown:', { isPlayable, id, color });
+        if (!isPlayable) {
+            console.log('[Checker] Not playable, ignoring pointerDown');
+            return;
+        }
 
         e.preventDefault();
         e.stopPropagation();
-        (e.target as SVGElement).setPointerCapture(e.pointerId);
+        if (e.target instanceof SVGElement) {
+            (e.target as SVGElement).setPointerCapture(e.pointerId);
+        }
         isDragging.current = true;
         startPos.current = { x: e.clientX, y: e.clientY };
         setDragOffset({ x: 0, y: 0 });
         onDragStart(id);
-    }, [isPlayable, id, onDragStart]);
+        console.log('[Checker] PointerDown captured, isDragging set to true');
+    }, [isPlayable, id, color, onDragStart]);
 
     const handlePointerMove = useCallback((e: React.PointerEvent) => {
         if (!isDragging.current) return;
