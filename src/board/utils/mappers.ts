@@ -27,14 +27,25 @@ interface LegacyGameState {
 
 // Helper to get points array from various legacy formats
 const getPointsArray = (board: LegacyGameState['board']): { player: number | null; count: number }[] => {
+    console.error('[mappers] getPointsArray called with:', {
+        boardType: typeof board,
+        isArray: Array.isArray(board),
+        hasPoints: board && typeof board === 'object' && 'points' in board,
+        pointsType: board && typeof board === 'object' && 'points' in board ? typeof (board as any).points : 'N/A',
+        pointsIsArray: board && typeof board === 'object' && 'points' in board ? Array.isArray((board as any).points) : false
+    });
+    
     if (Array.isArray(board)) {
+        console.error('[mappers] Board is array, length:', board.length);
         return board;
     }
-    if (board && 'points' in board && Array.isArray(board.points)) {
-        return board.points;
+    if (board && typeof board === 'object' && 'points' in board && Array.isArray((board as any).points)) {
+        const points = (board as any).points;
+        console.error('[mappers] Board has points array, length:', points.length);
+        return points;
     }
     // Fallback: create empty board
-    console.warn('[mappers] Invalid board structure, creating empty board');
+    console.error('[mappers] ❌ Invalid board structure, creating empty board');
     return Array(24).fill({ player: null, count: 0 });
 };
 
