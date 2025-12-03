@@ -31,6 +31,8 @@ const BoardWrap = memo<BoardProps>(({
     }, []);
 
     const handlePipClick = useCallback((pip: PipIndex | 'bar' | 'borne') => {
+        console.log('[BoardWrap] handlePipClick:', { pip, selectedPip, legalMovesCount: state.legalMoves.length, turn: state.turn });
+        
         // If clicking on borne (home), try to bear off
         if (pip === 'borne') {
             if (selectedPip !== null) {
@@ -38,6 +40,7 @@ const BoardWrap = memo<BoardProps>(({
                 const canBearOff = state.legalMoves.some(
                     m => m.from === selectedPip && m.to === 'borne'
                 );
+                console.log('[BoardWrap] Bear off attempt:', { selectedPip, canBearOff });
                 if (canBearOff && onMove) {
                     onMove(selectedPip, 'borne');
                     announceMove(selectedPip, 'borne');
@@ -54,8 +57,11 @@ const BoardWrap = memo<BoardProps>(({
             );
             const hasLegalMoves = state.legalMoves.some(m => m.from === pip);
             
+            console.log('[BoardWrap] Selection attempt:', { pip, hasPlayableChecker, hasLegalMoves, legalMoves: state.legalMoves.filter(m => m.from === pip) });
+            
             if (hasPlayableChecker && hasLegalMoves) {
                 setSelectedPip(pip);
+                console.log('[BoardWrap] Selected pip:', pip);
             }
         } else {
             // Try to move
@@ -63,9 +69,14 @@ const BoardWrap = memo<BoardProps>(({
                 m => m.from === selectedPip && m.to === pip
             );
             
+            console.log('[BoardWrap] Move attempt:', { from: selectedPip, to: pip, isValidMove, matchingMoves: state.legalMoves.filter(m => m.from === selectedPip && m.to === pip) });
+            
             if (isValidMove && onMove) {
+                console.log('[BoardWrap] Executing move:', selectedPip, '->', pip);
                 onMove(selectedPip, pip as PipIndex);
                 announceMove(selectedPip, pip as PipIndex);
+            } else {
+                console.warn('[BoardWrap] Invalid move or onMove not available');
             }
             
             // Clear selection (even if move was invalid)
