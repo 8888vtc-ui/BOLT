@@ -1,5 +1,5 @@
 import { BoardState, CheckerState, Color, CubeState, DiceState, LegalMove, PipIndex } from '../types';
-import { getValidMoves, PlayerColor } from '../../lib/gameLogic';
+import { getValidMoves, PlayerColor, Point } from '../../lib/gameLogic';
 
 // Define the shape of the existing GameState (approximate)
 interface LegacyGameState {
@@ -195,11 +195,30 @@ export const mapGameStateToBoardState = (
     // Get dice values
     const diceValues = gameState.dice && gameState.dice.length > 0 ? gameState.dice : [];
     
+    // Get points array safely
+    const pointsArray = getPointsArray(gameState.board);
+    
     // Only calculate moves if we have dice and a valid board
-    if (diceValues.length > 0 && gameState.board && gameState.board.points) {
+    if (diceValues.length > 0 && pointsArray.length === 24) {
         try {
+            // Convert to BoardState format for getValidMoves
+            const boardStateForLogic: { points: Point[]; bar: { player1: number; player2: number }; off: { player1: number; player2: number } } = {
+                points: pointsArray.map(p => ({
+                    player: (p.player === 1 || p.player === 2) ? p.player : null,
+                    count: p.count || 0
+                })),
+                bar: {
+                    player1: gameState.bar?.player1 || (gameState.bar && typeof gameState.bar[players[0]?.id || ''] === 'number' ? (gameState.bar[players[0]?.id || ''] as number) : 0),
+                    player2: gameState.bar?.player2 || (gameState.bar && typeof gameState.bar[players[1]?.id || ''] === 'number' ? (gameState.bar[players[1]?.id || ''] as number) : 0)
+                },
+                off: {
+                    player1: gameState.off?.player1 || (gameState.off && typeof gameState.off[players[0]?.id || ''] === 'number' ? (gameState.off[players[0]?.id || ''] as number) : 0),
+                    player2: gameState.off?.player2 || (gameState.off && typeof gameState.off[players[1]?.id || ''] === 'number' ? (gameState.off[players[1]?.id || ''] as number) : 0)
+                }
+            };
+            
             // Use getValidMoves to calculate all valid moves
-            const validMovesMap = getValidMoves(gameState.board, currentPlayerColor, diceValues);
+            const validMovesMap = getValidMoves(boardStateForLogic, currentPlayerColor, diceValues);
             
             // Convert Map to LegalMove array
             validMovesMap.forEach((destinations, fromIndex) => {
@@ -217,6 +236,8 @@ export const mapGameStateToBoardState = (
                     legalMoves.push({ from, to });
                 });
             });
+            
+            console.log('[mappers] Calculated legal moves:', legalMoves.length, legalMoves);
         } catch (error) {
             console.warn('[mappers] Error calculating legal moves:', error);
             // Fallback to gameState.validMoves if calculation fails
@@ -245,6 +266,12 @@ export const mapGameStateToBoardState = (
                 });
             }
         }
+    } else {
+        console.warn('[mappers] Cannot calculate legal moves:', {
+            diceLength: diceValues.length,
+            pointsLength: pointsArray.length,
+            hasBoard: !!gameState.board
+        });
     }
 
     return {
