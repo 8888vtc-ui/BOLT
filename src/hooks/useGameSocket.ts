@@ -9,7 +9,7 @@ import { analyzeMove } from '../lib/aiService';
 const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL;
 
 // --- Helper pour gérer les erreurs Supabase ---
-const handleSupabaseError = (error: any, context: string, addLog: (msg: string, type: string, data?: any) => void): boolean => {
+const handleSupabaseError = (error: any, context: string, addLog: (message: string, type?: 'info' | 'error' | 'success' | 'warning', data?: any) => void): boolean => {
     // Retourne true si c'est une erreur de permissions (on peut continuer)
     if (error?.code === '42501' || error?.message?.includes('permission denied')) {
         addLog(`⚠️ [SUPABASE] Permissions refusées (${context}) - Continuation en mode offline`, 'warning', error);
@@ -725,9 +725,24 @@ export const useGameSocket = () => {
         } else if (action === 'board:move') {
             const { from, to, playerId } = payload;
             
+            // Validation: gameState doit exister
+            if (!gameState) {
+                addLog('⛔ [board:move] No gameState available', 'error');
+                return;
+            }
+            
             // Validation stricte du tour AVANT traitement
             const myId = user?.id || (players && players.length > 0 ? players[0].id : 'guest');
             const currentTurn = gameState.turn;
+            
+            // Log détaillé AVANT validation
+            addLog('🔍 [board:move] Validation du tour...', 'info', {
+                currentTurn,
+                myId,
+                playerId,
+                players: players?.map(p => ({ id: p.id, username: p.username })),
+                gameStateTurn: gameState.turn
+            });
             
             const isPlayerTurn = currentTurn === myId || 
                                 currentTurn === 'guest' || 
@@ -740,8 +755,24 @@ export const useGameSocket = () => {
                     currentTurn,
                     myId,
                     playerId,
-                    gameStateTurn: gameState.turn
+                    gameStateTurn: gameState.turn,
+                    isPlayerTurn
                 });
+                
+                // Émettre move:rejected si on a un channel
+                if (currentRoom && currentRoom.id !== 'offline-bot' && channelRef.current) {
+                    channelRef.current.send({
+                        type: 'broadcast',
+                        event: 'move:rejected',
+                        payload: {
+                            reason: 'not-your-turn',
+                            currentTurn,
+                            myId,
+                            playerId
+                        }
+                    });
+                }
+                
                 return; // Ne pas traiter le move
             }
             
@@ -752,9 +783,33 @@ export const useGameSocket = () => {
                 else if (players[1]?.id === myId || players[1]?.id === playerId) playerColor = 2;
             }
             
+            addLog('✅ [board:move] Validation OK, traitement du move', 'success', {
+                from,
+                to,
+                playerColor,
+                currentTurn,
+                myId
+            });
+            
             // Les coordonnées sont déjà en format legacy (from/to sont des nombres)
             // Appeler récursivement avec l'action 'move' standard
-            return sendGameAction('move', { from, to }, playerColor);
+            const result = sendGameAction('move', { from, to }, playerColor);
+            
+            // Émettre move:confirmed si on a un channel et que le move a réussi
+            if (currentRoom && currentRoom.id !== 'offline-bot' && channelRef.current) {
+                channelRef.current.send({
+                    type: 'broadcast',
+                    event: 'move:confirmed',
+                    payload: {
+                        from,
+                        to,
+                        playerId: myId,
+                        playerColor
+                    }
+                });
+            }
+            
+            return result;
         }
 
         // Check for win condition before switching turn

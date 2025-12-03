@@ -136,3 +136,5 @@ async function testCheckerMove() {
 
 testCheckerMove().catch(console.error);
 
+
+

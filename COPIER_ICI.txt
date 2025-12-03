@@ -1,0 +1,160 @@
+ALTER TABLE IF EXISTS public.analysis_quotas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.websocket_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.game_analyses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.user_analytics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.tournament_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.tournaments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.game_moves ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.room_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.tournament_matches ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own quotas" ON public.analysis_quotas;
+CREATE POLICY "Users can view own quotas"
+ON public.analysis_quotas
+FOR SELECT
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can insert own quotas" ON public.analysis_quotas;
+CREATE POLICY "Users can insert own quotas"
+ON public.analysis_quotas
+FOR INSERT
+WITH CHECK (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can update own quotas" ON public.analysis_quotas;
+CREATE POLICY "Users can update own quotas"
+ON public.analysis_quotas
+FOR UPDATE
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can view own connections" ON public.websocket_connections;
+CREATE POLICY "Users can view own connections"
+ON public.websocket_connections
+FOR SELECT
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can insert own connections" ON public.websocket_connections;
+CREATE POLICY "Users can insert own connections"
+ON public.websocket_connections
+FOR INSERT
+WITH CHECK (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can update own connections" ON public.websocket_connections;
+CREATE POLICY "Users can update own connections"
+ON public.websocket_connections
+FOR UPDATE
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can delete own connections" ON public.websocket_connections;
+CREATE POLICY "Users can delete own connections"
+ON public.websocket_connections
+FOR DELETE
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can view own game analyses" ON public.game_analyses;
+CREATE POLICY "Users can view own game analyses"
+ON public.game_analyses
+FOR SELECT
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can insert own game analyses" ON public.game_analyses;
+CREATE POLICY "Users can insert own game analyses"
+ON public.game_analyses
+FOR INSERT
+WITH CHECK (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can view own analytics" ON public.user_analytics;
+CREATE POLICY "Users can view own analytics"
+ON public.user_analytics
+FOR SELECT
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can insert own analytics" ON public.user_analytics;
+CREATE POLICY "Users can insert own analytics"
+ON public.user_analytics
+FOR INSERT
+WITH CHECK (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can update own analytics" ON public.user_analytics;
+CREATE POLICY "Users can update own analytics"
+ON public.user_analytics
+FOR UPDATE
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Anyone can view tournament participants" ON public.tournament_participants;
+CREATE POLICY "Anyone can view tournament participants"
+ON public.tournament_participants
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "Users can register themselves" ON public.tournament_participants;
+CREATE POLICY "Users can register themselves"
+ON public.tournament_participants
+FOR INSERT
+WITH CHECK (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Users can unregister themselves" ON public.tournament_participants;
+CREATE POLICY "Users can unregister themselves"
+ON public.tournament_participants
+FOR DELETE
+USING (auth.uid()::text = user_id::text);
+
+DROP POLICY IF EXISTS "Anyone can view tournaments" ON public.tournaments;
+CREATE POLICY "Anyone can view tournaments"
+ON public.tournaments
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "Users can create tournaments" ON public.tournaments;
+CREATE POLICY "Users can create tournaments"
+ON public.tournaments
+FOR INSERT
+WITH CHECK (auth.uid()::text = created_by::text);
+
+DROP POLICY IF EXISTS "Creators can update own tournaments" ON public.tournaments;
+CREATE POLICY "Creators can update own tournaments"
+ON public.tournaments
+FOR UPDATE
+USING (auth.uid()::text = created_by::text);
+
+DROP POLICY IF EXISTS "Creators can delete own tournaments" ON public.tournaments;
+CREATE POLICY "Creators can delete own tournaments"
+ON public.tournaments
+FOR DELETE
+USING (auth.uid()::text = created_by::text);
+
+DO $$
+DECLARE
+    table_record RECORD;
+BEGIN
+    FOR table_record IN
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+        AND tablename NOT IN ('_prisma_migrations', 'schema_migrations')
+    LOOP
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+            AND c.relname = table_record.tablename
+            AND c.relrowsecurity = true
+        ) THEN
+            RAISE NOTICE 'Table sans RLS: %', table_record.tablename;
+        END IF;
+    END LOOP;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_analysis_quotas_user_id ON public.analysis_quotas(user_id);
+CREATE INDEX IF NOT EXISTS idx_websocket_connections_user_id ON public.websocket_connections(user_id);
+CREATE INDEX IF NOT EXISTS idx_game_analyses_game_id ON public.game_analyses(game_id);
+CREATE INDEX IF NOT EXISTS idx_game_analyses_user_id ON public.game_analyses(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_analytics_user_id ON public.user_analytics(user_id);
+CREATE INDEX IF NOT EXISTS idx_tournament_participants_tournament_id ON public.tournament_participants(tournament_id);
+CREATE INDEX IF NOT EXISTS idx_tournament_participants_user_id ON public.tournament_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_tournaments_created_by ON public.tournaments(created_by);
+CREATE INDEX IF NOT EXISTS idx_tournaments_status ON public.tournaments(status);

@@ -78,3 +78,5 @@ if (checkers.length === 0) {
 
 console.log('📋 Test terminé - Vérifiez les logs ci-dessus');
 
+
+

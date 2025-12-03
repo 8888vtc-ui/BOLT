@@ -25,7 +25,7 @@ import WinModal from '../components/game/WinModal';
 import TestPanel from '../components/TestPanel';
 import BoardWrap from '../board/components/BoardWrap';
 import { mapGameStateToBoardState, mapMoveToLegacy } from '../board/utils/mappers';
-import { Player, TimerState } from '../board/types';
+import { Player, TimerState, PipIndex } from '../board/types';
 
 
 
@@ -48,6 +48,7 @@ const GameRoom = () => {
     const { offerDouble, acceptDouble, rejectDouble } = useDoublingCube(currentRoom, user);
     const { isDesktop, isMobile } = useDevice();
     const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+    const [pendingMove, setPendingMove] = useState<{ from: PipIndex | 'bar', to: PipIndex | 'borne' } | null>(null);
     const [isChatOpen, setIsChatOpen] = useState(false);
 
     // AI Coach State
@@ -276,17 +277,17 @@ const GameRoom = () => {
                         // Sauvegarder en DB si nécessaire (async, ne bloque pas)
                         if (currentRoom && currentRoom.id !== 'offline-bot') {
                             import('../lib/supabase').then(({ supabase }) => {
-                                supabase.from('games').update({ board_state: updatedGameState })
-                                    .eq('room_id', currentRoom.id)
+                                (supabase.from('games').update({ board_state: updatedGameState })
+                                    .eq('room_id', currentRoom.id) as Promise<any>)
                                     .then(() => {
                                         const addLog = useDebugStore.getState().addLog;
                                         addLog('Score de match sauvegardé', 'success');
                                     })
-                                    .catch((error) => {
+                                    .catch((error: any) => {
                                         const addLog = useDebugStore.getState().addLog;
                                         addLog('Erreur sauvegarde score', 'error', error);
                                     });
-                            }).catch((error) => {
+                            }).catch((error: any) => {
                                 const addLog = useDebugStore.getState().addLog;
                                 addLog('Erreur import supabase', 'error', error);
                             });
@@ -388,24 +389,11 @@ const GameRoom = () => {
                     currentTurn === null ||
                     (players && players.length > 0 && currentTurn === players[0].id));
 
-            console.error('[GameRoom] isMyTurn calculation (demo/offline):', {
-                DEMO_MODE,
-                isOfflineOrDemo,
-                myId,
-                currentTurn,
-                isHumanTurn,
-                roomId: currentRoom?.id,
-                roomName: currentRoom?.name,
-                hasUser: !!user,
-                playersLength: players?.length || 0
-            });
-
             return isHumanTurn;
         }
 
         // Normal online mode: check against user ID
         if (!user) {
-            console.error('[GameRoom] isMyTurn: No user in online mode, returning false');
             return false;
         }
         const myId = user.id;
@@ -427,7 +415,7 @@ const GameRoom = () => {
         if (!gameState) return false;
         return canOfferDouble(
             cubeValue,
-            cubeOwner,
+            cubeOwner || null,
             user?.id || '',
             hasDiceRolled,
             gameState.matchLength || 0
@@ -437,17 +425,14 @@ const GameRoom = () => {
     // Map state for new board - MUST BE BEFORE CONDITIONAL RETURNS
     const boardState = useMemo(() => {
         if (!gameState) {
-            useDebugStore.getState().addLog('[GameRoom] No gameState for boardState', 'warning');
+            // Ne pas appeler addLog pendant le render - retourner simplement null
             return null;
         }
         const mappedPlayers = players.map((p, i) => ({
             id: p.id,
             color: i === 0 ? 1 : 2
         }));
-        const addLog = useDebugStore.getState().addLog;
-        addLog(`[GameRoom] Mapping gameState to boardState: dice=${gameState.dice?.length || 0}, turn=${gameState.turn}`, 'info');
         const mapped = mapGameStateToBoardState(gameState as any, user?.id || 'guest', mappedPlayers);
-        addLog(`[GameRoom] Mapped boardState: legalMoves=${mapped.legalMoves.length}, checkers=${mapped.checkers.length}`, 'info');
         return mapped;
     }, [gameState, user?.id, players]);
 
@@ -483,36 +468,124 @@ const GameRoom = () => {
     const handleBoardMove = useCallback((from: PipIndex | 'bar', to: PipIndex | 'borne') => {
         const addLog = useDebugStore.getState().addLog;
 
-        // 1. Strict Turn Validation
-        if (!isMyTurn) {
-            console.error('[GameRoom] ⛔ Abort sendMove: not my turn', {
-                currentTurn: turn,
-                myId: user?.id || 'guest',
-                isMyTurn,
-                playerColor
-            });
-            addLog('⛔ Action bloquée: Ce n\'est pas votre tour', 'warning');
+        // 1. Vérifier qu'il n'y a pas déjà un move en attente
+        if (pendingMove) {
+            console.warn('[GameRoom] ⛔ Move déjà en attente, ignoré', { pendingMove });
+            addLog('⛔ Un mouvement est déjà en cours, veuillez patienter', 'warning');
             return;
         }
 
-        // Map to legacy format
+        // 2. Validation stricte du tour AVANT traitement
+        const myId = user?.id || (players && players.length > 0 ? players[0].id : 'guest');
+        const currentTurn = gameState?.turn;
+        
+        // Vérification détaillée du tour
+        const isActuallyMyTurn = currentTurn === myId ||
+                                 currentTurn === 'guest' ||
+                                 currentTurn === 'guest-1' ||
+                                 (players && players.length > 0 && currentTurn === players[0].id);
+
+        if (!isActuallyMyTurn || !isMyTurn) {
+            console.error('[GameRoom] ⛔ Abort sendMove: not my turn', {
+                currentTurn,
+                myId,
+                isMyTurn,
+                isActuallyMyTurn,
+                playerColor,
+                gameStateTurn: gameState?.turn,
+                players: players?.map(p => ({ id: p.id, username: p.username }))
+            });
+            addLog('⛔ Action bloquée: Ce n\'est pas votre tour', 'warning', {
+                currentTurn,
+                myId,
+                isMyTurn,
+                isActuallyMyTurn
+            });
+            return;
+        }
+
+        // 3. Vérifier que gameState existe et est valide
+        if (!gameState || !gameState.board) {
+            console.error('[GameRoom] ⛔ Abort sendMove: no gameState', { gameState });
+            addLog('⛔ État de jeu non disponible', 'error');
+            return;
+        }
+
+        // 4. Map to legacy format
         const legacyMove = mapMoveToLegacy(from, to, playerColor);
 
-        console.log('[GameRoom] 🎲 EXECUTING MOVE', {
+        // 5. Log détaillé AVANT envoi
+        console.log('[GameRoom] 🎲 EXECUTING MOVE - Validation OK', {
             from,
             to,
             legacyMove,
             isMyTurn,
-            playerColor
+            isActuallyMyTurn,
+            currentTurn,
+            myId,
+            playerColor,
+            gameStateTurn: gameState.turn
+        });
+        addLog('🎲 Envoi du mouvement...', 'info', {
+            from,
+            to,
+            currentTurn,
+            myId
         });
 
-        // Send move to server
+        // 6. Mettre en état pending AVANT envoi
+        setPendingMove({ from, to });
+
+        // 7. Send move to server
         sendGameAction('board:move', {
             ...legacyMove,
-            playerId: user?.id || (playerColor === 1 ? 'player1' : 'player2')
+            playerId: myId
         });
 
-    }, [isMyTurn, turn, user?.id, playerColor, sendGameAction]);
+    }, [isMyTurn, turn, user?.id, playerColor, sendGameAction, gameState, players, pendingMove]);
+
+    // Gérer les événements move:confirmed et move:rejected
+    useEffect(() => {
+        if (!currentRoom || currentRoom.id === 'offline-bot') return;
+
+        const addLog = useDebugStore.getState().addLog;
+        const channel = supabase.channel(`room:${currentRoom.id}`);
+
+        // Écouter move:confirmed
+        channel.on('broadcast', { event: 'move:confirmed' }, (payload) => {
+            addLog('✅ Move confirmé par le serveur', 'success', payload);
+            if (pendingMove) {
+                setPendingMove(null);
+            }
+        });
+
+        // Écouter move:rejected
+        channel.on('broadcast', { event: 'move:rejected' }, (payload) => {
+            addLog('❌ Move rejeté par le serveur', 'error', payload);
+            setPendingMove(null);
+            
+            // Resynchroniser l'état du jeu
+            if (payload.reason === 'not-your-turn') {
+                addLog('🔄 Resynchronisation de l\'état du jeu...', 'info');
+                // Demander un nouvel état du jeu
+                sendGameAction('request:gameState', {});
+            }
+        });
+
+        // Écouter game:state pour resynchronisation
+        channel.on('broadcast', { event: 'game:state' }, (payload) => {
+            addLog('📥 État du jeu reçu (resynchronisation)', 'info', payload);
+            if (payload.gameState) {
+                updateGame(payload.gameState);
+            }
+        });
+
+        channel.subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [currentRoom, pendingMove, sendGameAction, updateGame]);
 
 
 
@@ -555,29 +628,23 @@ const GameRoom = () => {
 
     // === END OF HOOKS THAT MUST BE BEFORE CONDITIONAL RETURNS ===
 
-    // Check if game is loaded - FORCER l'initialisation si manquant
-    if (!currentRoom || !gameState) {
-        const addLog = useDebugStore.getState().addLog;
-
-        // Si on est en mode offline-bot, forcer l'initialisation immédiatement
-        if (roomId === 'offline-bot' && (!currentRoom || !gameState)) {
-            addLog(`⚠️ [GAME_ROOM] Room ou gameState manquant en mode offline-bot - Initialisation forcée`, 'warning', {
-                hasRoom: !!currentRoom,
-                hasGameState: !!gameState,
-                roomId
-            });
-
-            // Forcer l'initialisation immédiatement
-            if (joinRoom && !hasJoinedRef.current) {
+    // useEffect pour l'initialisation forcée - évite setState during render
+    useEffect(() => {
+        if (!currentRoom || !gameState) {
+            // Si on est en mode offline-bot, forcer l'initialisation
+            if (roomId === 'offline-bot' && joinRoom && !hasJoinedRef.current) {
                 hasJoinedRef.current = roomId;
-                const options = mode ? { mode, matchLength: length } : undefined;
+                const options = mode ? { mode: mode as 'match' | 'money', matchLength: length } : undefined;
                 joinRoom('offline-bot', options).catch((err: any) => {
-                    addLog(`❌ [GAME_ROOM] Erreur initialisation forcée: ${err?.message}`, 'error', err);
+                    console.error('[GAME_ROOM] Erreur initialisation forcée:', err?.message);
                     hasJoinedRef.current = null;
                 });
             }
         }
+    }, [currentRoom, gameState, roomId, mode, length, joinRoom]);
 
+    // Check if game is loaded - Afficher loader
+    if (!currentRoom || !gameState) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white">
                 <DebugOverlay />
@@ -617,35 +684,8 @@ const GameRoom = () => {
     }
 
     // --- Game Logic ---
-    // Vérifier que gameState existe et a un board valide - FORCER l'initialisation si manquant
+    // Vérifier que gameState existe et a un board valide
     if (!gameState || !gameState.board) {
-        const addLog = useDebugStore.getState().addLog;
-        addLog(`⚠️ [GAME_ROOM] gameState ou board manquant - Réinitialisation FORCÉE...`, 'error', {
-            gameState,
-            hasBoard: !!gameState?.board,
-            roomId,
-            currentRoom: currentRoom?.id
-        });
-
-        // FORCER l'initialisation immédiatement avec offline-bot
-        if (joinRoom && roomId) {
-            const targetRoomId = roomId === 'offline-bot' ? 'offline-bot' : 'offline-bot'; // Toujours offline-bot
-            const options = mode ? { mode, matchLength: length } : undefined;
-
-            if (!hasJoinedRef.current || hasJoinedRef.current !== targetRoomId) {
-                hasJoinedRef.current = targetRoomId;
-                addLog(`🔄 [GAME_ROOM] Réinitialisation forcée - joinRoom(${targetRoomId})`, 'info');
-                joinRoom(targetRoomId, options)
-                    .then(() => {
-                        addLog(`✅ [GAME_ROOM] Réinitialisation réussie`, 'success');
-                    })
-                    .catch((err: any) => {
-                        addLog(`❌ [GAME_ROOM] Erreur réinitialisation: ${err?.message}`, 'error', err);
-                        hasJoinedRef.current = null;
-                    });
-            }
-        }
-
         return (
             <div className="h-screen bg-[#050505] text-white flex items-center justify-center">
                 <DebugOverlay />
@@ -986,8 +1026,8 @@ const GameRoom = () => {
                                 <span className="text-sm font-bold text-[#FFD700]">
                                     {(() => {
                                         if (!players || players.length === 0) return '0 - 0';
-                                        const player1Score = score[players[0]?.id || 'player1'] || 0;
-                                        const player2Score = score[players[1]?.id || 'player2'] || 0;
+                                        const player1Score = (score && score[players[0]?.id || 'player1']) || 0;
+                                        const player2Score = (score && score[players[1]?.id || 'player2']) || 0;
                                         return `${player1Score} - ${player2Score}`;
                                     })()}
                                 </span>
@@ -1030,20 +1070,28 @@ const GameRoom = () => {
                 {/* Plateau de jeu */}
                 {/* Plateau de jeu */}
                 <div className={`${isMobile ? 'flex-1' : 'flex-1'} relative flex items-center justify-center p-2 md:p-4 lg:p-8 overflow-hidden`}>
-                    {boardState && (
-                        <BoardWrap
-                            state={boardState}
-                            matchState={matchState}
-                            onMove={handleBoardMove}
-                            onRollDice={handleRollDice}
-                            onDouble={offerDouble}
-                            onTake={pendingDouble && pendingDouble !== user?.id ? acceptDouble : undefined}
-                            onPass={pendingDouble && pendingDouble !== user?.id ? rejectDouble : undefined}
-                            pendingDouble={pendingDouble}
-                            canDouble={canDoubleNow}
-                            theme="dark"
-                        />
-                    )}
+                    {boardState && (() => {
+                        // Convertir pendingDouble au format attendu par BoardWrap
+                        const pendingDoubleString: string | null = 
+                            pendingDouble && typeof pendingDouble === 'object' && 'offeredBy' in pendingDouble 
+                                ? pendingDouble.offeredBy 
+                                : null;
+                        
+                        return (
+                            <BoardWrap
+                                state={boardState}
+                                matchState={matchState}
+                                onMove={handleBoardMove}
+                                onRollDice={handleRollDice}
+                                onDouble={offerDouble}
+                                onTake={pendingDoubleString && pendingDoubleString !== user?.id ? acceptDouble : undefined}
+                                onPass={pendingDoubleString && pendingDoubleString !== user?.id ? rejectDouble : undefined}
+                                pendingDouble={pendingDoubleString}
+                                canDouble={canDoubleNow}
+                                theme="dark"
+                            />
+                        );
+                    })()}
                 </div>
 
                 {/* Sidebar Droite (Chat & Infos) - Desktop */}

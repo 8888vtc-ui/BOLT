@@ -1,0 +1,61 @@
+Salut Opus — besoin d'une intervention urgente sur GuruGammon : correction de 3 erreurs critiques React et 2 erreurs importantes identifiées lors de tests approfondis.
+
+Résumé du problème
+J'ai effectué 5 cycles de tests complets. Toutes les erreurs critiques sont toujours présentes à chaque chargement de page. Le jeu fonctionne (les dés se lancent, les legal moves se calculent), mais les erreurs React polluent la console et peuvent causer des problèmes de performance.
+
+Erreurs critiques (à corriger en priorité)
+
+1. gameState undefined au rendu
+   - Fichier: src/pages/GameRoom.tsx
+   - Message: "[GameRoom] No gameState for boardState undefined"
+   - Fréquence: À chaque chargement de page
+   - Solution: Ajouter vérification if (!gameState || !gameState.board) return <Loader />; avant le rendu du plateau
+
+2. setState pendant render (GameRoom)
+   - Fichier: src/pages/GameRoom.tsx:43
+   - Message: "Cannot update a component (BrowserConsole) while rendering a different component (GameRoom)"
+   - Fréquence: À chaque chargement de page
+   - Solution: Déplacer tous les addLog du render vers useEffect
+
+3. setState pendant render (CheckersLayer)
+   - Fichier: src/board/components/CheckersLayer.tsx:22
+   - Message: "Cannot update a component (BrowserConsole) while rendering a different component (CheckersLayer)"
+   - Fréquence: À chaque chargement de page
+   - Solution: Déplacer tous les addLog du render vers useEffect ou les supprimer
+
+Erreurs importantes (à corriger aussi)
+
+4. DICE EXTRACTION log niveau incorrect
+   - Fichier: src/board/utils/mappers.ts
+   - Message: "[mappers] DICE EXTRACTION: [object Object]"
+   - Fréquence: À chaque rendu
+   - Solution: Changer console.error en console.info ou console.debug
+
+5. CANNOT CALCULATE LEGAL MOVES dice=0
+   - Fichier: src/board/utils/mappers.ts
+   - Message: "❌ CANNOT CALCULATE LEGAL MOVES: dice=0, points=24"
+   - Fréquence: Au chargement (normal mais mal géré)
+   - Solution: Retourner { legalMoves: [], legalMovesCount: 0 } au lieu d'erreur
+
+Preuve des erreurs
+J'ai capturé toutes les erreurs dans la console. Voici les messages exacts :
+- [15:38:32] [GameRoom] No gameState for boardState undefined
+- Warning: Cannot update a component (BrowserConsole) while rendering a different component (GameRoom) at GameRoom (src/pages/GameRoom.tsx:43:22)
+- Warning: Cannot update a component (BrowserConsole) while rendering a different component (CheckersLayer) at CheckersLayer.tsx:22:3
+- [mappers] DICE EXTRACTION: [object Object] (répété à chaque rendu)
+- [mappers] ❌ CANNOT CALCULATE LEGAL MOVES: dice=0, points=24
+
+Tests effectués
+- ✅ Chargement de la page → Erreurs détectées
+- ✅ Lancement des dés → Fonctionne (4, 2) mais erreurs persistent
+- ✅ Calcul legal moves → Fonctionne (8 moves) mais erreurs persistent
+- ❌ Répétitions → Toutes les erreurs se répètent à chaque chargement
+
+Ce que j'attends de toi, Opus
+1. Appliquer les 5 correctifs listés ci-dessus
+2. Vérifier qu'il n'y a plus d'erreurs React dans la console après chargement
+3. Confirmer que le jeu fonctionne toujours correctement (dés, legal moves)
+4. Commit et push des changements avec message clair : "fix: corriger erreurs React critiques (gameState undefined, setState during render)"
+
+Merci de traiter en priorité absolue.
+

@@ -439,3 +439,5 @@ Votre application GuruGammon est maintenant déployée et accessible publiquemen
 
 **Besoin d'aide ?** Ouvrez un issue sur GitHub ou consultez les logs Netlify.
 
+
+

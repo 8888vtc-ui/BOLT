@@ -1,0 +1,50 @@
+* [33m8ec8210[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m fix: Add missing mapMoveToLegacy import - Fixes ReferenceError when executing moves
+* [33m5618a60[m fix: Add board:move handler with turn validation - Fixes move rejection issue where moves were ignored due to missing handler - Adds double validation (client + server) for turn checking - Adds detailed logging for debugging move rejections - Fixes mapMoveToLegacy signature to accept optional playerColor
+* [33mb7ed40d[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fix: block moves when it's bot turn - strict turn validation in GameRoom, BoardWrap and mappers
+* [33md148dca[m feat: deplacement automatique en un clic
+* [33m7eff102[m fix: allow clicks to pass through CheckersLayer to Triangles
+* [33m76b7f4b[m fix: isMyTurn detection for demo/offline mode - dice rolling and checker selection now work
+* [33m03f2d75[m debug: Force console.error logs for click events and state tracking
+* [33m10cc6b1[m test: Add comprehensive test report and simple move script
+* [33mf99797a[m test: Add simple move test script for console injection
+* [33m1c78190[m test: Add initial autonomous test report
+* [33md4b3ef0[m fix: Add extensive error logging to handleBoardMove and BoardWrap
+* [33mc51c17e[m test: Add autonomous move testing script for debugging checker movement
+* [33m63a52a5[m fix: Add extensive logging to handleBoardMove for debugging
+* [33mb91404f[m feat: Improve Playwright test to verify checker movement
+* [33m5ed4752[m fix: Update assertNoOverlayBlocking to use fallback selectors
+* [33m17f8e08[m fix: Add fallback selectors for Playwright tests
+* [33mb5c269f[m fix: Improve Playwright test selectors and wait times
+* [33m4ff0e8f[m feat: Add Playwright E2E tests and data-testid attributes
+* [33mc328a06[m fix: Force checkers to always be clickable for debugging
+* [33md7c4472[m fix: Make triangles always clickable by using pointer-events on checkers
+* [33m527f6e5[m fix: Always allow checker clicks for debugging and add test script
+* [33ma3e8c2c[m fix: Ensure checkers and triangles are clickable with proper z-index
+* [33mef8be13[m fix: Make checkers and points always clickable for debugging
+* [33mced7ebe[m debug: Add extensive logging for checker playability
+* [33me6acaf4[m fix: Correct player ID to color mapping for guest and bot
+* [33mae01731[m fix: Improve turn to player color mapping in legal moves
+* [33m725ad9b[m fix: Improve player color mapping in legal moves calculation
+* [33m51ddd66[m debug: Add logging to check if validMoves exists in gameState
+* [33m1d87e42[m debug: Add extensive logging for validMoves fallback
+* [33md91e285[m fix: Use static import for getValidMoves in useGameSocket
+* [33m95be3a9[m fix: Calculate validMoves after rolling dice in useGameSocket
+* [33mf215a42[m fix: Add fallback to gameState.validMoves for legal moves calculation
+* [33m3d883fa[m debug: Add extensive logging to getPointsArray
+* [33m8f33119[m debug: Force visible error logs for legal moves calculation
+* [33m1829474[m fix: Improve dice values extraction for legal moves calculation
+* [33m35055d8[m debug: Add extensive error logging for legal moves calculation
+* [33mbea9ef2[m debug: Add logs to handlePointerDown in Checker
+* [33mfff7d28[m fix: Improve checker click handling and add debug logs
+* [33meea2ec4[m fix: Correct addLog usage in boardState useMemo
+* [33m882b51a[m debug: Add logs in GameRoom to track boardState mapping
+* [33m4957f04[m debug: Add visible debug logs using useDebugStore for legal moves
+* [33m3ee6607[m debug: Add extensive logging for legal moves calculation and checker playability
+* [33mfdac2c3[m debug: Add extensive logging to board move handling
+* [33me6391b4[m fix: Improve legal moves calculation in board mappers
+* [33me0fcdcb[m docs: Add .env.example with Ollama configuration
+* [33m887f6a6[m feat: Use Ollama (FREE) for AI Coach instead of DeepSeek API
+* [33mb120c7d[m docs: Add DeepSeek API configuration guide
+* [33ma3e9714[m fix: Calculate legalMoves dynamically using getValidMoves
+* [33m6c4fb85[m fix: Move handleRollDice before conditional returns to fix React #310
+* [33mb239d56[m fix: Improve turn detection for offline-bot mode

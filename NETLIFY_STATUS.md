@@ -57,3 +57,5 @@ Le script vérifie pour chaque site :
 Le token fourni a été utilisé pour vérifier l'état des sites.
 Les résultats sont affichés dans la console lors de l'exécution du script.
 
+
+

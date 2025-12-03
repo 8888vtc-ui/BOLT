@@ -27,25 +27,13 @@ interface LegacyGameState {
 
 // Helper to get points array from various legacy formats
 const getPointsArray = (board: LegacyGameState['board']): { player: number | null; count: number }[] => {
-    console.error('[mappers] getPointsArray called with:', {
-        boardType: typeof board,
-        isArray: Array.isArray(board),
-        hasPoints: board && typeof board === 'object' && 'points' in board,
-        pointsType: board && typeof board === 'object' && 'points' in board ? typeof (board as any).points : 'N/A',
-        pointsIsArray: board && typeof board === 'object' && 'points' in board ? Array.isArray((board as any).points) : false
-    });
-    
     if (Array.isArray(board)) {
-        console.error('[mappers] Board is array, length:', board.length);
         return board;
     }
     if (board && typeof board === 'object' && 'points' in board && Array.isArray((board as any).points)) {
-        const points = (board as any).points;
-        console.error('[mappers] Board has points array, length:', points.length);
-        return points;
+        return (board as any).points;
     }
     // Fallback: create empty board
-    console.error('[mappers] ❌ Invalid board structure, creating empty board');
     return Array(24).fill({ player: null, count: 0 });
 };
 
@@ -216,13 +204,6 @@ export const mapGameStateToBoardState = (
 
     // Map Turn
     const turn = getColor(gameState.turn);
-    
-    console.error('[mappers] ⚠️⚠️⚠️ TURN MAPPING ⚠️⚠️⚠️', {
-        gameStateTurn: gameState.turn,
-        mappedTurn: turn,
-        myId,
-        players: players.map(p => ({ id: p.id, color: p.color }))
-    });
 
     // Calculate Legal Moves dynamically using gameLogic
     const legalMoves: LegalMove[] = [];
@@ -241,14 +222,6 @@ export const mapGameStateToBoardState = (
         (players.length > 0 && gameState.turn === players[0].id)
     );
     
-    console.error('[mappers] 🔒🔒🔒 TURN VALIDATION 🔒🔒🔒', {
-        gameStateTurn: gameState.turn,
-        myId,
-        isBotTurn,
-        isMyTurn,
-        player0Id: players[0]?.id,
-        player1Id: players[1]?.id
-    });
     
     // Determine current player color (1 or 2)
     // CRITICAL: Map turn to player color correctly
@@ -278,24 +251,9 @@ export const mapGameStateToBoardState = (
         currentPlayerColor = turn === 'light' ? 1 : 2;
     }
     
-    console.error('[mappers] ⚠️⚠️⚠️ CURRENT PLAYER COLOR ⚠️⚠️⚠️', {
-        currentPlayerColor,
-        turn,
-        gameStateTurn: gameState.turn,
-        myId,
-        isBotTurn,
-        isMyTurn,
-        players: players.map(p => ({ id: p.id, color: p.color }))
-    });
     
     // === BLOCAGE: Ne pas calculer les legal moves si c'est le tour du BOT ===
     if (isBotTurn) {
-        console.error('[mappers] 🚫🚫🚫 TOUR DU BOT - PAS DE LEGAL MOVES POUR LE JOUEUR 🚫🚫🚫');
-        if (debugStore) {
-            try {
-                debugStore.getState().addLog(`[mappers] Tour du bot (${gameState.turn}) - pas de legal moves`, 'warning');
-            } catch (e) {}
-        }
         // Retourner avec legalMoves vide
         return {
             checkers,
@@ -321,7 +279,8 @@ export const mapGameStateToBoardState = (
         }
     }
     
-    console.warn('[mappers] DICE EXTRACTION:', {
+    // Log niveau debug au lieu d'error
+    console.debug('[mappers] DICE EXTRACTION:', {
         originalDice: gameState.dice,
         extractedDice: diceForMoves,
         diceLength: diceForMoves.length
@@ -330,38 +289,7 @@ export const mapGameStateToBoardState = (
     // Get points array safely
     const pointsArray = getPointsArray(gameState.board);
     
-    const debugMsg = `[mappers] Calculating legal moves: dice=${diceForMoves.length}, points=${pointsArray.length}, turn=${turn}`;
-    console.log(debugMsg, {
-        diceForMoves,
-        diceLength: diceForMoves.length,
-        pointsLength: pointsArray.length,
-        turn,
-        currentPlayerColor: turn === 'light' ? 1 : 2,
-        hasBoard: !!gameState.board
-    });
-    if (debugStore) {
-        try {
-            debugStore.getState().addLog(debugMsg, 'info');
-        } catch (e) {}
-    }
-    
     // Only calculate moves if we have dice and a valid board
-    // FORCE LOGS TO BE VISIBLE
-    const conditionCheck = {
-        diceValuesLength: diceForMoves.length,
-        pointsArrayLength: pointsArray.length,
-        hasDice: diceForMoves.length > 0,
-        hasValidBoard: pointsArray.length === 24,
-        willCalculate: diceForMoves.length > 0 && pointsArray.length === 24,
-        diceForMoves: diceForMoves,
-        pointsArraySample: pointsArray.slice(0, 3)
-    };
-    console.error('[mappers] ⚠️⚠️⚠️ CHECKING CONDITIONS ⚠️⚠️⚠️', conditionCheck);
-    if (debugStore) {
-        try {
-            debugStore.getState().addLog(`[mappers] Conditions: dice=${diceForMoves.length}, points=${pointsArray.length}`, 'error');
-        } catch (e) {}
-    }
     
     if (diceForMoves.length > 0 && pointsArray.length === 24) {
         try {
@@ -372,7 +300,7 @@ export const mapGameStateToBoardState = (
             const player1Id = players[1]?.id;
             
             const boardStateForLogic: { points: Point[]; bar: { player1: number; player2: number }; off: { player1: number; player2: number } } = {
-                points: pointsArray.map((p, idx) => {
+                points: pointsArray.map((p) => {
                     let mappedPlayer: 1 | 2 | null = null;
                     
                     if (p.player !== null && p.player !== undefined) {
@@ -405,33 +333,8 @@ export const mapGameStateToBoardState = (
                 }
             };
             
-            console.error('[mappers] ⚠️⚠️⚠️ BOARD STATE FOR LOGIC ⚠️⚠️⚠️', {
-                pointsWithPlayers: boardStateForLogic.points.filter(p => p.player !== null).slice(0, 5),
-                bar: boardStateForLogic.bar,
-                off: boardStateForLogic.off,
-                currentPlayerColor,
-                player0Id,
-                player1Id
-            });
-            
             // Use getValidMoves to calculate all valid moves
-            console.error('[mappers] ⚠️⚠️⚠️ CALLING getValidMoves ⚠️⚠️⚠️', {
-                boardStateForLogic: {
-                    pointsLength: boardStateForLogic.points.length,
-                    pointsSample: boardStateForLogic.points.slice(0, 3),
-                    bar: boardStateForLogic.bar,
-                    off: boardStateForLogic.off
-                },
-                currentPlayerColor,
-                diceForMoves
-            });
-            
             const validMovesMap = getValidMoves(boardStateForLogic, currentPlayerColor, diceForMoves);
-            
-            console.error('[mappers] ⚠️⚠️⚠️ getValidMoves RESULT ⚠️⚠️⚠️', {
-                mapSize: validMovesMap.size,
-                mapEntries: Array.from(validMovesMap.entries()).slice(0, 5)
-            });
             
             // Convert Map to LegalMove array
             validMovesMap.forEach((destinations, fromIndex) => {
@@ -450,13 +353,6 @@ export const mapGameStateToBoardState = (
                 });
             });
             
-            const successMsg = `[mappers] ✅ Calculated ${legalMoves.length} legal moves`;
-            console.error('[mappers] ✅✅✅ SUCCESS ✅✅✅', successMsg, legalMoves);
-            if (debugStore) {
-                try {
-                    debugStore.getState().addLog(successMsg, 'success');
-                } catch (e) {}
-            }
         } catch (error) {
             console.warn('[mappers] Error calculating legal moves:', error);
             // Fallback to gameState.validMoves if calculation fails
@@ -485,20 +381,16 @@ export const mapGameStateToBoardState = (
                 });
             }
         }
+    } else {
+        // Cas normal quand dice=0 (avant lancement des dés) - pas d'erreur, juste debug
+        if (diceForMoves.length === 0) {
+            console.debug('[mappers] No dice yet - legal moves empty (normal before roll)');
         } else {
-        const errorMsg = `[mappers] ❌ CANNOT CALCULATE LEGAL MOVES: dice=${diceForMoves.length}, points=${pointsArray.length}`;
-        console.error(errorMsg, {
-            diceLength: diceForMoves.length,
-            pointsLength: pointsArray.length,
-            hasBoard: !!gameState.board,
-            boardType: typeof gameState.board,
-            boardIsArray: Array.isArray(gameState.board),
-            boardHasPoints: gameState.board && typeof gameState.board === 'object' && 'points' in gameState.board
-        });
-        if (debugStore) {
-            try {
-                debugStore.getState().addLog(errorMsg, 'error');
-            } catch (e) {}
+            // Vrai problème si on a des dés mais pas de board valide
+            console.warn('[mappers] Cannot calculate legal moves - invalid board state', {
+                diceLength: diceForMoves.length,
+                pointsLength: pointsArray.length
+            });
         }
     }
 
@@ -515,7 +407,7 @@ export const mapGameStateToBoardState = (
 export const mapMoveToLegacy = (
     from: PipIndex | 'bar',
     to: PipIndex | 'borne',
-    playerColor?: number // Paramètre optionnel pour compatibilité (non utilisé)
+    _playerColor?: number // Paramètre optionnel pour compatibilité (non utilisé)
 ): { from: number; to: number } => {
     const legacyFrom = from === 'bar' ? -1 : (from as number) - 1;
     const legacyTo = to === 'borne' ? -1 : (to as number) - 1;

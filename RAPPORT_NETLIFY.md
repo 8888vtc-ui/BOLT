@@ -169,3 +169,5 @@ npm run build 2>&1 | tee build.log
 
 **Prochaine action recommandée :** Vérifier les logs Netlify pour identifier l'erreur exacte du build.
 
+
+

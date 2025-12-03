@@ -250,3 +250,5 @@ Le jeu est maintenant :
 
 **Prochaine Action Recommandée** : Tester une partie complète contre le bot pour valider toutes les corrections.
 
+
+

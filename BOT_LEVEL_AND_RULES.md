@@ -216,3 +216,5 @@ Les règles manquantes sont optionnelles et n'empêchent pas un jeu standard com
 
 **Le bot est prêt pour les tests live !** 🚀
 
+
+

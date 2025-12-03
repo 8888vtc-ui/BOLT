@@ -302,3 +302,5 @@ Les règles manquantes sont optionnelles ou avancées et n'empêchent pas un jeu
 
 **Prochaine Action :** Ajouter Crawford Rule pour match play complet (optionnel).
 
+
+

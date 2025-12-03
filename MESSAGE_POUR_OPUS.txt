@@ -1,0 +1,46 @@
+Salut Opus — besoin d'une intervention urgente sur GuruGammon : correction de 3 erreurs critiques React et 2 erreurs importantes identifiées lors de tests automatiques.
+
+Résumé du problème
+24+ erreurs trouvées lors de tests automatiques en boucle, dont 3 critiques qui empêchent le bon fonctionnement du jeu.
+
+Actions demandées (ordre de priorité)
+
+1. Corriger gameState undefined au rendu
+   - Fichier: src/pages/GameRoom.tsx
+   - Problème: gameState est null au premier rendu, causant "No gameState for boardState undefined"
+   - Solution: Ajouter vérification if (!gameState || !gameState.board) return <Loader />; avant le rendu du plateau
+
+2. Corriger setState pendant render (GameRoom)
+   - Fichier: src/pages/GameRoom.tsx:43
+   - Problème: Appel de addLog pendant le render, violation des règles React
+   - Solution: Déplacer tous les addLog du render vers useEffect
+
+3. Corriger setState pendant render (CheckersLayer)
+   - Fichier: src/board/components/CheckersLayer.tsx:22
+   - Problème: Appel de addLog pendant le render, violation des règles React
+   - Solution: Déplacer tous les addLog du render vers useEffect ou les supprimer
+
+4. Corriger niveau de log pour DICE EXTRACTION
+   - Fichier: src/board/utils/mappers.ts
+   - Problème: Log d'erreur pour extraction des dés (normal)
+   - Solution: Changer console.error en console.info ou console.debug
+
+5. Gérer proprement dice=0 pour legal moves
+   - Fichier: src/board/utils/mappers.ts
+   - Problème: Erreur quand dice=0 (normal au début)
+   - Solution: Retourner { legalMoves: [], legalMovesCount: 0 } au lieu d'erreur
+
+Tests à exécuter après correctifs
+- Charger la page de jeu → vérifier qu'il n'y a plus d'erreur "gameState undefined"
+- Vérifier console → plus d'erreur "setState during render"
+- Lancer les dés → vérifier que les legal moves sont calculés correctement
+- Répéter 5 fois sans erreur
+
+Ce que j'attends de toi, Opus
+- Appliquer les 5 correctifs listés
+- Vérifier qu'il n'y a plus d'erreurs React dans la console
+- Confirmer que le jeu fonctionne correctement
+- Commit et push des changements avec message clair
+
+Merci de traiter en priorité.
+

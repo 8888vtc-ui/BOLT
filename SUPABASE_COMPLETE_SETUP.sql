@@ -531,3 +531,5 @@ CREATE TRIGGER update_tournaments_updated_at
 -- Les politiques RLS sont configurées pour permettre l'accès anonyme
 -- aux tables principales (rooms, games, messages) pour éviter l'erreur 42501.
 
+
+

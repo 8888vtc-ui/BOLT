@@ -65,30 +65,7 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                 );
                 const canPlay = isPlayable && isTopOfStack;
                 
-                // Debug logging for first checker on point 6
-                if (checker.pip === 6 && checker.color === 'light' && (checker.z || 0) === 0) {
-                    console.error('[CheckersLayer] ⚠️⚠️⚠️ CHECKER ON POINT 6 ⚠️⚠️⚠️', {
-                        turn,
-                        checkerColor: checker.color,
-                        isCurrentPlayerChecker,
-                        hasLegalMoves,
-                        isTopOfStack,
-                        canPlay,
-                        playablePips: Array.from(playablePips),
-                        legalMovesCount: legalMoves.length,
-                        legalMovesFrom6: legalMoves.filter(m => m.from === 6)
-                    });
-                }
-                
-                // FORCE LOG FOR ALL LIGHT CHECKERS
-                if (checker.color === 'light' && (checker.z || 0) === 0) {
-                    console.error(`[CheckersLayer] Light checker on pip ${checker.pip}:`, {
-                        canPlay,
-                        hasLegalMoves,
-                        isCurrentPlayerChecker,
-                        legalMovesFromThisPip: legalMoves.filter(m => m.from === checker.pip)
-                    });
-                }
+                // Debug logging supprimé pour éviter setState during render
                 
                 const isSelected = checker.pip === selectedPip;
 
@@ -111,12 +88,6 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
                         onClick={() => {
-                            // ALWAYS call onCheckerClick for debugging, even if canPlay is false
-                            console.error('[CheckersLayer] ✅✅✅ CHECKER CLICK ✅✅✅', { 
-                                pip: checker.pip, 
-                                canPlay, 
-                                color: checker.color 
-                            });
                             onCheckerClick(checker.pip);
                         }}
                     />

@@ -63,3 +63,5 @@
     console.log('📋 Vérifiez les logs [Checker] et [Triangle] dans la console');
 })();
 
+
+

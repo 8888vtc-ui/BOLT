@@ -181,3 +181,5 @@ Le bot devrait maintenant :
 
 **Prochaine Action** : Tester une partie complète et vérifier que tout fonctionne !
 
+
+

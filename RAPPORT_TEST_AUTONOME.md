@@ -98,3 +98,5 @@ Script minimal pour test rapide : lance dés → clique checker → clique point
 
 **Note** : Ce rapport sera mis à jour lorsque le déplacement fonctionnera ou après 50 tentatives.
 
+
+

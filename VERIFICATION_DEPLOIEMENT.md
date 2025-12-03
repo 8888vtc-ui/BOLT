@@ -205,3 +205,5 @@ curl -X POST https://botgammon.netlify.app/.netlify/functions/analyze \
 **Date de vérification :** _______________________
 **Vérifié par :** _______________________
 
+
+

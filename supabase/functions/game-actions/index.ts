@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
+
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid authorization' }), {
         status: 401,
@@ -122,7 +122,11 @@ Deno.serve(async (req: Request) => {
 
       const playerNumber = game.player1_id === user.id ? 1 : 2
       if (game.current_turn !== playerNumber) {
-        return new Response(JSON.stringify({ error: 'Not your turn' }), {
+        return new Response(JSON.stringify({
+          error: 'Not your turn',
+          reason: 'not-your-turn',
+          currentTurn: game.current_turn
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
