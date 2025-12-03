@@ -24,7 +24,7 @@ import BrowserConsole from '../components/BrowserConsole';
 import WinModal from '../components/game/WinModal';
 import TestPanel from '../components/TestPanel';
 import BoardWrap from '../board/components/BoardWrap';
-import { mapGameStateToBoardState } from '../board/utils/mappers';
+import { mapGameStateToBoardState, mapMoveToLegacy } from '../board/utils/mappers';
 import { Player, TimerState } from '../board/types';
 
 
