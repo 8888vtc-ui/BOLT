@@ -209,6 +209,14 @@ export const mapGameStateToBoardState = (
     // Calculate Legal Moves dynamically using gameLogic
     const legalMoves: LegalMove[] = [];
     
+    // LOG: Check if validMoves exists in gameState
+    console.error('[mappers] 🔍 CHECKING gameState.validMoves:', {
+        hasValidMoves: !!gameState.validMoves,
+        isArray: Array.isArray(gameState.validMoves),
+        length: gameState.validMoves?.length,
+        sample: gameState.validMoves?.slice(0, 3)
+    });
+    
     // Determine current player color (1 or 2)
     const currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
     
