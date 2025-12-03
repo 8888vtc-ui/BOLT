@@ -105,7 +105,15 @@ const CheckersLayer = memo<CheckersLayerProps>(({
                         zIndex={20 + (checker.z || 0)} // Higher than triangles
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
-                        onClick={() => canPlay && onCheckerClick(checker.pip)}
+                        onClick={() => {
+                            // ALWAYS call onCheckerClick for debugging, even if canPlay is false
+                            console.error('[CheckersLayer] ✅✅✅ CHECKER CLICK ✅✅✅', { 
+                                pip: checker.pip, 
+                                canPlay, 
+                                color: checker.color 
+                            });
+                            onCheckerClick(checker.pip);
+                        }}
                     />
                 );
             })}

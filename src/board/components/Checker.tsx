@@ -98,15 +98,15 @@ const Checker = memo<CheckerProps>(({
         }
 
         if (wasDragging) {
-            const dx = e.clientX - startPos.current.x;
-            const dy = e.clientY - startPos.current.y;
+        const dx = e.clientX - startPos.current.x;
+        const dy = e.clientY - startPos.current.y;
 
-            // If minimal movement, treat as click
-            if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+        // If minimal movement, treat as click
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
                 console.error('[Checker] ✅✅✅ CLICK DETECTED ✅✅✅', { isPlayable, id, color });
                 if (isPlayable) {
-                    onClick();
-                } else {
+            onClick();
+        } else {
                     console.error('[Checker] ❌ Not playable, but click detected');
                 }
             } else {
@@ -149,12 +149,11 @@ const Checker = memo<CheckerProps>(({
             onPointerLeave={() => setIsHovered(false)}
             onKeyDown={handleKeyDown}
             onClick={(e) => {
-                // Direct click handler as fallback
+                // Direct click handler - ALWAYS call onClick for debugging
                 console.error('[Checker] ✅✅✅ DIRECT CLICK HANDLER ✅✅✅', { isPlayable, id, color });
                 e.stopPropagation();
-                if (isPlayable) {
-                    onClick();
-                }
+                // ALWAYS call onClick, even if not playable (for debugging)
+                onClick();
             }}
             role="button"
             aria-label={`${color} checker${isPlayable ? ', playable' : ''}${isSelected ? ', selected' : ''}`}
