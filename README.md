@@ -81,10 +81,22 @@ npm run build
 
 ## 📦 Variables d'Environnement
 
+### Requis
 ```bash
-VITE_SUPABASE_URL=https://vgmrkdlgjivfdyrpadha.supabase.co
-VITE_SUPABASE_ANON_KEY=ton_anon_key_ici
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
 ```
+
+### Optionnel (pour AI Coach)
+```bash
+# DeepSeek API - pour l'AI Coach
+VITE_DEEPSEEK_API_KEY=your-deepseek-api-key-here
+
+# HeyGen API - pour les vidéos du coach
+VITE_HEYGEN_API_KEY=your-heygen-api-key-here
+```
+
+📖 **Guide complet:** Voir `DEEPSEEK_SETUP.md` pour configurer l'AI Coach
 
 ## 🎯 Prochaines Étapes
 
