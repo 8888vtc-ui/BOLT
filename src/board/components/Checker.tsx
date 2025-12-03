@@ -83,24 +83,35 @@ const Checker = memo<CheckerProps>(({
     }, []);
 
     const handlePointerUp = useCallback((e: React.PointerEvent) => {
-        if (!isDragging.current) return;
-
+        const wasDragging = isDragging.current;
         isDragging.current = false;
-        (e.target as SVGElement).releasePointerCapture(e.pointerId);
+        
+        if (e.target instanceof SVGElement) {
+            (e.target as SVGElement).releasePointerCapture(e.pointerId);
+        }
 
-        const dx = e.clientX - startPos.current.x;
-        const dy = e.clientY - startPos.current.y;
+        if (wasDragging) {
+            const dx = e.clientX - startPos.current.x;
+            const dy = e.clientY - startPos.current.y;
 
-        // If minimal movement, treat as click
-        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-            onClick();
+            // If minimal movement, treat as click
+            if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                console.log('[Checker] Click detected, calling onClick');
+                onClick();
+            } else {
+                // Drop - will be resolved by hit test in parent
+                onDragEnd(null);
+            }
         } else {
-            // Drop - will be resolved by hit test in parent
-            onDragEnd(null);
+            // If pointerDown was never captured, treat as click anyway
+            console.log('[Checker] PointerUp without drag, treating as click');
+            if (isPlayable) {
+                onClick();
+            }
         }
         
         setDragOffset({ x: 0, y: 0 });
-    }, [onClick, onDragEnd]);
+    }, [onClick, onDragEnd, isPlayable]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (!isPlayable) return;
