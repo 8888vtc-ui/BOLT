@@ -227,6 +227,29 @@ export const mapGameStateToBoardState = (
     // Calculate Legal Moves dynamically using gameLogic
     const legalMoves: LegalMove[] = [];
     
+    // === VALIDATION: Ne pas calculer les moves si c'est le tour du BOT ===
+    const isBotTurn = gameState.turn === 'bot' || 
+                      (players.length > 1 && gameState.turn === players[1].id && players[1].id !== myId);
+    
+    // Déterminer si c'est vraiment le tour du joueur humain
+    const isMyTurn = !isBotTurn && (
+        gameState.turn === myId ||
+        gameState.turn === 'guest' ||
+        gameState.turn === 'guest-1' ||
+        gameState.turn === undefined ||
+        gameState.turn === null ||
+        (players.length > 0 && gameState.turn === players[0].id)
+    );
+    
+    console.error('[mappers] 🔒🔒🔒 TURN VALIDATION 🔒🔒🔒', {
+        gameStateTurn: gameState.turn,
+        myId,
+        isBotTurn,
+        isMyTurn,
+        player0Id: players[0]?.id,
+        player1Id: players[1]?.id
+    });
+    
     // Determine current player color (1 or 2)
     // CRITICAL: Map turn to player color correctly
     let currentPlayerColor: PlayerColor;
@@ -260,8 +283,28 @@ export const mapGameStateToBoardState = (
         turn,
         gameStateTurn: gameState.turn,
         myId,
+        isBotTurn,
+        isMyTurn,
         players: players.map(p => ({ id: p.id, color: p.color }))
     });
+    
+    // === BLOCAGE: Ne pas calculer les legal moves si c'est le tour du BOT ===
+    if (isBotTurn) {
+        console.error('[mappers] 🚫🚫🚫 TOUR DU BOT - PAS DE LEGAL MOVES POUR LE JOUEUR 🚫🚫🚫');
+        if (debugStore) {
+            try {
+                debugStore.getState().addLog(`[mappers] Tour du bot (${gameState.turn}) - pas de legal moves`, 'warning');
+            } catch (e) {}
+        }
+        // Retourner avec legalMoves vide
+        return {
+            checkers,
+            dice,
+            cube,
+            legalMoves: [],
+            turn
+        };
+    }
     
     // Get dice values for move calculation - handle various formats
     let diceForMoves: number[] = [];

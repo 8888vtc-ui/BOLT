@@ -481,20 +481,59 @@ const GameRoom = () => {
 
     // Handle moves from the new board component
     const handleBoardMove = useCallback((from: number | 'bar', to: number | 'borne') => {
-        console.error('[GameRoom] ✅✅✅ handleBoardMove CALLED ✅✅✅', { 
+        const addLog = useDebugStore.getState().addLog;
+        const currentTurn = gameState?.turn;
+        const myId = user?.id || players?.[0]?.id || 'guest';
+        
+        // === VALIDATION STRICTE DU TOUR ===
+        // 1. Vérifier que ce n'est PAS le tour du bot
+        const isBotTurn = currentTurn === 'bot' || currentTurn === players?.[1]?.id;
+        
+        // 2. Vérifier que c'est VRAIMENT mon tour
+        const isDefinitelyMyTurn = !isBotTurn && (
+            currentTurn === myId ||
+            currentTurn === 'guest' ||
+            currentTurn === 'guest-1' ||
+            currentTurn === players?.[0]?.id ||
+            currentTurn === undefined ||
+            currentTurn === null
+        );
+        
+        console.error('[GameRoom] 🔒 handleBoardMove - TURN VALIDATION 🔒', { 
             from, 
             to, 
-            isMyTurn, 
+            currentTurn,
+            myId,
+            isBotTurn,
+            isDefinitelyMyTurn,
+            isMyTurn,
             playerColor,
+            playersIds: players?.map(p => p.id),
             timestamp: new Date().toISOString()
         });
         
-        if (!isMyTurn) {
-            console.error('[GameRoom] ❌ Not my turn, ignoring move', { 
-                isMyTurn, 
-                currentTurn: gameState?.turn,
-                myId: user?.id
+        addLog(`[handleBoardMove] Validation tour: currentTurn=${currentTurn}, myId=${myId}, isBotTurn=${isBotTurn}`, 'info');
+        
+        // === BLOCAGE SI TOUR DU BOT ===
+        if (isBotTurn) {
+            console.error('[GameRoom] ❌❌❌ BLOCAGE: C\'est le tour du BOT, move ignoré ❌❌❌', { 
+                currentTurn,
+                botId: players?.[1]?.id || 'bot',
+                myId
             });
+            addLog(`[handleBoardMove] BLOCAGE: Tour du bot (${currentTurn}), move ignoré`, 'warning');
+            return;
+        }
+        
+        // === BLOCAGE SI PAS MON TOUR (double vérification) ===
+        if (!isMyTurn && !isDefinitelyMyTurn) {
+            console.error('[GameRoom] ❌ Not my turn (double check), ignoring move', { 
+                isMyTurn,
+                isDefinitelyMyTurn,
+                currentTurn,
+                myId
+            });
+            addLog(`[handleBoardMove] BLOCAGE: Pas mon tour (isMyTurn=${isMyTurn}, currentTurn=${currentTurn})`, 'warning');
             return;
         }
         
@@ -514,16 +553,20 @@ const GameRoom = () => {
             toIdx = to - 1;
         }
         
-        console.error('[GameRoom] ✅✅✅ SENDING MOVE ✅✅✅', { 
+        console.error('[GameRoom] ✅✅✅ ENVOI MOVE AUTORISÉ ✅✅✅', { 
             fromIdx, 
             toIdx, 
             originalFrom: from, 
             originalTo: to,
+            currentTurn,
+            myId,
             mapped: `${fromIdx} -> ${toIdx}`
         });
         
+        addLog(`[handleBoardMove] Envoi move: ${fromIdx} -> ${toIdx}, turn=${currentTurn}`, 'success');
+        
         sendGameAction('move', { from: fromIdx, to: toIdx });
-    }, [isMyTurn, playerColor, sendGameAction, gameState?.turn, user?.id]);
+    }, [isMyTurn, playerColor, sendGameAction, gameState?.turn, user?.id, players]);
 
     // Determine if current player can double now
     const canDoubleNow = useMemo(() => {

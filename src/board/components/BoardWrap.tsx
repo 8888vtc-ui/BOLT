@@ -96,17 +96,30 @@ const BoardWrap = memo<BoardProps>(({
     }, [state.legalMoves, state.checkers, state.turn]);
 
     const handlePipClick = useCallback((pip: PipIndex | 'bar' | 'borne') => {
+        // === VALIDATION: Bloquer si pas de onMove (pas mon tour) ===
+        if (!onMove) {
+            console.warn('[BoardWrap] ⚠️ onMove non disponible - action bloquée');
+            return;
+        }
+        
+        // === VALIDATION: Bloquer si pas de legal moves (pas mon tour) ===
+        if (state.legalMoves.length === 0) {
+            console.warn('[BoardWrap] ⚠️ Aucun coup légal - probablement pas mon tour');
+            return;
+        }
+        
         console.error('[BoardWrap] 🔥🔥🔥 handlePipClick - AUTO MOVE 🔥🔥🔥', { 
             pip, 
             legalMovesCount: state.legalMoves.length, 
             turn: state.turn,
+            hasOnMove: !!onMove,
             timestamp: new Date().toISOString()
         });
         
         // Si clic sur la zone de sortie (borne), bear off automatique
         if (pip === 'borne') {
             const bearOffMoves = state.legalMoves.filter(m => m.to === 'borne');
-            if (bearOffMoves.length > 0 && onMove) {
+            if (bearOffMoves.length > 0) {
                 const move = bearOffMoves[0];
                 console.error('[BoardWrap] 🏠 AUTO BEAR OFF:', move);
                 onMove(move.from, 'borne');
@@ -127,11 +140,12 @@ const BoardWrap = memo<BoardProps>(({
             pip, 
             hasPlayableChecker, 
             hasLegalMoves, 
-            movesFromPip
+            movesFromPip,
+            currentTurn: state.turn
         });
         
         // 🎯 DÉPLACEMENT AUTOMATIQUE EN UN CLIC !
-        if (hasPlayableChecker && hasLegalMoves && onMove) {
+        if (hasPlayableChecker && hasLegalMoves) {
             const bestMove = getBestDestination(pip);
             
             if (bestMove) {
@@ -139,6 +153,7 @@ const BoardWrap = memo<BoardProps>(({
                     from: pip, 
                     to: bestMove.to,
                     allOptions: movesFromPip,
+                    turn: state.turn,
                     timestamp: new Date().toISOString()
                 });
                 
@@ -155,7 +170,7 @@ const BoardWrap = memo<BoardProps>(({
                 m => m.from === selectedPip && m.to === pip
             );
             
-            if (isValidMove && onMove) {
+            if (isValidMove) {
                 console.error('[BoardWrap] ✅ Fallback move:', { from: selectedPip, to: pip });
                 onMove(selectedPip, pip as PipIndex);
                 announceMove(selectedPip, pip as PipIndex);
