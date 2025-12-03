@@ -614,12 +614,12 @@ const GameRoom = () => {
             score && players[0] ? (score[players[0].id] || 0) : 0,
             score && players[1] ? (score[players[1].id] || 0) : 0
         ] as [number, number],
-        limitPoints: gameState.matchLength || 0,
+        limitPoints: gameState?.matchLength || 0,
         timers: [
             { msRemaining: 0, running: false },
             { msRemaining: 0, running: false }
         ] as [TimerState, TimerState]
-    }), [players, score, gameState.matchLength]);
+    }), [players, score, gameState?.matchLength]);
 
     /**
      * Handle moves from the new board component
