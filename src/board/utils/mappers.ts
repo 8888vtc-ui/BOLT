@@ -1,4 +1,5 @@
 import { BoardState, CheckerState, Color, CubeState, DiceState, LegalMove, PipIndex } from '../types';
+import { getValidMoves, PlayerColor } from '../../lib/gameLogic';
 
 // Define the shape of the existing GameState (approximate)
 interface LegacyGameState {
@@ -185,32 +186,66 @@ export const mapGameStateToBoardState = (
     // Map Turn
     const turn = getColor(gameState.turn);
 
-    // Map Legal Moves
-    const legalMoves: LegalMove[] = (gameState.validMoves || []).map((m: any) => {
-        // Handle various move formats
-        let from: PipIndex | 'bar';
-        let to: PipIndex | 'borne';
-
-        // From position
-        if (m.bar || m.from === 'bar' || m.from === -1 || m.from === 24) {
-            from = 'bar';
-        } else if (typeof m.from === 'number') {
-            from = (m.from + 1) as PipIndex; // Convert 0-23 to 1-24
-        } else {
-            from = m.from as PipIndex;
+    // Calculate Legal Moves dynamically using gameLogic
+    const legalMoves: LegalMove[] = [];
+    
+    // Determine current player color (1 or 2)
+    const currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
+    
+    // Get dice values
+    const diceValues = gameState.dice && gameState.dice.length > 0 ? gameState.dice : [];
+    
+    // Only calculate moves if we have dice and a valid board
+    if (diceValues.length > 0 && gameState.board && gameState.board.points) {
+        try {
+            // Use getValidMoves to calculate all valid moves
+            const validMovesMap = getValidMoves(gameState.board, currentPlayerColor, diceValues);
+            
+            // Convert Map to LegalMove array
+            validMovesMap.forEach((destinations, fromIndex) => {
+                destinations.forEach((toIndex) => {
+                    // Convert from index (-1 or 0-23) to PipIndex | 'bar'
+                    const from: PipIndex | 'bar' = fromIndex === -1 
+                        ? 'bar' 
+                        : (fromIndex + 1) as PipIndex;
+                    
+                    // Convert to index (-1, 24, or 0-23) to PipIndex | 'borne'
+                    const to: PipIndex | 'borne' = (toIndex === -1 || toIndex === 24)
+                        ? 'borne'
+                        : (toIndex + 1) as PipIndex;
+                    
+                    legalMoves.push({ from, to });
+                });
+            });
+        } catch (error) {
+            console.warn('[mappers] Error calculating legal moves:', error);
+            // Fallback to gameState.validMoves if calculation fails
+            if (gameState.validMoves && Array.isArray(gameState.validMoves)) {
+                gameState.validMoves.forEach((m: any) => {
+                    let from: PipIndex | 'bar';
+                    let to: PipIndex | 'borne';
+                    
+                    if (m.bar || m.from === 'bar' || m.from === -1 || m.from === 24) {
+                        from = 'bar';
+                    } else if (typeof m.from === 'number') {
+                        from = (m.from + 1) as PipIndex;
+                    } else {
+                        from = m.from as PipIndex;
+                    }
+                    
+                    if (m.to === -1 || m.to === 24 || m.to === 'off' || m.to === 'borne') {
+                        to = 'borne';
+                    } else if (typeof m.to === 'number') {
+                        to = (m.to + 1) as PipIndex;
+                    } else {
+                        to = m.to as PipIndex;
+                    }
+                    
+                    legalMoves.push({ from, to });
+                });
+            }
         }
-
-        // To position
-        if (m.to === -1 || m.to === 24 || m.to === 'off' || m.to === 'borne') {
-            to = 'borne';
-        } else if (typeof m.to === 'number') {
-            to = (m.to + 1) as PipIndex; // Convert 0-23 to 1-24
-        } else {
-            to = m.to as PipIndex;
-        }
-
-        return { from, to };
-    });
+    }
 
     return {
         checkers,
