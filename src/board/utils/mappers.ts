@@ -205,12 +205,41 @@ export const mapGameStateToBoardState = (
 
     // Map Turn
     const turn = getColor(gameState.turn);
+    
+    console.error('[mappers] ⚠️⚠️⚠️ TURN MAPPING ⚠️⚠️⚠️', {
+        gameStateTurn: gameState.turn,
+        mappedTurn: turn,
+        myId,
+        players: players.map(p => ({ id: p.id, color: p.color }))
+    });
 
     // Calculate Legal Moves dynamically using gameLogic
     const legalMoves: LegalMove[] = [];
     
     // Determine current player color (1 or 2)
-    const currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
+    // CRITICAL: Map turn to player color correctly
+    // If turn is a player ID, find which player it is
+    let currentPlayerColor: PlayerColor = turn === 'light' ? 1 : 2;
+    
+    // If gameState.turn is a player ID, map it correctly
+    if (typeof gameState.turn === 'string') {
+        const turnPlayer = players.find(p => p.id === gameState.turn);
+        if (turnPlayer) {
+            currentPlayerColor = turnPlayer.color as PlayerColor;
+        } else if (gameState.turn === myId) {
+            // Current user is player 0 (light/1)
+            currentPlayerColor = 1;
+        } else {
+            // Opponent is player 1 (dark/2)
+            currentPlayerColor = 2;
+        }
+    }
+    
+    console.error('[mappers] ⚠️⚠️⚠️ CURRENT PLAYER COLOR ⚠️⚠️⚠️', {
+        currentPlayerColor,
+        turn,
+        gameStateTurn: gameState.turn
+    });
     
     // Get dice values - handle various formats
     let diceValues: number[] = [];
