@@ -6,6 +6,16 @@ import { supabase } from '../lib/supabase';
 import { useDebugStore } from '../stores/debugStore';
 import { analyzeMove } from '../lib/aiService';
 import { waitForDice, waitForDiceConsumed, waitForTurnSwitch, waitForInitialization, delay } from '../utils/botSync';
+import { 
+    checkBotInitialization, 
+    isSoloGame as checkIsSoloGame, 
+    checkBotTurn, 
+    botHasDice, 
+    generateAnalysisKey,
+    hasPendingDoubleForBot,
+    canBotConsiderDoubling,
+    DEFAULT_BOT_OPTIONS
+} from './useBotLogic';
 
 // FORCER MODE RÉEL - Désactiver le mode démo même si les variables ne sont pas chargées
 const DEMO_MODE = false; // FORCÉ EN MODE RÉEL - !import.meta.env.VITE_SUPABASE_URL;
@@ -1188,46 +1198,29 @@ export const useGameSocket = () => {
             const latestGameState = store.gameState;
             const latestPlayers = store.players;
 
+            // Utiliser la fonction utilitaire pour vérifier l'initialisation
+            const initStatus = checkBotInitialization(latestRoom, latestGameState, latestPlayers);
+
             addLog('[BOT DEBUG] useEffect triggered', 'info', {
-                hasCurrentRoom: !!latestRoom,
-                hasGameState: !!latestGameState,
+                hasCurrentRoom: initStatus.hasRoom,
+                hasGameState: initStatus.hasGameState,
                 gameStateTurn: latestGameState?.turn,
-                hasBoard: !!latestGameState?.board,
-                hasPoints: !!latestGameState?.board?.points,
-                playersLength: latestPlayers?.length,
-                roomId: latestRoom?.id
+                hasBoard: initStatus.hasBoard,
+                hasPoints: initStatus.hasPoints,
+                playersLength: initStatus.playersCount,
+                roomId: latestRoom?.id,
+                isReady: initStatus.isReady
             });
 
-            // Vérifier que tout est initialisé
-            // En mode offline-bot, on peut avoir un gameState sans board immédiatement après joinRoom
-            // Attendre un peu si nécessaire, mais ne pas bloquer indéfiniment
-            if (!latestRoom || !latestGameState) {
-                addLog('[BOT DEBUG] Early return: missing room or gameState', 'warning', {
-                    hasRoom: !!latestRoom,
-                    hasGameState: !!latestGameState,
-                    roomId: latestRoom?.id
-                });
-                return false; // Attendre l'initialisation complète
-            }
-
-            // Vérifier le board de manière plus tolérante
-            if (!latestGameState.board || !latestGameState.board.points || latestGameState.board.points.length !== 24) {
-                addLog('[BOT DEBUG] Early return: board not ready', 'warning', {
-                    hasBoard: !!latestGameState.board,
-                    hasPoints: !!latestGameState.board?.points,
-                    pointsLength: latestGameState.board?.points?.length,
-                    boardState: latestGameState.board ? 'exists' : 'missing',
-                    pointsState: latestGameState.board?.points ? 'exists' : 'missing',
-                    initializationStatus: {
-                        room: !!latestRoom,
-                        gameState: !!latestGameState,
-                        players: latestPlayers?.length || 0,
-                        board: !!latestGameState.board,
-                        points: !!latestGameState.board?.points
-                    }
-                });
-                // En mode offline-bot, attendre un peu que le board soit initialisé
-                // Le useEffect se redéclenchera quand gameState.board sera mis à jour
+            if (!initStatus.isReady) {
+                if (!initStatus.hasRoom || !initStatus.hasGameState) {
+                    addLog('[BOT DEBUG] Early return: missing room or gameState', 'warning', {
+                        ...initStatus,
+                        roomId: latestRoom?.id
+                    });
+                } else if (!initStatus.hasBoard || !initStatus.hasPoints || initStatus.pointsCount !== 24) {
+                    addLog('[BOT DEBUG] Early return: board not ready', 'warning', initStatus);
+                }
                 return false;
             }
 
@@ -1246,10 +1239,8 @@ export const useGameSocket = () => {
                 return;
             }
 
-            // Check if it's a solo training game
-            const isSoloGame = latestRoom.id === 'offline-bot' ||
-                latestRoom.name?.startsWith('Entraînement') ||
-                (latestPlayers && latestPlayers.length <= 1);
+            // Utiliser la fonction utilitaire pour vérifier si c'est un jeu solo
+            const isSoloGame = checkIsSoloGame(latestRoom, latestPlayers);
 
             if (!isSoloGame) {
                 addLog('[BOT DEBUG] Early return: not a solo game', 'warning', { roomId: latestRoom.id });
@@ -1257,8 +1248,6 @@ export const useGameSocket = () => {
             }
 
             // CRITIQUE : Vérifier que players contient 2 joueurs avant de continuer
-            // En mode offline-bot, les joueurs peuvent ne pas être encore initialisés
-            // Attendre un peu si nécessaire, mais ne pas bloquer indéfiniment
             if (!latestPlayers || latestPlayers.length < 2) {
                 addLog('[BOT DEBUG] Early return: not enough players', 'warning', {
                     playersLength: latestPlayers?.length,
@@ -1266,8 +1255,6 @@ export const useGameSocket = () => {
                     currentRoomId: latestRoom?.id,
                     isOfflineBot: latestRoom?.id === 'offline-bot'
                 });
-                // En mode offline-bot, si players n'est pas encore initialisé, attendre un peu
-                // mais ne pas bloquer - le useEffect se redéclenchera quand players sera mis à jour
                 return; // Attendre que les 2 joueurs soient définis
             }
 
@@ -1281,50 +1268,21 @@ export const useGameSocket = () => {
                 return; // Attendre que les joueurs soient complètement initialisés
             }
 
-            // Check if it's Bot's turn
-            // Protection: vérifier que latestPlayers[0] existe avant d'accéder à .id
-            const myId = user?.id || (latestPlayers && latestPlayers.length > 0 && latestPlayers[0] && latestPlayers[0].id ? latestPlayers[0].id : 'guest');
-            const currentTurn = latestGameState.turn;
-
-            // CRITIQUE : Identifier le bot depuis la liste des joueurs
-            // Le bot est toujours le deuxième joueur dans offline-bot mode
-            // Protection: vérifier que latestPlayers[1] existe avant d'accéder à .id
-            const botId = (latestPlayers && latestPlayers.length > 1 && latestPlayers[1] && latestPlayers[1].id) ? latestPlayers[1].id : 'bot';
+            // Utiliser la fonction utilitaire pour vérifier le tour du bot
+            const turnInfo = checkBotTurn(latestGameState, latestPlayers, user?.id);
+            const { isBotTurn, currentTurn, myId, botId, reason } = turnInfo;
 
             // Logs de debug pour comprendre le problème
             addLog('🔍 [BOT DEBUG] Détection du tour', 'debug', {
                 currentTurn,
                 myId,
                 botId,
+                reason,
+                isBotTurn,
                 players: latestPlayers?.filter(p => p && p.id).map(p => p && p.id ? { id: p.id, username: p.username || 'Unknown' } : null).filter(Boolean) || [],
-                turnMatchesBotId: currentTurn === botId,
-                turnMatchesBot: currentTurn === 'bot',
-                turnMatchesPlayer1: currentTurn === latestPlayers?.[0]?.id,
-                turnMatchesPlayer2: currentTurn === latestPlayers?.[1]?.id,
-                isNotMyTurn: currentTurn !== myId,
                 player0Id: latestPlayers?.[0]?.id,
                 player1Id: latestPlayers?.[1]?.id
             });
-
-            // Vérifier TOUTES les conditions possibles pour le tour du bot
-            // Le bot peut être identifié par son ID, 'bot', ou être le joueur 2
-            // IMPORTANT: Si currentTurn correspond au joueur 1, ce n'est PAS le tour du bot
-            // Si currentTurn correspond au joueur 2 (bot), c'est le tour du bot
-            // CRITIQUE: Si currentTurn est 'guest' ou 'guest-1', c'est le tour du joueur, PAS du bot
-            const isBotTurn = (
-                currentTurn === botId ||
-                currentTurn === 'bot' ||
-                (latestPlayers && latestPlayers.length > 1 && latestPlayers[1] && currentTurn === latestPlayers[1].id)
-            );
-
-            // Log de diagnostic précis pour le tour du bot
-            if (currentTurn === 'bot' && !isBotTurn) {
-                addLog('🚨 [BOT DEBUG] ERREUR CRITIQUE: turn="bot" mais isBotTurn=false', 'error', {
-                    currentTurn,
-                    botId,
-                    isBotTurn
-                });
-            }
 
             // Log supplémentaire pour voir pourquoi isBotTurn est false
             if (!isBotTurn) {
@@ -1332,20 +1290,14 @@ export const useGameSocket = () => {
                     currentTurn,
                     botId,
                     myId,
+                    reason,
                     player0Id: latestPlayers?.[0]?.id,
-                    player1Id: latestPlayers?.[1]?.id,
-                    check1: currentTurn === botId,
-                    check2: currentTurn === 'bot',
-                    check3: latestPlayers && latestPlayers.length > 1 && latestPlayers[1] && currentTurn === latestPlayers[1].id,
-                    check4: currentTurn !== myId && currentTurn !== latestPlayers?.[0]?.id && latestPlayers && latestPlayers.length === 2 && currentTurn !== 'guest' && currentTurn !== 'guest-1'
+                    player1Id: latestPlayers?.[1]?.id
                 });
             }
 
-            // Créer une clé unique pour cette analyse (turn + dice)
-            // Gérer le cas où les dés sont vides (avant le premier lancer)
-            const analysisKey = latestGameState.dice.length > 0
-                ? `${currentTurn}-${latestGameState.dice.join(',')}`
-                : `${currentTurn}-no-dice`;
+            // Créer une clé unique pour cette analyse (utiliser la fonction utilitaire)
+            const analysisKey = generateAnalysisKey(latestGameState);
 
             // Logs détaillés pour diagnostiquer
             addLog('🤖 Bot: Checking turn...', 'info', {
