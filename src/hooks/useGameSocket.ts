@@ -1827,25 +1827,18 @@ export const useGameSocket = () => {
                                     }
                                 }
                             }
-                        } catch (finalError: any) {
+                        } catch (e: any) {
                             // Protection globale: s'assurer que le bot n'est jamais bloqué
-                            addLog('🤖 Bot: Final error handler - unlocking bot', 'error', finalError);
-                            botIsThinking.current = false;
-                            botAnalysisInProgress.current = null;
+                            addLog('🤖 Bot: Final error handler - unlocking bot', 'error', e);
+                        } finally {
+                            // Clear timeout on success or error
                             if (botTimeoutRef.current) {
                                 clearTimeout(botTimeoutRef.current);
                                 botTimeoutRef.current = null;
                             }
-                            return;
+                            botIsThinking.current = false;
+                            botAnalysisInProgress.current = null; // Libérer le verrou
                         }
-
-                        // Clear timeout on success
-                        if (botTimeoutRef.current) {
-                            clearTimeout(botTimeoutRef.current);
-                            botTimeoutRef.current = null;
-                        }
-                        botIsThinking.current = false;
-                        botAnalysisInProgress.current = null; // Libérer le verrou
                     };
 
                     // Protection: envelopper performBotMove dans un try/catch global
