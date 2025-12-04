@@ -347,7 +347,46 @@ export const useGameSocket = () => {
                 setPlayers(soloPlayers);
 
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
-                const botState = createMockGameState(user?.id, options);
+                // IMPORTANT: Jeu de départ (opening roll) pour déterminer qui commence
+                // Chaque joueur lance un dé, celui qui obtient le plus haut nombre commence
+                // Si égalité, on relance
+                let playerRoll = 0;
+                let botRoll = 0;
+                let startingPlayerId: string;
+                
+                // Jeu de départ : lancer les dés jusqu'à ce qu'il y ait un gagnant
+                do {
+                    playerRoll = Math.floor(Math.random() * 6) + 1;
+                    botRoll = Math.floor(Math.random() * 6) + 1;
+                    
+                    addLog(`🎲 [OPENING ROLL] Joueur: ${playerRoll}, Bot: ${botRoll}`, 'info', {
+                        playerRoll,
+                        botRoll,
+                        playerId: soloPlayers[0].id,
+                        botId: soloPlayers[1].id
+                    });
+                    
+                    if (playerRoll > botRoll) {
+                        startingPlayerId = soloPlayers[0].id; // Le joueur commence
+                        addLog(`✅ [OPENING ROLL] Le joueur commence (${playerRoll} > ${botRoll})`, 'success');
+                    } else if (botRoll > playerRoll) {
+                        startingPlayerId = soloPlayers[1].id; // Le bot commence
+                        addLog(`✅ [OPENING ROLL] Le bot commence (${botRoll} > ${playerRoll})`, 'success');
+                    } else {
+                        addLog(`🔄 [OPENING ROLL] Égalité (${playerRoll} = ${botRoll}), on relance...`, 'info');
+                    }
+                } while (playerRoll === botRoll); // Relancer en cas d'égalité
+                
+                const botState = createMockGameState(startingPlayerId, options);
+                
+                // Log pour vérifier le tour initial
+                addLog(`🎲 [JOIN_ROOM] Tour initial: ${botState.turn} (après opening roll)`, 'info', {
+                    startingPlayerId,
+                    botId: soloPlayers[1].id,
+                    turn: botState.turn,
+                    playerRoll,
+                    botRoll
+                });
 
                 // Vérifier que le board est valide AVANT les logs - utiliser copie profonde sécurisée
                 if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
@@ -945,8 +984,8 @@ export const useGameSocket = () => {
                     // Determine current player color
                     let currentPlayerColor = 1;
                     if (players && players.length > 0) {
-                        if (currentPlayerId === players[0].id) currentPlayerColor = 1;
-                        else if (currentPlayerId === players[1]?.id) currentPlayerColor = 2;
+                        if (currentPlayerId === players[0].id || currentPlayerId === 'guest' || currentPlayerId === 'guest-1') currentPlayerColor = 1;
+                        else if (currentPlayerId === players[1]?.id || currentPlayerId === 'bot') currentPlayerColor = 2;
                         else if (currentPlayerId === 'bot') currentPlayerColor = 2;
                     }
 
@@ -1012,37 +1051,43 @@ export const useGameSocket = () => {
         // DEBUG: Log pour vérifier que le useEffect se déclenche
         const addLog = useDebugStore.getState().addLog;
         
+        // Récupérer les valeurs à jour depuis le store pour éviter les problèmes de closure
+        const store = useGameStore.getState();
+        const latestRoom = store.currentRoom;
+        const latestGameState = store.gameState;
+        const latestPlayers = store.players;
+        
         // En mode offline-bot, attendre un peu que les états soient synchronisés
         // Les setState sont asynchrones, donc on peut avoir besoin d'attendre
         const checkInitialization = () => {
             addLog('[BOT DEBUG] useEffect triggered', 'info', {
-                hasCurrentRoom: !!currentRoom,
-                hasGameState: !!gameState,
-                gameStateTurn: gameState?.turn,
-                hasBoard: !!gameState?.board,
-                hasPoints: !!gameState?.board?.points,
-                playersLength: players?.length,
-                roomId: currentRoom?.id
+                hasCurrentRoom: !!latestRoom,
+                hasGameState: !!latestGameState,
+                gameStateTurn: latestGameState?.turn,
+                hasBoard: !!latestGameState?.board,
+                hasPoints: !!latestGameState?.board?.points,
+                playersLength: latestPlayers?.length,
+                roomId: latestRoom?.id
             });
 
             // Vérifier que tout est initialisé
             // En mode offline-bot, on peut avoir un gameState sans board immédiatement après joinRoom
             // Attendre un peu si nécessaire, mais ne pas bloquer indéfiniment
-            if (!currentRoom || !gameState) {
+            if (!latestRoom || !latestGameState) {
                 addLog('[BOT DEBUG] Early return: missing room or gameState', 'warning', {
-                    hasRoom: !!currentRoom,
-                    hasGameState: !!gameState,
-                    roomId: currentRoom?.id
+                    hasRoom: !!latestRoom,
+                    hasGameState: !!latestGameState,
+                    roomId: latestRoom?.id
                 });
                 return false; // Attendre l'initialisation complète
             }
             
             // Vérifier le board de manière plus tolérante
-            if (!gameState.board || !gameState.board.points || gameState.board.points.length !== 24) {
+            if (!latestGameState.board || !latestGameState.board.points || latestGameState.board.points.length !== 24) {
                 addLog('[BOT DEBUG] Early return: board not ready', 'warning', {
-                    hasBoard: !!gameState.board,
-                    hasPoints: !!gameState.board?.points,
-                    pointsLength: gameState.board?.points?.length
+                    hasBoard: !!latestGameState.board,
+                    hasPoints: !!latestGameState.board?.points,
+                    pointsLength: latestGameState.board?.points?.length
                 });
                 // En mode offline-bot, attendre un peu que le board soit initialisé
                 // Le useEffect se redéclenchera quand gameState.board sera mis à jour
@@ -1055,24 +1100,24 @@ export const useGameSocket = () => {
         // Fonction pour exécuter la logique du bot
         const executeBotLogic = () => {
             // Check if it's a solo training game
-        const isSoloGame = currentRoom.id === 'offline-bot' ||
-            currentRoom.name?.startsWith('Entraînement') ||
-            (players && players.length <= 1);
+        const isSoloGame = latestRoom.id === 'offline-bot' ||
+            latestRoom.name?.startsWith('Entraînement') ||
+            (latestPlayers && latestPlayers.length <= 1);
 
         if (!isSoloGame) {
-            addLog('[BOT DEBUG] Early return: not a solo game', 'warning', { roomId: currentRoom.id });
+            addLog('[BOT DEBUG] Early return: not a solo game', 'warning', { roomId: latestRoom.id });
             return; // Pas un jeu solo, ignorer
         }
 
         // CRITIQUE : Vérifier que players contient 2 joueurs avant de continuer
         // En mode offline-bot, les joueurs peuvent ne pas être encore initialisés
         // Attendre un peu si nécessaire, mais ne pas bloquer indéfiniment
-        if (!players || players.length < 2) {
+        if (!latestPlayers || latestPlayers.length < 2) {
             addLog('[BOT DEBUG] Early return: not enough players', 'warning', { 
-                playersLength: players?.length,
-                players: players,
-                currentRoomId: currentRoom?.id,
-                isOfflineBot: currentRoom?.id === 'offline-bot'
+                playersLength: latestPlayers?.length,
+                players: latestPlayers,
+                currentRoomId: latestRoom?.id,
+                isOfflineBot: latestRoom?.id === 'offline-bot'
             });
             // En mode offline-bot, si players n'est pas encore initialisé, attendre un peu
             // mais ne pas bloquer - le useEffect se redéclenchera quand players sera mis à jour
@@ -1080,27 +1125,67 @@ export const useGameSocket = () => {
         }
 
         // Check if it's Bot's turn
-        const myId = user?.id || (players.length > 0 ? players[0].id : 'guest');
-        const currentTurn = gameState.turn;
+        const myId = user?.id || (latestPlayers.length > 0 ? latestPlayers[0].id : 'guest');
+        const currentTurn = latestGameState.turn;
 
         // CRITIQUE : Identifier le bot depuis la liste des joueurs
         // Le bot est toujours le deuxième joueur dans offline-bot mode
-        const botId = players && players.length > 1 ? players[1].id : 'bot';
+        const botId = latestPlayers && latestPlayers.length > 1 ? latestPlayers[1].id : 'bot';
+        
+        // Logs de debug pour comprendre le problème
+        addLog('🔍 [BOT DEBUG] Détection du tour', 'debug', {
+            currentTurn,
+            myId,
+            botId,
+            players: latestPlayers?.map(p => ({ id: p.id, username: p.username })),
+            turnMatchesBotId: currentTurn === botId,
+            turnMatchesBot: currentTurn === 'bot',
+            turnMatchesPlayer1: currentTurn === latestPlayers?.[0]?.id,
+            turnMatchesPlayer2: currentTurn === latestPlayers?.[1]?.id,
+            isNotMyTurn: currentTurn !== myId,
+            player0Id: latestPlayers?.[0]?.id,
+            player1Id: latestPlayers?.[1]?.id
+        });
         
         // Vérifier TOUTES les conditions possibles pour le tour du bot
         // Le bot peut être identifié par son ID, 'bot', ou être le joueur 2
+        // IMPORTANT: Si currentTurn correspond au joueur 1, ce n'est PAS le tour du bot
+        // Si currentTurn correspond au joueur 2 (bot), c'est le tour du bot
+        // CRITIQUE: Si currentTurn est 'guest' ou 'guest-1', c'est le tour du joueur, PAS du bot
         const isBotTurn = (
             currentTurn === botId ||
             currentTurn === 'bot' ||
-            (players && players.length > 1 && currentTurn === players[1].id) ||
-            // Fallback: si ce n'est pas mon tour et qu'on a 2 joueurs, c'est probablement le bot
-            (currentTurn !== myId && players && players.length === 2 && currentTurn !== 'guest' && currentTurn !== 'guest-1')
+            (latestPlayers && latestPlayers.length > 1 && currentTurn === latestPlayers[1].id) ||
+            // Fallback amélioré: si ce n'est pas mon tour ET que ce n'est pas le joueur 1 ET que ce n'est pas 'guest', c'est probablement le bot
+            (currentTurn !== myId && 
+             currentTurn !== latestPlayers?.[0]?.id && 
+             latestPlayers && 
+             latestPlayers.length === 2 && 
+             currentTurn !== 'guest' && 
+             currentTurn !== 'guest-1' &&
+             // Vérifier que ce n'est pas un ID de joueur connu
+             !latestPlayers.some(p => p.id === currentTurn))
         );
+        
+        // Log supplémentaire pour voir pourquoi isBotTurn est false
+        if (!isBotTurn) {
+            addLog('🔍 [BOT DEBUG] Pourquoi isBotTurn est false', 'debug', {
+                currentTurn,
+                botId,
+                myId,
+                player0Id: latestPlayers?.[0]?.id,
+                player1Id: latestPlayers?.[1]?.id,
+                check1: currentTurn === botId,
+                check2: currentTurn === 'bot',
+                check3: latestPlayers && latestPlayers.length > 1 && currentTurn === latestPlayers[1].id,
+                check4: currentTurn !== myId && currentTurn !== latestPlayers?.[0]?.id && latestPlayers && latestPlayers.length === 2 && currentTurn !== 'guest' && currentTurn !== 'guest-1'
+            });
+        }
 
         // Créer une clé unique pour cette analyse (turn + dice)
         // Gérer le cas où les dés sont vides (avant le premier lancer)
-        const analysisKey = gameState.dice.length > 0
-            ? `${currentTurn}-${gameState.dice.join(',')}`
+        const analysisKey = latestGameState.dice.length > 0
+            ? `${currentTurn}-${latestGameState.dice.join(',')}`
             : `${currentTurn}-no-dice`;
 
         // Logs détaillés pour diagnostiquer
@@ -1112,9 +1197,34 @@ export const useGameSocket = () => {
             botIsThinking: botIsThinking.current,
             analysisInProgress: botAnalysisInProgress.current,
             analysisKey,
-            players: players?.map(p => ({ id: p.id, username: p.username })),
-            diceLength: gameState.dice.length
+            players: latestPlayers?.map(p => ({ id: p.id, username: p.username })),
+            diceLength: latestGameState.dice.length
         });
+
+        // Logs supplémentaires pour diagnostiquer pourquoi le bot ne joue pas
+        if (isBotTurn) {
+            addLog('🤖 Bot: C\'est mon tour!', 'info', {
+                hasDice: latestGameState.dice.length > 0,
+                dice: latestGameState.dice,
+                botIsThinking: botIsThinking.current,
+                analysisInProgress: botAnalysisInProgress.current,
+                analysisKey,
+                willPlay: !botIsThinking.current && botAnalysisInProgress.current !== analysisKey
+            });
+        } else {
+            addLog('🤖 Bot: Ce n\'est pas mon tour', 'info', {
+                currentTurn,
+                myId,
+                botId,
+                isBotTurn,
+                player0Id: latestPlayers?.[0]?.id,
+                player1Id: latestPlayers?.[1]?.id,
+                reason: currentTurn === myId ? 'C\'est le tour du joueur' : 
+                        currentTurn === latestPlayers?.[0]?.id ? 'C\'est le tour du joueur 1' :
+                        currentTurn === latestPlayers?.[1]?.id ? 'C\'est le tour du bot (mais non détecté!)' :
+                        'Tour inconnu'
+            });
+        }
 
         // Vérifier si une analyse est déjà en cours pour cette position exacte
         if (isBotTurn && !botIsThinking.current && botAnalysisInProgress.current !== analysisKey) {
@@ -1138,15 +1248,20 @@ export const useGameSocket = () => {
                 botIsThinking.current = true;
                 botAnalysisInProgress.current = analysisKey; // Marquer cette analyse comme en cours
                 const addLog = useDebugStore.getState().addLog;
+                
+                // Récupérer les valeurs à jour depuis le store (au cas où elles auraient changé)
+                const store = useGameStore.getState();
+                const currentGameState = store.gameState;
+                const currentRoom = store.currentRoom;
 
                 // 0. Check if Bot needs to respond to a double offer
-                if (gameState.pendingDouble && gameState.pendingDouble.offeredBy !== 'bot') {
+                if (currentGameState?.pendingDouble && currentGameState.pendingDouble.offeredBy !== 'bot') {
                     addLog('🤖 Bot: Évaluation de la proposition de double...', 'info');
                     await new Promise(r => setTimeout(r, 1500));
 
                     try {
                         // Analyser la position pour décider
-                        const analysis = await analyzeMove(gameState, gameState.dice.length > 0 ? gameState.dice : [1, 1], 2);
+                        const analysis = await analyzeMove(currentGameState, currentGameState.dice.length > 0 ? currentGameState.dice : [1, 1], 2);
 
                         // Import dynamique pour éviter les dépendances circulaires
                         const { shouldBotAcceptDouble } = await import('../lib/botDoublingLogic');
@@ -1154,9 +1269,9 @@ export const useGameSocket = () => {
                         const shouldAccept = shouldBotAcceptDouble(
                             analysis.winProbability / 100, // Convertir en 0-1
                             analysis.equity || 0,
-                            gameState.cubeValue,
+                            currentGameState.cubeValue,
                             undefined,
-                            gameState.matchLength || 0
+                            currentGameState.matchLength || 0
                         );
 
                         if (shouldAccept) {
@@ -1166,8 +1281,8 @@ export const useGameSocket = () => {
                             // Accepter le double
                             const botId = 'bot';
                             const newState = {
-                                ...gameState,
-                                cubeValue: gameState.cubeValue * 2,
+                                ...currentGameState,
+                                cubeValue: currentGameState.cubeValue * 2,
                                 cubeOwner: botId,
                                 pendingDouble: null
                             };
@@ -1181,16 +1296,16 @@ export const useGameSocket = () => {
                             await new Promise(r => setTimeout(r, 800));
 
                             // Refuser = Abandonner, l'adversaire gagne
-                            const pointsWon = gameState.cubeValue;
-                            const newScore = { ...gameState.score };
-                            newScore[gameState.pendingDouble.offeredBy] = (newScore[gameState.pendingDouble.offeredBy] || 0) + pointsWon;
+                            const pointsWon = currentGameState.cubeValue;
+                            const newScore = { ...currentGameState.score };
+                            newScore[currentGameState.pendingDouble.offeredBy] = (newScore[currentGameState.pendingDouble.offeredBy] || 0) + pointsWon;
 
                             const newState = {
-                                ...gameState,
+                                ...currentGameState,
                                 score: newScore,
                                 pendingDouble: null,
                                 dice: [],
-                                turn: gameState.pendingDouble.offeredBy
+                                turn: currentGameState.pendingDouble.offeredBy
                             };
                             updateGame(newState);
 
@@ -1203,8 +1318,8 @@ export const useGameSocket = () => {
                         // Par défaut, accepter pour ne pas bloquer le jeu
                         const botId = 'bot';
                         const newState = {
-                            ...gameState,
-                            cubeValue: gameState.cubeValue * 2,
+                            ...currentGameState,
+                            cubeValue: currentGameState.cubeValue * 2,
                             cubeOwner: botId,
                             pendingDouble: null
                         };
@@ -1216,31 +1331,31 @@ export const useGameSocket = () => {
                 }
 
                 // 1. Consider doubling BEFORE rolling dice (if dice not rolled yet)
-                if (gameState.dice.length === 0 && !gameState.pendingDouble) {
+                if (currentGameState.dice.length === 0 && !currentGameState.pendingDouble) {
                     // Check if bot can double
                     const { canOfferDouble } = await import('../lib/gameLogic');
                     const botId = 'bot';
 
                     const canDouble = canOfferDouble(
-                        gameState.cubeValue,
-                        gameState.cubeOwner,
+                        currentGameState.cubeValue,
+                        currentGameState.cubeOwner,
                         botId,
                         false, // Pas encore lancé les dés
-                        gameState.matchLength || 0
+                        currentGameState.matchLength || 0
                     );
 
                     if (canDouble) {
                         // Analyser la position pour décider
                         try {
-                            const analysis = await analyzeMove(gameState, [1, 1], 2); // Dés fictifs pour l'analyse
+                            const analysis = await analyzeMove(currentGameState, [1, 1], 2); // Dés fictifs pour l'analyse
                             const { shouldBotDouble } = await import('../lib/botDoublingLogic');
 
                             const shouldDouble = shouldBotDouble(
                                 analysis.winProbability / 100,
                                 analysis.equity || 0,
-                                gameState.cubeValue,
+                                currentGameState.cubeValue,
                                 undefined,
-                                gameState.matchLength || 0
+                                currentGameState.matchLength || 0
                             );
 
                             if (shouldDouble) {
@@ -1248,7 +1363,7 @@ export const useGameSocket = () => {
                                 await new Promise(r => setTimeout(r, 1200));
 
                                 const newState = {
-                                    ...gameState,
+                                    ...currentGameState,
                                     pendingDouble: {
                                         offeredBy: botId,
                                         timestamp: Date.now()
@@ -1272,7 +1387,7 @@ export const useGameSocket = () => {
                 }
 
                 // 2. Roll Dice if needed
-                if (gameState.dice.length === 0) {
+                if (currentGameState.dice.length === 0) {
                     addLog('🤖 Bot: Rolling dice...', 'info');
                     await new Promise(r => setTimeout(r, 1000));
                     sendGameAction('rollDice', {}, 2); // Force Player 2 (Black)
@@ -1288,13 +1403,13 @@ export const useGameSocket = () => {
 
                 // 2. Analyze and Move
                 addLog('🤖 Bot: Analyzing position...', 'info', {
-                    dice: gameState.dice,
-                    diceCount: gameState.dice.length
+                    dice: currentGameState.dice,
+                    diceCount: currentGameState.dice.length
                 });
 
                 try {
                     // L'API a son propre timeout de 30s avec retry, pas besoin de timeout supplémentaire ici
-                    const analysis = await analyzeMove(gameState, gameState.dice, 2);
+                    const analysis = await analyzeMove(currentGameState, currentGameState.dice, 2);
 
                     if (analysis.bestMove && analysis.bestMove.length > 0) {
                         addLog(`🤖 Bot: Found ${analysis.bestMove.length} move(s)`, 'success', {
@@ -1306,7 +1421,7 @@ export const useGameSocket = () => {
                             const move = analysis.bestMove[i];
                             addLog(`🤖 Bot: Playing move ${i + 1}/${analysis.bestMove.length}: ${move.from} -> ${move.to}`, 'info', {
                                 move: { from: move.from, to: move.to, die: move.die },
-                                availableDice: gameState.dice
+                                availableDice: currentGameState.dice
                             });
 
                             // Attendre un peu avant chaque coup pour la visualisation
@@ -1340,7 +1455,7 @@ export const useGameSocket = () => {
                         await new Promise(r => setTimeout(r, 2000));
 
                         // Clear dice to force turn switch in the next render cycle
-                        const newState = { ...gameState, dice: [] };
+                        const newState = { ...currentGameState, dice: [] };
                         updateGame(newState);
 
                         // Also update DB to ensure sync (SKIP for offline-bot)
@@ -1357,7 +1472,7 @@ export const useGameSocket = () => {
                         const { findAnyValidMove } = await import('../lib/gameLogic');
 
                         // Essayer de trouver un coup valide
-                        const validMove = findAnyValidMove(gameState.board, 2, gameState.dice);
+                        const validMove = findAnyValidMove(currentGameState.board, 2, currentGameState.dice);
 
                         if (validMove) {
                             addLog(`🤖 Bot: Fallback move found: ${validMove.from} -> ${validMove.to} (dé: ${validMove.dieUsed || 'N/A'})`, 'warning');
@@ -1367,7 +1482,7 @@ export const useGameSocket = () => {
                             addLog('🤖 Bot: No fallback move available, switching turn', 'error');
                             // Switch turn if no moves possible
                             await new Promise(r => setTimeout(r, 2000));
-                            const newState = { ...gameState, dice: [] };
+                            const newState = { ...currentGameState, dice: [] };
                             updateGame(newState);
 
                             if (!DEMO_MODE && currentRoom && currentRoom.id !== 'offline-bot') {
@@ -1404,14 +1519,15 @@ export const useGameSocket = () => {
         };
         
         // Vérifier immédiatement
-        if (!checkInitialization()) {
+        const isInitialized = checkInitialization();
+        
+        if (!isInitialized) {
             // En mode offline-bot, attendre un peu et réessayer une fois
-            if (currentRoom?.id === 'offline-bot') {
-                setTimeout(() => {
-                    if (checkInitialization()) {
-                        executeBotLogic();
-                    }
-                }, 100);
+            // Le useEffect se redéclenchera automatiquement quand les dépendances changeront
+            if (currentRoom?.id === 'offline-bot' || !currentRoom) {
+                // Attendre que les états soient mis à jour
+                // Le useEffect se redéclenchera automatiquement grâce aux dépendances
+                // Pas besoin de setTimeout, les dépendances le feront
                 return;
             }
             return;
