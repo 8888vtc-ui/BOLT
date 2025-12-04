@@ -365,9 +365,11 @@ async function askNetlifyCoach(
 
 /**
  * Ask DeepSeek coach a question
- * PRIORITÉ 1 : Netlify Function (appelle Ollama depuis le serveur)
- * PRIORITÉ 2 : Ollama Direct (fallback si Netlify Function non disponible)
- * PRIORITÉ 3 : DeepSeek API (fallback si Ollama non disponible)
+ * 
+ * NOUVELLE PRIORITÉ (Ollama crash sur Railway - OOM):
+ * PRIORITÉ 1 : DeepSeek API (stable et rapide)
+ * PRIORITÉ 2 : Netlify Function (si DeepSeek non configuré)
+ * PRIORITÉ 3 : Ollama Direct (désactivé par défaut - OOM sur Railway)
  */
 export async function askDeepSeekCoach(
     question: string,
@@ -389,47 +391,59 @@ export async function askDeepSeekCoach(
         userMessage = `${contextInfo}\n\nQuestion: ${question}`;
     }
 
-    // PRIORITÉ 1 : Utiliser Netlify Function (appelle Ollama depuis le serveur)
-    try {
-        console.log('[AI Coach] Using Netlify Function (recommended)');
-        const response = await askNetlifyCoach(question, gameContext, contextType);
-        console.log('[AI Coach] Netlify Function response received');
-        return response;
-    } catch (error: any) {
-        console.warn('[AI Coach] Netlify Function failed, trying direct Ollama...', error.message);
-        // Continue to fallback
-    }
-
-    // PRIORITÉ 2 : Utiliser Ollama Direct (Fallback)
-    const ollamaAvailable = await isOllamaAvailable();
-    
-    if (ollamaAvailable) {
-        try {
-            console.log('[AI Coach] Using Ollama Direct (FREE)');
-            const response = await askOllamaCoach(question, systemPrompt, userMessage);
-            console.log('[AI Coach] Ollama response received');
-            return response;
-        } catch (error: any) {
-            console.warn('[AI Coach] Ollama failed, trying DeepSeek API fallback:', error.message);
-            // Continue to fallback
-        }
-    } else {
-        console.log('[AI Coach] Ollama not available, skipping...');
-    }
-
-    // PRIORITÉ 3 : Fallback vers DeepSeek API (si configuré)
+    // PRIORITÉ 1 : Utiliser DeepSeek API (STABLE - Recommandé car Ollama crash sur Railway)
     if (DEEPSEEK_API_KEY) {
         try {
-            console.log('[AI Coach] Using DeepSeek API (fallback)');
+            console.log('[AI Coach] Using DeepSeek API (PRIORITY 1 - stable)');
             const response = await askDeepSeekAPICoach(question, systemPrompt, userMessage);
             console.log('[AI Coach] DeepSeek API response received');
             return response;
         } catch (error: any) {
-            console.error('[AI Coach] DeepSeek API also failed:', error.message);
-            return `Désolé, le coach AI rencontre des difficultés techniques. Veuillez réessayer plus tard. (Erreur: ${error.message || 'Unknown error'})`;
+            console.warn('[AI Coach] DeepSeek API failed, trying Netlify Function...', error.message);
+            // Continue to fallback
         }
+    } else {
+        console.log('[AI Coach] DeepSeek API key not configured, trying Netlify Function...');
+    }
+
+    // PRIORITÉ 2 : Utiliser Netlify Function (appelle Ollama depuis le serveur)
+    try {
+        console.log('[AI Coach] Using Netlify Function (PRIORITY 2)');
+        const response = await askNetlifyCoach(question, gameContext, contextType);
+        console.log('[AI Coach] Netlify Function response received');
+        return response;
+    } catch (error: any) {
+        console.warn('[AI Coach] Netlify Function failed:', error.message);
+        // Continue to fallback
+    }
+
+    // PRIORITÉ 3 : Ollama Direct (DÉSACTIVÉ par défaut - OOM sur Railway)
+    // Activer seulement si VITE_ENABLE_OLLAMA_DIRECT=true
+    const enableOllamaDirect = import.meta.env.VITE_ENABLE_OLLAMA_DIRECT === 'true';
+    
+    if (enableOllamaDirect) {
+        const ollamaAvailable = await isOllamaAvailable();
+        
+        if (ollamaAvailable) {
+            try {
+                console.log('[AI Coach] Using Ollama Direct (PRIORITY 3 - may crash on low RAM)');
+                const response = await askOllamaCoach(question, systemPrompt, userMessage);
+                console.log('[AI Coach] Ollama response received');
+                return response;
+            } catch (error: any) {
+                console.error('[AI Coach] Ollama also failed:', error.message);
+            }
+        } else {
+            console.log('[AI Coach] Ollama not available');
+        }
+    } else {
+        console.log('[AI Coach] Ollama Direct disabled (OOM issues on Railway)');
     }
 
     // Aucune option disponible ou toutes ont échoué
-    return 'AI Coach is not configured. Please set VITE_COACH_API_URL (recommended), VITE_OLLAMA_URL (FREE), or VITE_DEEPSEEK_API_KEY environment variable.';
+    if (DEEPSEEK_API_KEY) {
+        return 'Désolé, le coach AI rencontre des difficultés techniques. Veuillez réessayer plus tard.';
+    }
+    
+    return 'AI Coach is not configured. Please set VITE_DEEPSEEK_API_KEY environment variable.';
 }
