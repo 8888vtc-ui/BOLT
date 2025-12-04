@@ -1087,7 +1087,16 @@ export const useGameSocket = () => {
                 addLog('[BOT DEBUG] Early return: board not ready', 'warning', {
                     hasBoard: !!latestGameState.board,
                     hasPoints: !!latestGameState.board?.points,
-                    pointsLength: latestGameState.board?.points?.length
+                    pointsLength: latestGameState.board?.points?.length,
+                    boardState: latestGameState.board ? 'exists' : 'missing',
+                    pointsState: latestGameState.board?.points ? 'exists' : 'missing',
+                    initializationStatus: {
+                        room: !!latestRoom,
+                        gameState: !!latestGameState,
+                        players: latestPlayers?.length || 0,
+                        board: !!latestGameState.board,
+                        points: !!latestGameState.board?.points
+                    }
                 });
                 // En mode offline-bot, attendre un peu que le board soit initialisé
                 // Le useEffect se redéclenchera quand gameState.board sera mis à jour
@@ -1522,12 +1531,70 @@ export const useGameSocket = () => {
         const isInitialized = checkInitialization();
         
         if (!isInitialized) {
-            // En mode offline-bot, attendre un peu et réessayer une fois
-            // Le useEffect se redéclenchera automatiquement quand les dépendances changeront
+            // En mode offline-bot, attendre un peu et réessayer avec retry
             if (currentRoom?.id === 'offline-bot' || !currentRoom) {
-                // Attendre que les états soient mis à jour
-                // Le useEffect se redéclenchera automatiquement grâce aux dépendances
-                // Pas besoin de setTimeout, les dépendances le feront
+                // Attendre que l'initialisation soit complète avec retry
+                const waitForInitialization = async () => {
+                    let attempts = 0;
+                    const maxAttempts = 10; // 10 tentatives = 5 secondes max
+                    const delay = 500; // 500ms entre chaque tentative
+                    
+                    while (attempts < maxAttempts) {
+                        const store = useGameStore.getState();
+                        const latestRoom = store.currentRoom;
+                        const latestGameState = store.gameState;
+                        const latestPlayers = store.players;
+                        
+                        // Vérifier à nouveau avec les valeurs à jour
+                        if (latestRoom && latestGameState && 
+                            latestGameState.board && 
+                            latestGameState.board.points && 
+                            latestGameState.board.points.length === 24 &&
+                            latestPlayers && latestPlayers.length >= 2) {
+                            addLog('[BOT DEBUG] Initialization complete after retry!', 'success', {
+                                attempts,
+                                initializationStatus: {
+                                    room: !!latestRoom,
+                                    gameState: !!latestGameState,
+                                    board: !!latestGameState.board,
+                                    points: !!latestGameState.board.points,
+                                    pointsCount: latestGameState.board.points.length,
+                                    players: latestPlayers.length
+                                }
+                            });
+                            // L'initialisation est complète, exécuter la logique du bot
+                            executeBotLogic();
+                            return;
+                        }
+                        
+                        attempts++;
+                        addLog(`[BOT DEBUG] Waiting for initialization... (${attempts}/${maxAttempts})`, 'info', {
+                            room: !!latestRoom,
+                            gameState: !!latestGameState,
+                            board: !!latestGameState?.board,
+                            points: !!latestGameState?.board?.points,
+                            players: latestPlayers?.length || 0
+                        });
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                    
+                    // Si on arrive ici, l'initialisation n'est pas complète après 5 secondes
+                    const finalStore = useGameStore.getState();
+                    addLog('[BOT DEBUG] Initialization timeout - giving up', 'error', {
+                        maxAttempts,
+                        finalStatus: {
+                            room: !!finalStore.currentRoom,
+                            gameState: !!finalStore.gameState,
+                            board: !!finalStore.gameState?.board,
+                            points: !!finalStore.gameState?.board?.points,
+                            pointsCount: finalStore.gameState?.board?.points?.length || 0,
+                            players: finalStore.players?.length || 0
+                        }
+                    });
+                };
+                
+                // Lancer l'attente en arrière-plan (ne pas bloquer le useEffect)
+                waitForInitialization();
                 return;
             }
             return;
