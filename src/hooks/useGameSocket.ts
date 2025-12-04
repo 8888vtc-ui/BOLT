@@ -368,9 +368,17 @@ export const useGameSocket = () => {
                 };
                 addLog(`✅ [JOIN_ROOM] Room définie (bot): ${botRoom.name}`, 'success');
 
-                // SET ROOM ET PLAYERS IMMÉDIATEMENT (synchrone)
+                // SET ROOM ET PLAYERS IMMÉDIATEMENT (synchrone) - CRITIQUE pour éviter hasCurrentRoom = false
                 setRoom(botRoom);
                 setPlayers(soloPlayers);
+                
+                // Vérification immédiate que room et players sont définis
+                addLog(`✅ [JOIN_ROOM] Room et Players définis immédiatement`, 'success', {
+                    roomId: botRoom.id,
+                    playersCount: soloPlayers.length,
+                    player0Id: soloPlayers[0]?.id || 'unknown',
+                    player1Id: soloPlayers[1]?.id || 'unknown'
+                });
 
                 // Créer l'état de jeu IMMÉDIATEMENT - pas d'attente
                 // IMPORTANT: Jeu de départ (opening roll) pour déterminer qui commence
@@ -403,30 +411,25 @@ export const useGameSocket = () => {
                     }
                 } while (playerRoll === botRoll); // Relancer en cas d'égalité
 
-                // CRITIQUE: Passer les dés initiaux au GameState
-                // Pour le premier coup, on utilise les deux dés lancés (le plus grand et le plus petit)
-                const initialDice = [playerRoll, botRoll];
-                const botState = createMockGameState(startingPlayerId, options, initialDice, startingPlayerId);
+                // CRITIQUE: Créer le GameState avec le joueur qui commence
+                // IMPORTANT: Les dés doivent être VIDES après l'opening roll
+                // Le joueur qui commence doit lancer les dés pour son premier tour
+                const botState = createMockGameState(startingPlayerId, options);
+                botState.turn = startingPlayerId; // S'assurer que le tour est au bon joueur
+                botState.dice = []; // CRITIQUE: Dés vides - le joueur qui commence doit lancer
 
                 // Log pour vérifier le tour initial
-                addLog(`🎲 [JOIN_ROOM] Tour initial: ${botState.turn} (après opening roll) avec dés: ${initialDice.join(',')}`, 'info', {
+                addLog(`🎲 [JOIN_ROLL] Opening roll terminé - ${startingPlayerId === soloPlayers[0]?.id ? 'Joueur' : 'Bot'} commence`, 'success', {
                     startingPlayerId,
                     botId: soloPlayers[1]?.id || 'bot',
+                    playerId: soloPlayers[0]?.id || 'guest',
                     turn: botState.turn,
                     dice: botState.dice,
-                    playerRoll,
-                    botRoll
-                });
-
-                // Log pour vérifier le tour initial
-                addLog(`🎲 [JOIN_ROOM] Tour initial: ${botState.turn} (après opening roll)`, 'info', {
-                    startingPlayerId,
-                    botId: soloPlayers[1]?.id || 'bot',
-                    turn: botState.turn,
+                    diceLength: botState.dice.length,
+                    hasDice: botState.dice.length > 0,
                     playerRoll,
                     botRoll,
-                    dice: botState.dice,
-                    hasDice: botState.dice.length > 0
+                    note: 'Les dés sont vides - le joueur qui commence doit lancer les dés'
                 });
 
                 // Vérifier que le board est valide AVANT les logs - utiliser copie profonde sécurisée
@@ -519,13 +522,21 @@ export const useGameSocket = () => {
 
                 // UPDATE GAME IMMÉDIATEMENT (synchrone) - CRITIQUE pour éviter écran noir
                 updateGame(botState);
+                
+                // Vérification immédiate que gameState est défini
+                const storeAfterUpdate = useGameStore.getState();
                 addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ - Room et GameState définis`, 'success', {
-                    roomSet: true,
-                    gameStateSet: true,
+                    roomSet: !!storeAfterUpdate.currentRoom,
+                    gameStateSet: !!storeAfterUpdate.gameState,
                     hasBoard: !!botState.board,
                     hasPoints: !!botState.board?.points,
                     pointsLength: botState.board?.points?.length,
-                    boardValid: botState.board && botState.board.points && botState.board.points.length === 24
+                    boardValid: botState.board && botState.board.points && botState.board.points.length === 24,
+                    turn: botState.turn,
+                    diceLength: botState.dice.length,
+                    hasDice: botState.dice.length > 0,
+                    startingPlayerId,
+                    note: startingPlayerId === soloPlayers[1]?.id ? 'Bot doit lancer les dés' : 'Joueur doit lancer les dés'
                 });
                 return;
             }
@@ -1538,16 +1549,20 @@ export const useGameSocket = () => {
 
                         // 2. Roll Dice if needed
                         // CRITICAL FIX: Vérifier que dice existe et est un tableau
+                        // IMPORTANT: Après l'opening roll, les dés sont vides - le joueur qui commence doit lancer
                         if (!currentGameState.dice || !Array.isArray(currentGameState.dice) || currentGameState.dice.length === 0) {
                             addLog('🤖 Bot: No dice available, rolling dice...', 'info', {
                                 hasDice: !!currentGameState.dice,
                                 diceLength: currentGameState.dice?.length || 0,
                                 diceType: typeof currentGameState.dice,
-                                isArray: Array.isArray(currentGameState.dice)
+                                isArray: Array.isArray(currentGameState.dice),
+                                turn: currentGameState.turn,
+                                note: 'Bot doit lancer les dés pour son premier tour'
                             });
                             await new Promise(r => setTimeout(r, 1000));
                             try {
-                                sendGameAction('rollDice', {}, 2); // Force Player 2 (Black)
+                                await sendGameAction('rollDice', {}, 2); // Force Player 2 (Black) - CRITICAL: await pour synchronisation
+                                addLog('🤖 Bot: Dice rolled successfully', 'success');
                             } catch (rollError: any) {
                                 addLog('🤖 Bot: Error rolling dice', 'error', rollError);
                                 botIsThinking.current = false;
