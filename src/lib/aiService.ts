@@ -46,32 +46,50 @@ export const analyzeMove = async (
         const targetEnginePlayer = activePlayer === 1 ? 2 : 1; // 1=White, 2=Black
         const opponentEnginePlayer = targetEnginePlayer === 1 ? 2 : 1;
 
-        // Map Points
-        const mappedPoints = gameState.board.points.map((p: any) => {
+        // Protection: vérifier que board et points existent
+        if (!gameState || !gameState.board || !Array.isArray(gameState.board.points)) {
+            throw new Error('Invalid gameState: board.points is missing or not an array');
+        }
+
+        // Map Points avec protection
+        const mappedPoints = gameState.board.points.map((p: any, index: number) => {
+            // Protection: vérifier que p est un objet valide
+            if (!p || typeof p !== 'object') {
+                addLog(`⚠️ [AI] Invalid point at index ${index}, using default`, 'warning', { point: p });
+                return { player: 0, count: 0 };
+            }
+
             let enginePlayer = 0;
-            if (p.player === activePlayer) enginePlayer = targetEnginePlayer;
-            else if (p.player !== null) enginePlayer = opponentEnginePlayer;
+            const player = typeof p.player === 'number' ? p.player : null;
+            const count = typeof p.count === 'number' ? p.count : 0;
+
+            if (player === activePlayer) enginePlayer = targetEnginePlayer;
+            else if (player !== null && player !== 0) enginePlayer = opponentEnginePlayer;
 
             return {
                 player: enginePlayer,
-                count: p.count
+                count: count
             };
         });
 
-        // Map Bar and Off
+        // Map Bar and Off avec protection
         const bar = { white: 0, black: 0 };
         const off = { white: 0, black: 0 };
 
+        // Protection: vérifier que bar et off existent
+        const boardBar = gameState.board.bar || {};
+        const boardOff = gameState.board.off || {};
+
         if (targetEnginePlayer === 1) { // I am White (Up) -> I am P2
-            bar.white = gameState.board.bar.player2 || 0;
-            bar.black = gameState.board.bar.player1 || 0;
-            off.white = gameState.board.off.player2 || 0;
-            off.black = gameState.board.off.player1 || 0;
+            bar.white = typeof boardBar.player2 === 'number' ? boardBar.player2 : 0;
+            bar.black = typeof boardBar.player1 === 'number' ? boardBar.player1 : 0;
+            off.white = typeof boardOff.player2 === 'number' ? boardOff.player2 : 0;
+            off.black = typeof boardOff.player1 === 'number' ? boardOff.player1 : 0;
         } else { // I am Black (Down) -> I am P1
-            bar.black = gameState.board.bar.player1 || 0;
-            bar.white = gameState.board.bar.player2 || 0;
-            off.black = gameState.board.off.player1 || 0;
-            off.white = gameState.board.off.player2 || 0;
+            bar.black = typeof boardBar.player1 === 'number' ? boardBar.player1 : 0;
+            bar.white = typeof boardBar.player2 === 'number' ? boardBar.player2 : 0;
+            off.black = typeof boardOff.player1 === 'number' ? boardOff.player1 : 0;
+            off.white = typeof boardOff.player2 === 'number' ? boardOff.player2 : 0;
         }
 
         // 3. Construct Payload (Old Format + requestAllMoves)
@@ -149,10 +167,30 @@ export const analyzeMove = async (
             throw lastError || new Error('BotGammon API: All retry attempts failed');
         }
 
-        const data = await response.json();
+        // Protection: vérifier que la réponse est valide avant de parser
+        let data: any;
+        try {
+            const responseText = await response.text();
+            if (!responseText || responseText.trim() === '') {
+                throw new Error('Empty response from BotGammon API');
+            }
+            data = JSON.parse(responseText);
+        } catch (parseError: any) {
+            addLog('❌ AI Service: Failed to parse API response', 'error', parseError);
+            throw new Error(`BotGammon API: Invalid JSON response - ${parseError.message}`);
+        }
+
         addLog('🤖 AI Service: Raw Data received', 'info', JSON.stringify(data));
 
-        let bestMoves = data.bestMoves || [];
+        // Protection: vérifier que bestMoves existe et est un tableau
+        let bestMoves: any[] = [];
+        if (data && Array.isArray(data.bestMoves)) {
+            bestMoves = data.bestMoves;
+        } else if (data && Array.isArray(data.moves)) {
+            bestMoves = data.moves;
+        } else if (data && data.bestMove && Array.isArray(data.bestMove)) {
+            bestMoves = data.bestMove;
+        }
 
         // CRITICAL FIX FOR DOUBLES
         // When dice are doubles (e.g., 3-3), the API returns only 2 unique moves
@@ -184,10 +222,31 @@ export const analyzeMove = async (
         // But we should ensure they are valid.
 
         if (bestMoves.length > 0) {
-            bestMoves = bestMoves.map((move: any) => {
-                // Normalisation des coordonnées
-                let from = typeof move.from === 'number' ? move.from : parseInt(move.from);
-                let to = typeof move.to === 'number' ? move.to : parseInt(move.to);
+            bestMoves = bestMoves.map((move: any, index: number) => {
+                // Protection: vérifier que move est un objet valide
+                if (!move || typeof move !== 'object') {
+                    addLog(`⚠️ [AI] Invalid move at index ${index}, skipping`, 'warning', { move });
+                    return null;
+                }
+
+                // Normalisation des coordonnées avec protection
+                let from: number;
+                let to: number;
+                
+                try {
+                    from = typeof move.from === 'number' ? move.from : parseInt(String(move.from || 0), 10);
+                    to = typeof move.to === 'number' ? move.to : parseInt(String(move.to || 0), 10);
+                    
+                    // Vérifier que from et to sont des nombres valides
+                    if (isNaN(from) || isNaN(to)) {
+                        addLog(`⚠️ [AI] Invalid coordinates at index ${index}, skipping`, 'warning', { move, from, to });
+                        return null;
+                    }
+                } catch (parseError: any) {
+                    addLog(`⚠️ [AI] Error parsing move at index ${index}, skipping`, 'warning', { move, error: parseError });
+                    return null;
+                }
+                
                 const die = move.die !== undefined ? move.die : (move.dieUsed !== undefined ? move.dieUsed : undefined);
 
                 // MAPPING CRITIQUE POUR LE JOUEUR 2 (NOIR)
@@ -219,24 +278,41 @@ export const analyzeMove = async (
                     to,
                     die
                 };
-            });
-            addLog('🤖 AI Service: Mapped moves', 'info', bestMoves.map((m: any) => ({ from: m.from, to: m.to, die: m.die })));
+            }).filter((m: any) => m !== null); // Filtrer les moves invalides
+            
+            // Protection: vérifier qu'il reste des moves valides
+            if (bestMoves.length === 0) {
+                addLog('⚠️ [AI] No valid moves after mapping', 'warning');
+            } else {
+                addLog('🤖 AI Service: Mapped moves', 'info', bestMoves.map((m: any) => ({ from: m.from, to: m.to, die: m.die })));
+            }
         }
 
-        let explanation = `Equity: ${data.evaluation?.equity?.toFixed(3) || 'N/A'}. Win: ${(data.evaluation?.winProbability * 100)?.toFixed(1)}%`;
+        // Protection: vérifier que evaluation existe avant d'accéder à ses propriétés
+        const evaluation = data?.evaluation || {};
+        const winProbability = typeof evaluation.winProbability === 'number' ? evaluation.winProbability : 0.5;
+        const equity = typeof evaluation.equity === 'number' ? evaluation.equity : 0;
 
-        if (data.strategicAdvice) {
-            explanation += `\n\n🧠 STRATÉGIE: ${data.strategicAdvice.recommendedStrategy.toUpperCase()}\n`;
-            explanation += `${data.strategicAdvice.analysis}\n`;
-            if (data.strategicAdvice.riskLevel) explanation += `⚠️ Risque: ${data.strategicAdvice.riskLevel}\n`;
+        let explanation = `Equity: ${equity !== 0 ? equity.toFixed(3) : 'N/A'}. Win: ${(winProbability * 100).toFixed(1)}%`;
+
+        // Protection: vérifier que strategicAdvice existe avant d'accéder à ses propriétés
+        const strategicAdvice = data?.strategicAdvice;
+        if (strategicAdvice && typeof strategicAdvice === 'object') {
+            const strategy = strategicAdvice.recommendedStrategy || 'N/A';
+            const analysis = strategicAdvice.analysis || '';
+            const riskLevel = strategicAdvice.riskLevel;
+            
+            explanation += `\n\n🧠 STRATÉGIE: ${typeof strategy === 'string' ? strategy.toUpperCase() : 'N/A'}\n`;
+            if (analysis) explanation += `${analysis}\n`;
+            if (riskLevel) explanation += `⚠️ Risque: ${riskLevel}\n`;
         }
 
         return {
             bestMove: bestMoves,
             explanation: explanation,
-            winProbability: (data.evaluation?.winProbability || 0.5) * 100,
-            equity: data.evaluation?.equity,
-            strategicAdvice: data.strategicAdvice
+            winProbability: winProbability * 100,
+            equity: equity,
+            strategicAdvice: strategicAdvice || undefined
         };
 
     } catch (error) {

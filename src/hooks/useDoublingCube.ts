@@ -101,7 +101,14 @@ export const useDoublingCube = (currentRoom: any, user: any) => {
 
         const pointsLost = rejectDoubleFn(gameState.cubeValue);
 
-        addLog(`❌ Vous abandonnez. ${gameState.pendingDouble.offeredBy} gagne ${pointsLost} point(s)`, 'error');
+        // Vérifier que pendingDouble et offeredBy existent avant d'accéder
+        if (!gameState.pendingDouble || !gameState.pendingDouble.offeredBy) {
+            addLog('❌ Erreur: pendingDouble.offeredBy est null ou undefined', 'error');
+            return;
+        }
+
+        const opponentId = gameState.pendingDouble.offeredBy;
+        addLog(`❌ Vous abandonnez. ${opponentId} gagne ${pointsLost} point(s)`, 'error');
 
         // Message Chat Système
         addMessage({
@@ -114,7 +121,6 @@ export const useDoublingCube = (currentRoom: any, user: any) => {
         });
 
         // Mettre à jour le score
-        const opponentId = gameState.pendingDouble.offeredBy;
         const newScore = { ...gameState.score };
         newScore[opponentId] = (newScore[opponentId] || 0) + pointsLost;
 

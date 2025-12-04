@@ -16,6 +16,11 @@ const formatTime = (ms: number): string => {
 
 const MatchHeader = memo<MatchHeaderProps>(({ state, cubeValue, cubeOwner }) => {
     const { players, score, limitPoints, stakes, timers } = state;
+    
+    // Protection contre players null ou undefined
+    if (!players || players.length < 2) {
+        return null; // Ne pas rendre si players n'est pas valide
+    }
     const [time1, setTime1] = useState(timers[0].msRemaining);
     const [time2, setTime2] = useState(timers[1].msRemaining);
 

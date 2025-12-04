@@ -70,7 +70,11 @@ const ChatBox = () => {
                     id: `bot-error-${Date.now()}`,
                     userId: 'ai-coach',
                     username: '🤖 AI Coach',
-                    text: error?.message || 'Désolé, le coach AI rencontre des difficultés techniques. Veuillez réessayer plus tard.',
+                    text: error?.message?.includes('timeout') || error?.message?.includes('Timeout') 
+                        ? 'Le coach AI prend trop de temps à répondre. Veuillez réessayer.'
+                        : error?.message?.includes('Network') || error?.message?.includes('fetch')
+                        ? 'Erreur de connexion. Vérifiez votre connexion internet et réessayez.'
+                        : error?.message || 'Désolé, le coach AI rencontre des difficultés techniques. Veuillez réessayer plus tard.',
                     timestamp: Date.now()
                 };
                 const { addMessage } = useGameStore.getState();

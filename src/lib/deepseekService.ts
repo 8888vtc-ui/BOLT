@@ -181,7 +181,7 @@ async function askOllamaCoach(
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(chatPayload),
-                signal: AbortSignal.timeout(30000)
+                signal: AbortSignal.timeout(45000) // Augmenter le timeout à 45s
             });
 
             if (chatResponse.ok) {
@@ -207,13 +207,13 @@ async function askOllamaCoach(
 
         console.log('[Ollama] Trying /api/generate endpoint...');
 
-        const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+            const response = await fetch(`${OLLAMA_URL}/api/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(generatePayload),
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(45000) // Augmenter le timeout à 45s
         });
 
         if (!response.ok) {
@@ -234,7 +234,7 @@ async function askOllamaCoach(
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(minimalPayload),
-                signal: AbortSignal.timeout(30000)
+                signal: AbortSignal.timeout(45000) // Augmenter le timeout à 45s
             });
             
             if (retryResponse.ok) {
@@ -289,7 +289,7 @@ async function askDeepSeekAPICoach(
                 temperature: 0.7,
                 max_tokens: 500
             }),
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(45000) // Augmenter le timeout à 45s
         });
 
         if (!response.ok) {
@@ -316,6 +316,11 @@ async function askNetlifyCoach(
     contextType: ContextType = 'game'
 ): Promise<string> {
     try {
+        // Protection: vérifier que COACH_API_URL est défini
+        if (!COACH_API_URL) {
+            throw new Error('COACH_API_URL not configured');
+        }
+
         const response = await fetch(COACH_API_URL, {
             method: 'POST',
             headers: {
@@ -326,18 +331,34 @@ async function askNetlifyCoach(
                 gameContext,
                 contextType
             }),
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(45000) // Augmenter le timeout à 45s
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`Netlify Coach API error: ${response.status} - ${errorData.message || errorData.error || response.statusText}`);
+            const errorText = await response.text().catch(() => 'No error details');
+            let errorData;
+            try {
+                errorData = JSON.parse(errorText);
+            } catch {
+                errorData = { message: errorText };
+            }
+            throw new Error(`Netlify Coach API error: ${response.status} - ${errorData.message || errorData.error || response.statusText || errorText}`);
         }
 
         const data = await response.json();
-        return data.answer || data.message || 'No response from AI coach.';
+        const answer = data.answer || data.message || data.response || 'No response from AI coach.';
+        
+        if (!answer || answer.trim() === '') {
+            throw new Error('Empty response from AI coach');
+        }
+        
+        return answer.trim();
     } catch (error: any) {
         console.error('[AI Coach] Netlify Function error:', error);
+        // Si c'est une erreur de timeout, la propager avec un message clair
+        if (error?.name === 'AbortError' || error?.message?.includes('timeout')) {
+            throw new Error('Timeout: Le serveur prend trop de temps à répondre. Veuillez réessayer.');
+        }
         throw error;
     }
 }
