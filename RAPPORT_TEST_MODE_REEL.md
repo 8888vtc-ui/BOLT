@@ -196,3 +196,4 @@ Ces problèmes sont **côté configuration Supabase**, pas côté code. Le code 
 - Les erreurs sont liées à la **configuration Supabase**, pas au code
 - Une fois Supabase configuré correctement, tout fonctionnera
 
+

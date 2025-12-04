@@ -172,3 +172,4 @@ Si vous souhaitez activer les connexions anonymes:
 2. `src/hooks/useAuth.ts` - Amélioration de `loginAsGuest`
 3. `src/pages/Login.tsx` - Gestion d'erreur améliorée
 
+

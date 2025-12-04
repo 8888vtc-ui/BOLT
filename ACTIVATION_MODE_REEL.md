@@ -177,3 +177,4 @@ Après activation du mode réel:
 - Les variables sont chargées au démarrage du serveur
 - Un redémarrage complet est nécessaire pour appliquer les changements
 
+

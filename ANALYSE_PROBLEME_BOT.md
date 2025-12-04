@@ -47,3 +47,4 @@
 
 Récupérer le state à jour après chaque mouvement dans la boucle du bot.
 
+

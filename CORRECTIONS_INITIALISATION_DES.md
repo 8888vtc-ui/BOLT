@@ -133,3 +133,4 @@ Ces corrections garantissent que :
 - Bot qui lance les dés avant d'analyser
 - Pas d'erreurs `hasCurrentRoom = false` ou `hasGameState = false`
 
+

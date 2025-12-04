@@ -139,3 +139,4 @@ check3: latestPlayers && latestPlayers.length > 1 && latestPlayers[1] && current
 3. Vérifier que les tours alternent correctement
 4. Vérifier que les logs ne contiennent plus d'erreurs null.id
 
+

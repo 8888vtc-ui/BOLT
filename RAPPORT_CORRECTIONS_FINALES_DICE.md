@@ -52,3 +52,4 @@ Le jeu devrait maintenant :
 4. **Joueur peut jouer** → S'il commence, il a des dés
 5. **Plus d'erreurs null.id** → Toutes les protections en place
 
+

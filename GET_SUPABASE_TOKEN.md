@@ -142,3 +142,4 @@ Si vous me fournissez le Service Role Key, je peux:
 
 **Action immédiate**: Utiliser le **Dashboard Supabase** pour exécuter `FIX_SECURITY_RLS.sql` (méthode la plus rapide et sécurisée).
 
+

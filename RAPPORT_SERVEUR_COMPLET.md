@@ -324,3 +324,4 @@ Frontend → Netlify Function (analyze-move)
 
 **Conclusion**: Architecture solide mais nécessite configuration complète des services externes pour être pleinement opérationnelle.
 
+

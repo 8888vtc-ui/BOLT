@@ -87,3 +87,4 @@ Le code est maintenant **ultra-protégé** et devrait fonctionner parfaitement m
 
 **Le bot est maintenant IMPOSSIBLE À BLOQUER grâce aux protections globales.**
 
+

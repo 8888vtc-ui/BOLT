@@ -17,8 +17,8 @@ interface LegacyGameState {
     } | { player: number | null; count: number }[];
     dice: number[];
     turn: string;
-    bar: { player1?: number; player2?: number; [key: string]: number | undefined };
-    off: { player1?: number; player2?: number; [key: string]: number | undefined };
+    bar: { player1?: number; player2?: number;[key: string]: number | undefined };
+    off: { player1?: number; player2?: number;[key: string]: number | undefined };
     cubeValue?: number;
     cubeOwner?: string | null;
     validMoves?: any[];
@@ -47,7 +47,7 @@ export const mapGameStateToBoardState = (
     // Helper to determine color from player ID or number
     const getColor = (playerId: string | number | null | undefined): Color => {
         if (playerId === null || playerId === undefined) return 'light';
-        
+
         // Numeric player ID (1 or 2)
         if (playerId === 1) return 'light';
         if (playerId === 2) return 'dark';
@@ -71,10 +71,10 @@ export const mapGameStateToBoardState = (
             // Bot is always dark (player 2)
             return 'dark';
         }
-        
+
         // Fallback: Check if it's the current user
         if (playerIdStr === myId) return 'light';
-        
+
         // Default to dark for opponent/bot
         return 'dark';
     };
@@ -105,7 +105,7 @@ export const mapGameStateToBoardState = (
     if (gameState.bar) {
         // Vérifier si on a le format player1/player2
         const hasPlayerFormat = typeof gameState.bar.player1 === 'number' || typeof gameState.bar.player2 === 'number';
-        
+
         if (hasPlayerFormat) {
             // Utiliser le format player1/player2 uniquement
             if (typeof gameState.bar.player1 === 'number' && gameState.bar.player1 > 0) {
@@ -153,7 +153,7 @@ export const mapGameStateToBoardState = (
     if (gameState.off) {
         // Vérifier si on a le format player1/player2
         const hasPlayerFormat = typeof gameState.off.player1 === 'number' || typeof gameState.off.player2 === 'number';
-        
+
         if (hasPlayerFormat) {
             // Utiliser le format player1/player2 uniquement
             if (typeof gameState.off.player1 === 'number' && gameState.off.player1 > 0) {
@@ -197,14 +197,14 @@ export const mapGameStateToBoardState = (
     }
 
     // Map Dice
-    const diceValues = gameState.dice && gameState.dice.length >= 2 
+    const diceValues = gameState.dice && gameState.dice.length >= 2
         ? [gameState.dice[0], gameState.dice[1]] as [number, number]
         : null;
-    
+
     const dice: DiceState = {
         values: diceValues,
         rolling: false,
-        used: gameState.dice?.length > 2 
+        used: gameState.dice?.length > 2
             ? [gameState.dice[2] === 0, gameState.dice[3] === 0] // Some formats store used state
             : [false, false]
     };
@@ -212,7 +212,7 @@ export const mapGameStateToBoardState = (
     // Map Cube
     const cubeValue = (gameState.cubeValue || 1) as 1 | 2 | 4 | 8 | 16 | 32 | 64;
     let cubeOwner: 'center' | 'light' | 'dark' = 'center';
-    
+
     if (gameState.cubeOwner) {
         const ownerColor = getColor(gameState.cubeOwner);
         cubeOwner = ownerColor;
@@ -228,12 +228,12 @@ export const mapGameStateToBoardState = (
 
     // Calculate Legal Moves dynamically using gameLogic
     const legalMoves: LegalMove[] = [];
-    
+
     // === VALIDATION: Ne pas calculer les moves si c'est le tour du BOT ===
     // Vérifier que players est valide avant d'accéder à ses éléments
-    const isBotTurn = gameState.turn === 'bot' || 
-                      (players && players.length > 1 && players[1] && gameState.turn === players[1].id && players[1].id !== myId);
-    
+    const isBotTurn = gameState.turn === 'bot' ||
+        (players && players.length > 1 && players[1] && gameState.turn === players[1].id && players[1].id !== myId);
+
     // Déterminer si c'est vraiment le tour du joueur humain
     const isMyTurn = !isBotTurn && (
         gameState.turn === myId ||
@@ -243,16 +243,15 @@ export const mapGameStateToBoardState = (
         gameState.turn === null ||
         (players && players.length > 0 && players[0] && gameState.turn === players[0].id)
     );
-    
-    
+
     // Determine current player color (1 or 2)
     // CRITICAL: Map turn to player color correctly
     let currentPlayerColor: PlayerColor;
-    
+
     // If gameState.turn is a player ID, map it correctly
     if (typeof gameState.turn === 'string') {
         const turnStr = gameState.turn;
-        
+
         // Map specific player IDs
         if (turnStr === 'guest' || turnStr === myId) {
             currentPlayerColor = 1; // Light
@@ -277,11 +276,12 @@ export const mapGameStateToBoardState = (
         // If turn is already mapped to 'light' or 'dark'
         currentPlayerColor = turn === 'light' ? 1 : 2;
     }
-    
-    
+
+
     // === BLOCAGE: Ne pas calculer les legal moves si c'est le tour du BOT ===
     if (isBotTurn) {
-        // Retourner avec legalMoves vide
+        // Retourner avec legalMoves vide, mais sans erreur
+        // Le bot calcule ses propres coups via l'API
         return {
             checkers,
             dice,
@@ -290,7 +290,7 @@ export const mapGameStateToBoardState = (
             turn
         };
     }
-    
+
     // Get dice values for move calculation - handle various formats
     let diceForMoves: number[] = [];
     if (gameState.dice) {
@@ -308,19 +308,19 @@ export const mapGameStateToBoardState = (
             }
         }
     }
-    
+
     // Log niveau debug au lieu d'error
     console.debug('[mappers] DICE EXTRACTION:', {
         originalDice: gameState.dice,
         extractedDice: diceForMoves,
         diceLength: diceForMoves.length
     });
-    
+
     // Get points array safely
     const pointsArray = getPointsArray(gameState.board);
-    
+
     // Only calculate moves if we have dice and a valid board
-    
+
     if (diceForMoves.length > 0 && pointsArray.length === 24) {
         try {
             // Convert to BoardState format for getValidMoves
@@ -329,11 +329,11 @@ export const mapGameStateToBoardState = (
             // Vérifier que players est valide et contient les éléments nécessaires
             const player0Id = players && players.length > 0 && players[0] ? players[0].id : null;
             const player1Id = players && players.length > 1 && players[1] ? players[1].id : null;
-            
+
             const boardStateForLogic: { points: Point[]; bar: { player1: number; player2: number }; off: { player1: number; player2: number } } = {
                 points: pointsArray.map((p) => {
                     let mappedPlayer: 1 | 2 | null = null;
-                    
+
                     if (p.player !== null && p.player !== undefined) {
                         // If numeric, use directly
                         if (typeof p.player === 'number' && (p.player === 1 || p.player === 2)) {
@@ -348,7 +348,7 @@ export const mapGameStateToBoardState = (
                             }
                         }
                     }
-                    
+
                     return {
                         player: mappedPlayer,
                         count: p.count || 0
@@ -363,27 +363,27 @@ export const mapGameStateToBoardState = (
                     player2: gameState.off?.player2 || (gameState.off && typeof gameState.off[player1Id || ''] === 'number' ? (gameState.off[player1Id || ''] as number) : 0)
                 }
             };
-            
+
             // Use getValidMoves to calculate all valid moves
             const validMovesMap = getValidMoves(boardStateForLogic, currentPlayerColor, diceForMoves);
-            
+
             // Convert Map to LegalMove array
             validMovesMap.forEach((destinations, fromIndex) => {
                 destinations.forEach((toIndex) => {
                     // Convert from index (-1 or 0-23) to PipIndex | 'bar'
-                    const from: PipIndex | 'bar' = fromIndex === -1 
-                        ? 'bar' 
+                    const from: PipIndex | 'bar' = fromIndex === -1
+                        ? 'bar'
                         : (fromIndex + 1) as PipIndex;
-                    
+
                     // Convert to index (-1, 24, or 0-23) to PipIndex | 'borne'
                     const to: PipIndex | 'borne' = (toIndex === -1 || toIndex === 24)
                         ? 'borne'
                         : (toIndex + 1) as PipIndex;
-                    
+
                     legalMoves.push({ from, to });
                 });
             });
-            
+
         } catch (error) {
             console.warn('[mappers] Error calculating legal moves:', error);
             // Fallback to gameState.validMoves if calculation fails
@@ -391,7 +391,7 @@ export const mapGameStateToBoardState = (
                 gameState.validMoves.forEach((m: any) => {
                     let from: PipIndex | 'bar';
                     let to: PipIndex | 'borne';
-                    
+
                     if (m.bar || m.from === 'bar' || m.from === -1 || m.from === 24) {
                         from = 'bar';
                     } else if (typeof m.from === 'number') {
@@ -399,7 +399,7 @@ export const mapGameStateToBoardState = (
                     } else {
                         from = m.from as PipIndex;
                     }
-                    
+
                     if (m.to === -1 || m.to === 24 || m.to === 'off' || m.to === 'borne') {
                         to = 'borne';
                     } else if (typeof m.to === 'number') {
@@ -407,7 +407,7 @@ export const mapGameStateToBoardState = (
                     } else {
                         to = m.to as PipIndex;
                     }
-                    
+
                     legalMoves.push({ from, to });
                 });
             }
@@ -442,6 +442,6 @@ export const mapMoveToLegacy = (
 ): { from: number; to: number } => {
     const legacyFrom = from === 'bar' ? -1 : (from as number) - 1;
     const legacyTo = to === 'borne' ? -1 : (to as number) - 1;
-    
+
     return { from: legacyFrom, to: legacyTo };
 };

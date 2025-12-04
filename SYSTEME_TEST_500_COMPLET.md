@@ -75,3 +75,4 @@ Le code est maintenant **ultra-protégé** et devrait fonctionner parfaitement m
 
 Le système de test automatisé est prêt. Le jeu peut maintenant être testé en boucle pendant 500 cycles sans risque d'erreurs critiques.
 
+

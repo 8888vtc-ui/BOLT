@@ -184,3 +184,4 @@ Si le tour ne passe pas au bot:
 - Le bot devrait fonctionner en mode réel comme en mode démo
 - Les problèmes peuvent être liés à la détection du tour ou à l'alternance des tours
 
+

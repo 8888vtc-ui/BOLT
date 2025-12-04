@@ -127,3 +127,4 @@ D'après le dashboard Supabase, ces tables existent et nécessitent RLS:
 
 **✅ BASE SUPABASE CONFIRMÉE ET CONFIGURÉE**
 
+

@@ -185,3 +185,4 @@ Si vous rencontrez des problèmes:
 
 **Recommandation**: Utiliser le **Dashboard Supabase** pour la première exécution, puis automatiser avec le CLI pour les futures migrations.
 
+

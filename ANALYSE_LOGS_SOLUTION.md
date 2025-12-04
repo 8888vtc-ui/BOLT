@@ -251,3 +251,4 @@ La solution pour `hasBoard: false` fonctionne correctement :
 2. ✅ **Améliorer les logs** : Afficher les valeurs au lieu de `[object Object]`
 3. ✅ **Tester à nouveau** : Vérifier que l'erreur est corrigée
 
+

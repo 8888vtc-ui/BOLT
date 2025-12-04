@@ -252,3 +252,4 @@ Après intervention, le coach devrait :
 - ✅ Fournir des conseils stratégiques
 - ✅ Fonctionner en français automatiquement
 
+

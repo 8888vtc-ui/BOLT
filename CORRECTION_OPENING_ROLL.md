@@ -84,3 +84,4 @@ const botState = createMockGameState(startingPlayerId, options);
 - Le tour initial est déterminé par le résultat du jeu de départ
 - Le bot jouera automatiquement s'il gagne le jeu de départ
 
+

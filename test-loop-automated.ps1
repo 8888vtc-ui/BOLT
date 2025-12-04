@@ -39,3 +39,4 @@ function Run-Test {
 
 Write-Host "✅ Script de test créé. L'IA va maintenant exécuter les tests." -ForegroundColor Green
 
+

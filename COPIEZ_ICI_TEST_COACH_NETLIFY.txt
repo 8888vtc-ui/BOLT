@@ -76,3 +76,4 @@ Résultats attendus:
 ✅ Réponse coach reçue
 ✅ Temps < 30 secondes
 
+

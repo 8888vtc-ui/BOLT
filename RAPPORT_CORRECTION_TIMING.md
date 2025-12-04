@@ -130,3 +130,4 @@ const performBotMove = async () => {
 
 Le problème de timing est maintenant résolu. Le bot utilise les valeurs à jour du store au lieu des valeurs de closure, ce qui élimine les problèmes de timing avec les `setState` asynchrones.
 
+

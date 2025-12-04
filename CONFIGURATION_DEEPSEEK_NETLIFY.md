@@ -161,3 +161,4 @@ Après configuration et redéploiement:
 - ✅ Les réponses sont en français automatiquement
 - ✅ Pas de problème CORS ou de sécurité
 
+

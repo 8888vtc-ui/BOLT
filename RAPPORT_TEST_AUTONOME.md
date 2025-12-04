@@ -100,3 +100,4 @@ Script minimal pour test rapide : lance dés → clique checker → clique point
 
 
 
+

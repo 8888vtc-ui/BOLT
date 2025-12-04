@@ -45,3 +45,4 @@ Pour confirmer que tout est bien fait, vérifiez dans le dashboard Supabase :
 
 **🎉 Tout est déjà fait ! Pas besoin de refaire !**
 
+

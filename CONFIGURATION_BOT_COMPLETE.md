@@ -258,3 +258,4 @@ Frontend (BOLT)
 - [ ] Bot chat fonctionne
 - [ ] Pas d'erreurs dans les logs
 
+

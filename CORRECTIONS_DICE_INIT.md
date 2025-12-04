@@ -48,3 +48,4 @@ Le jeu devrait maintenant :
 - ✅ Plus d'erreurs "O is null" liées aux joueurs
 - ✅ Plus d'erreurs "legalMovesCount = 0" dues à l'absence de dés
 
+

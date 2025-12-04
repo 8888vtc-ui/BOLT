@@ -66,3 +66,4 @@ Fichiers créés:
 - RAPPORT_MONEY_GAME_3_PARTIES.md (rapport détaillé)
 - COPIEZ_ICI_POUR_OPUS_MONEY_GAME.txt (ce fichier)
 
+

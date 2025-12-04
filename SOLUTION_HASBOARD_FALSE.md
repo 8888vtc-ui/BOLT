@@ -244,3 +244,4 @@ Après ces corrections :
 
 **Résultat attendu**: Plus d'erreur `hasBoard: false` persistante, initialisation complète dès le début.
 
+

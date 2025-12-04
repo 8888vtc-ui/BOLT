@@ -210,3 +210,4 @@ Les améliorations de synchronisation sont **implémentées** et **prêtes pour 
 
 **Prochaine étape** : Tester en conditions réelles et ajuster si nécessaire.
 
+

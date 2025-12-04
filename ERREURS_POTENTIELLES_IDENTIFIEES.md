@@ -30,3 +30,4 @@
 3. Ajouter des vérifications pour `analysis.bestMove` avant la boucle
 4. Ajouter des vérifications pour `move.from`, `move.to`, `move.die` dans la boucle
 
+

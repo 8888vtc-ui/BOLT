@@ -154,3 +154,4 @@ Le coach AI fonctionne correctement via Netlify Function:
 - Le fallback DeepSeek API fonctionne **automatiquement** si Ollama échoue
 - Architecture **robuste** et **sécurisée**
 
+

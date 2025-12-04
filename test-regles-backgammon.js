@@ -106,3 +106,4 @@ if (typeof module !== 'undefined' && module.exports) {
 console.log('Script de test des règles du backgammon chargé');
 console.log('Règles à tester:', Object.keys(regles).length);
 
+

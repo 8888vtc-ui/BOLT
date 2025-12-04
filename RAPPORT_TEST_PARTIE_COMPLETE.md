@@ -199,3 +199,4 @@ Vérifier que le jeu fonctionne correctement de bout en bout:
 - Les détails des objets de log doivent être ouverts pour voir les valeurs exactes
 - Le test peut prendre plusieurs minutes selon la longueur de la partie
 
+

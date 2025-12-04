@@ -77,3 +77,4 @@ console.log('7. Répéter plusieurs tours pour vérifier l\'alternance\n');
 
 console.log('✅ Script de test prêt!');
 
+

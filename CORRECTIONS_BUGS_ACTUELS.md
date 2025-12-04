@@ -117,3 +117,4 @@ if (currentGameState.dice.length === 0) {
 - ✅ **Bug #2**: Corrigé
 - ⏳ **Tests**: En attente
 
+

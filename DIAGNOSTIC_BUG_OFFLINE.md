@@ -100,3 +100,4 @@ Vérifier que:
 3. Vérifier pourquoi les interactions ne fonctionnent pas
 4. Corriger les problèmes identifiés
 
+

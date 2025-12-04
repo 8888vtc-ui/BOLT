@@ -226,3 +226,4 @@ checkersCount: 30  // Pas 31!
 2. ✅ Vérifier qu'il n'y a plus d'erreur null.id
 3. ✅ Valider que l'auto-move fonctionne correctement
 
+

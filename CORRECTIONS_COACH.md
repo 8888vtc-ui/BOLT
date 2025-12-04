@@ -70,3 +70,4 @@ Les corrections ont été appliquées pour améliorer la robustesse du coach :
 
 Le problème principal (erreur 500 serveur Ollama) nécessite une intervention côté serveur.
 
+

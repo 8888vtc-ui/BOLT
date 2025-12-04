@@ -218,3 +218,4 @@ Après redémarrage:
 - Le mode `offline-bot` reste disponible pour l'entraînement solo
 - Tous les autres modes utilisent maintenant Supabase en temps réel
 
+

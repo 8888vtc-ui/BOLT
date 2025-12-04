@@ -12,3 +12,4 @@ console.log(`✅ Tests réussis consécutifs requis: ${REQUIRED_SUCCESS}`);
 
 module.exports = { MAX_TESTS, TEST_INTERVAL, INIT_WAIT, REQUIRED_SUCCESS };
 
+

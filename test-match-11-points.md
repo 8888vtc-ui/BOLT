@@ -57,3 +57,4 @@
 - Fin de partie incorrecte
 - Gammon/Backgammon non détectés
 
+

@@ -195,10 +195,12 @@ export const analyzeMove = async (
         // CRITICAL FIX FOR DOUBLES
         // When dice are doubles (e.g., 3-3), the API returns only 2 unique moves
         // We need to duplicate them to get 4 moves total
-        const isDouble = dice.length === 2 && dice[0] === dice[1];
+        // Improved double detection: handle both [3,3] and [3,3,3,3]
+        const isDouble = (dice.length === 2 && dice[0] === dice[1]) ||
+            (dice.length === 4 && dice[0] === dice[1] && dice[1] === dice[2] && dice[2] === dice[3]);
 
         if (isDouble && bestMoves.length === 2) {
-            addLog('🎲 Doubles detected - duplicating moves', 'info');
+            addLog('🎲 Doubles detected (2 moves returned) - duplicating moves', 'info');
             // Duplicate the moves: [move1, move2] becomes [move1, move2, move1, move2]
             bestMoves = [
                 bestMoves[0],
@@ -232,11 +234,11 @@ export const analyzeMove = async (
                 // Normalisation des coordonnées avec protection
                 let from: number;
                 let to: number;
-                
+
                 try {
                     from = typeof move.from === 'number' ? move.from : parseInt(String(move.from || 0), 10);
                     to = typeof move.to === 'number' ? move.to : parseInt(String(move.to || 0), 10);
-                    
+
                     // Vérifier que from et to sont des nombres valides
                     if (isNaN(from) || isNaN(to)) {
                         addLog(`⚠️ [AI] Invalid coordinates at index ${index}, skipping`, 'warning', { move, from, to });
@@ -246,7 +248,7 @@ export const analyzeMove = async (
                     addLog(`⚠️ [AI] Error parsing move at index ${index}, skipping`, 'warning', { move, error: parseError });
                     return null;
                 }
-                
+
                 const die = move.die !== undefined ? move.die : (move.dieUsed !== undefined ? move.dieUsed : undefined);
 
                 // MAPPING CRITIQUE POUR LE JOUEUR 2 (NOIR)
@@ -279,7 +281,7 @@ export const analyzeMove = async (
                     die
                 };
             }).filter((m: any) => m !== null); // Filtrer les moves invalides
-            
+
             // Protection: vérifier qu'il reste des moves valides
             if (bestMoves.length === 0) {
                 addLog('⚠️ [AI] No valid moves after mapping', 'warning');
@@ -301,7 +303,7 @@ export const analyzeMove = async (
             const strategy = strategicAdvice.recommendedStrategy || 'N/A';
             const analysis = strategicAdvice.analysis || '';
             const riskLevel = strategicAdvice.riskLevel;
-            
+
             explanation += `\n\n🧠 STRATÉGIE: ${typeof strategy === 'string' ? strategy.toUpperCase() : 'N/A'}\n`;
             if (analysis) explanation += `${analysis}\n`;
             if (riskLevel) explanation += `⚠️ Risque: ${riskLevel}\n`;

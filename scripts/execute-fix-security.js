@@ -82,3 +82,4 @@ console.log('pour des raisons de sécurité. Le Dashboard est la méthode recomm
 console.log('✅ Le script SQL est prêt et validé');
 console.log('✅ Suivez les instructions ci-dessus pour l\'exécuter\n');
 
+

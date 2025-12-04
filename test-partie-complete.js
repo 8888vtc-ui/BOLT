@@ -66,3 +66,4 @@ console.log('4. Vérifier que le bot joue automatiquement');
 console.log('5. Vérifier l\'alternance des tours');
 console.log('6. Vérifier qu\'il n\'y a pas d\'erreurs critiques\n');
 
+

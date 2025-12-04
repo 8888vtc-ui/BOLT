@@ -183,3 +183,4 @@ Après déploiement Netlify (quelques minutes) :
 - **Déploiement**: ⏳ En attente (Netlify)
 - **Tests**: ⏳ À effectuer après déploiement
 
+

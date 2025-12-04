@@ -197,3 +197,4 @@ curl -X POST https://botgammon.netlify.app/.netlify/functions/coach \
 - [ ] Test de la fonction réussi
 - [ ] Test depuis le frontend réussi
 
+

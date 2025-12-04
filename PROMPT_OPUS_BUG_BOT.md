@@ -132,3 +132,4 @@ La logique de détection du bot (lignes 976-982) pourrait ne pas fonctionner cor
 **Sévérité**: Critique  
 **Impact**: Le jeu est bloqué en mode offline-bot car le bot ne joue jamais automatiquement. Le joueur doit attendre indéfiniment.
 
+

@@ -38,3 +38,4 @@ Le jeu devrait maintenant :
 - ✅ Plus d'erreurs "legalMovesCount = 0" dues à l'absence de dés
 - ✅ Plus de boucle infinie "C'est mon tour!" sans dés
 
+

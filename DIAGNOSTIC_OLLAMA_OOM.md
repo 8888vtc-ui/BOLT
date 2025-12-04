@@ -125,3 +125,4 @@ Pour vérifier que le fallback fonctionne, observer les logs du client qui devra
 [AI Coach] Using DeepSeek API (fallback)
 ```
 
+

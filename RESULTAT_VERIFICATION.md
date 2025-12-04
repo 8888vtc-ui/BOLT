@@ -65,3 +65,4 @@
 
 **🎉 Félicitations ! Votre base de données Supabase est maintenant complètement sécurisée !**
 
+

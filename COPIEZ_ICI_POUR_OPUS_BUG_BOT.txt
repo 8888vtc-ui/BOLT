@@ -52,3 +52,4 @@ Logs attendus mais absents:
 
 ⚠️ Impact: Critique — Le jeu est bloqué en mode offline-bot
 
+

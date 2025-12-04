@@ -158,3 +158,4 @@ return 'AI Coach is not configured...';
 
 **Action requise**: Vérifier/corriger le serveur Ollama ou configurer le fallback DeepSeek API.
 
+

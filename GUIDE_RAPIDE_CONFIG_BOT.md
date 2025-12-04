@@ -78,3 +78,4 @@ VITE_COACH_API_URL = https://botgammon.netlify.app/.netlify/functions/coach
 - DeepSeek API fonctionne correctement
 - Déjà configuré avec votre clé
 
+

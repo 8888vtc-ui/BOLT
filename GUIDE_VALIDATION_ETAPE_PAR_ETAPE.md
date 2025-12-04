@@ -369,3 +369,4 @@ Une fois toutes les étapes validées :
 2. Vérifier l'état du plateau
 3. Vérifier la logique de calcul des legal moves
 
+

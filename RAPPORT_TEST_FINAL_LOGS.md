@@ -224,3 +224,4 @@ Si le bot ne joue pas:
 3. Vérifier l'alternance des tours
 4. Corriger les problèmes restants si nécessaire
 
+

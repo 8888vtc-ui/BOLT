@@ -312,3 +312,4 @@ Après ces corrections :
 4. ✅ Pas d'erreurs "missing room or gameState"
 5. ✅ Pas d'erreurs "board not ready"
 
+

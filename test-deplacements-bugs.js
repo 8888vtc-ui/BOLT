@@ -28,3 +28,4 @@ const bugReport = {
 console.log('=== TEST DE DÉPLACEMENTS JUSQU\'AU BLOCAGE ===');
 console.log('Ce script documente les bugs trouvés pendant les tests manuels');
 
+

@@ -60,3 +60,4 @@ Le script `FIX_SECURITY_RLS.sql` va:
 **Temps estimé**: 2 minutes  
 **Difficulté**: ⭐ Facile
 
+

@@ -41,3 +41,4 @@ Après exécution, vous devriez voir :
 - ✅ Tous les index créés
 - ✅ Aucune erreur dans le dashboard Supabase
 
+

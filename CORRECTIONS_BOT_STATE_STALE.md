@@ -95,3 +95,4 @@ Le bot devrait maintenant :
 - Alterner correctement les tours avec le joueur
 - Fonctionner correctement avec les doubles (4 mouvements)
 
+

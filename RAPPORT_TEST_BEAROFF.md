@@ -61,3 +61,4 @@
 4. Vérifier le score money game
 5. Vérifier le démarrage automatique de la partie 2
 
+
