@@ -40,7 +40,21 @@ const createMockGameState = (userId?: string, options?: GameOptions): GameState 
         };
     }
 
-    return {
+    // VALIDATION CRITIQUE : S'assurer que le board est toujours valide
+    if (!boardCopy || !boardCopy.points || boardCopy.points.length !== 24) {
+        // Si le board est invalide, le recréer depuis INITIAL_BOARD
+        try {
+            boardCopy = JSON.parse(JSON.stringify(INITIAL_BOARD));
+        } catch (error) {
+            boardCopy = {
+                points: INITIAL_BOARD.points.map(p => ({ ...p })),
+                bar: { ...INITIAL_BOARD.bar },
+                off: { ...INITIAL_BOARD.off }
+            };
+        }
+    }
+
+    const gameState: GameState = {
         board: boardCopy,
         dice: [],
         turn: userId || 'guest', // Le tour est au joueur par défaut (cohérent avec players[0].id)
@@ -53,6 +67,18 @@ const createMockGameState = (userId?: string, options?: GameOptions): GameState 
         currentPlayer: 1,
         pendingDouble: null
     };
+
+    // VALIDATION FINALE : Vérifier que le board est bien présent
+    if (!gameState.board || !gameState.board.points || gameState.board.points.length !== 24) {
+        console.error('[createMockGameState] Board invalide après création, forçage INITIAL_BOARD');
+        gameState.board = {
+            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+            bar: { ...INITIAL_BOARD.bar },
+            off: { ...INITIAL_BOARD.off }
+        };
+    }
+
+    return gameState;
 };
 
 const createMockRooms = (): Room[] => [];
@@ -457,12 +483,34 @@ export const useGameSocket = () => {
                     }
                 }
 
+                // VALIDATION FINALE AVANT UPDATE : S'assurer que le board est toujours valide
+                if (!botState.board || !botState.board.points || botState.board.points.length !== 24) {
+                    addLog(`❌ [JOIN_ROOM] Board invalide AVANT updateGame, FORCAGE FINAL`, 'error', {
+                        hasBoard: !!botState.board,
+                        hasPoints: !!botState.board?.points,
+                        pointsLength: botState.board?.points?.length
+                    });
+                    try {
+                        botState.board = JSON.parse(JSON.stringify(INITIAL_BOARD));
+                    } catch (error) {
+                        botState.board = {
+                            points: INITIAL_BOARD.points.map(p => ({ ...p })),
+                            bar: { ...INITIAL_BOARD.bar },
+                            off: { ...INITIAL_BOARD.off }
+                        };
+                    }
+                    addLog(`✅ [JOIN_ROOM] Board FORCÉ AVANT updateGame`, 'success');
+                }
+
                 // UPDATE GAME IMMÉDIATEMENT (synchrone) - CRITIQUE pour éviter écran noir
                 updateGame(botState);
                 addLog(`✅ [JOIN_ROOM] Terminé (bot offline) - INSTANTANÉ - Room et GameState définis`, 'success', {
                     roomSet: true,
                     gameStateSet: true,
-                    hasBoard: !!botState.board
+                    hasBoard: !!botState.board,
+                    hasPoints: !!botState.board?.points,
+                    pointsLength: botState.board?.points?.length,
+                    boardValid: botState.board && botState.board.points && botState.board.points.length === 24
                 });
                 return;
             }
@@ -1307,14 +1355,18 @@ export const useGameSocket = () => {
                             // Refuser = Abandonner, l'adversaire gagne
                             const pointsWon = currentGameState.cubeValue;
                             const newScore = { ...currentGameState.score };
-                            newScore[currentGameState.pendingDouble.offeredBy] = (newScore[currentGameState.pendingDouble.offeredBy] || 0) + pointsWon;
+                            // Vérifier que pendingDouble et offeredBy existent avant d'accéder
+                            if (currentGameState.pendingDouble && currentGameState.pendingDouble.offeredBy) {
+                                newScore[currentGameState.pendingDouble.offeredBy] = (newScore[currentGameState.pendingDouble.offeredBy] || 0) + pointsWon;
+                            }
 
                             const newState = {
                                 ...currentGameState,
                                 score: newScore,
                                 pendingDouble: null,
                                 dice: [],
-                                turn: currentGameState.pendingDouble.offeredBy
+                                // Vérifier que pendingDouble et offeredBy existent avant d'accéder
+                                turn: currentGameState.pendingDouble?.offeredBy || currentGameState.turn
                             };
                             updateGame(newState);
 
