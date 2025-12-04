@@ -1618,7 +1618,8 @@ export const useGameSocket = () => {
                                     moves: analysis.bestMove.map((m: any) => `${m.from}→${m.to}`)
                                 });
 
-                                // Play ALL moves in the sequence, en attendant la confirmation de chaque coup
+                                // Play ALL moves in the sequence, en récupérant le state à jour après chaque mouvement
+                                // CRITICAL FIX: Récupérer le state à jour après chaque mouvement pour éviter d'utiliser des dés déjà consommés
                                 for (let i = 0; i < analysis.bestMove.length; i++) {
                                     const move = analysis.bestMove[i];
 
@@ -1628,9 +1629,26 @@ export const useGameSocket = () => {
                                         continue;
                                     }
 
+                                    // CRITICAL FIX: Récupérer le state à jour AVANT chaque mouvement
+                                    // Le state peut avoir changé après le mouvement précédent
+                                    const latestStore = useGameStore.getState();
+                                    const latestGameState = latestStore.gameState || currentGameState;
+                                    
+                                    // Protection: vérifier que dice existe et n'est pas vide
+                                    if (!latestGameState.dice || !Array.isArray(latestGameState.dice) || latestGameState.dice.length === 0) {
+                                        addLog(`🤖 Bot: No dice available for move ${i + 1}, stopping`, 'error', {
+                                            moveIndex: i,
+                                            totalMoves: analysis.bestMove.length,
+                                            dice: latestGameState.dice,
+                                            diceLength: latestGameState.dice?.length || 0
+                                        });
+                                        break; // Arrêter la boucle, plus de dés disponibles
+                                    }
+
                                     addLog(`🤖 Bot: Playing move ${i + 1}/${analysis.bestMove.length}: ${move.from} -> ${move.to}`, 'info', {
                                         move: { from: move.from, to: move.to, die: move.die },
-                                        availableDice: currentGameState.dice || []
+                                        availableDice: latestGameState.dice || [],
+                                        diceBefore: latestGameState.dice.length
                                     });
 
                                     // Attendre un peu avant chaque coup pour la visualisation
@@ -1638,14 +1656,16 @@ export const useGameSocket = () => {
 
                                     // Envoyer le coup avec le die fourni par l'API
                                     // IMPORTANT: On passe 'die' explicitement dans le payload
+                                    // CRITICAL FIX: Attendre que sendGameAction soit terminé pour s'assurer que le state est mis à jour
                                     // Protection: vérifier que from et to sont valides avant d'envoyer
                                     if (move.from !== undefined && move.to !== undefined) {
                                         try {
-                                            sendGameAction('move', {
+                                            await sendGameAction('move', {
                                                 from: move.from,
                                                 to: move.to,
                                                 die: move.die
                                             }, 2);
+                                            addLog(`🤖 Bot: Move ${i + 1} sent and processed`, 'success');
                                         } catch (moveError: any) {
                                             addLog(`🤖 Bot: Error sending move ${i + 1}, skipping`, 'error', moveError);
                                             continue; // Passer au mouvement suivant
@@ -1655,12 +1675,30 @@ export const useGameSocket = () => {
                                         continue;
                                     }
 
-                                    // Attendre que le state se mette à jour avant le prochain coup
+                                    // CRITICAL FIX: Attendre que le state se mette à jour et récupérer le nouveau state
                                     // On attend un peu plus pour les doubles
                                     const waitTime = analysis.bestMove.length > 2 ? 1200 : 1000;
                                     await new Promise(r => setTimeout(r, waitTime));
 
-                                    // Vérifier que le coup a été appliqué (dice devrait diminuer)
+                                    // CRITICAL FIX: Récupérer le state à jour APRÈS le mouvement
+                                    // Pour vérifier que le mouvement a été appliqué et que les dés ont été consommés
+                                    const updatedStore = useGameStore.getState();
+                                    const updatedGameState = updatedStore.gameState;
+                                    
+                                    if (updatedGameState) {
+                                        addLog(`🤖 Bot: Move ${i + 1} applied, dice remaining: ${updatedGameState.dice?.length || 0}`, 'info', {
+                                            moveIndex: i,
+                                            diceAfter: updatedGameState.dice?.length || 0,
+                                            dice: updatedGameState.dice || []
+                                        });
+                                        
+                                        // Si plus de dés disponibles, arrêter la boucle
+                                        if (!updatedGameState.dice || updatedGameState.dice.length === 0) {
+                                            addLog(`🤖 Bot: No more dice after move ${i + 1}, stopping`, 'info');
+                                            break;
+                                        }
+                                    }
+
                                     // Si on a encore des dés et qu'on n'est pas au dernier coup, continuer
                                     if (i < analysis.bestMove.length - 1) {
                                         // Attendre un peu plus pour la synchronisation
@@ -1669,6 +1707,29 @@ export const useGameSocket = () => {
                                 }
 
                                 addLog('🤖 Bot: All moves completed', 'success');
+                                
+                                // CRITICAL FIX: Libérer les flags après que tous les mouvements soient terminés
+                                // Attendre un peu pour s'assurer que le state est complètement mis à jour
+                                await new Promise(r => setTimeout(r, 500));
+                                
+                                // Récupérer le state final pour vérifier que tout est correct
+                                const finalStore = useGameStore.getState();
+                                const finalGameState = finalStore.gameState;
+                                
+                                if (finalGameState) {
+                                    addLog('🤖 Bot: Final state check', 'info', {
+                                        turn: finalGameState.turn,
+                                        diceRemaining: finalGameState.dice?.length || 0,
+                                        dice: finalGameState.dice || []
+                                    });
+                                    
+                                    // Si plus de dés, le tour devrait avoir changé
+                                    if (!finalGameState.dice || finalGameState.dice.length === 0) {
+                                        addLog('🤖 Bot: All dice consumed, turn should switch', 'info', {
+                                            currentTurn: finalGameState.turn
+                                        });
+                                    }
+                                }
                             } else {
                                 addLog('🤖 Bot: No moves found or turn done.', 'warning');
                                 // Force turn switch if no moves possible
